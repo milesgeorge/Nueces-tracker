@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nueces Reach Model v2 — Uvalde ↔ Three Rivers</title>
+<script>
+/* early error reporter — shows any script error on-screen (helps debug phones) */
+window.addEventListener('error',function(e){
+  try{
+    var d=document.getElementById('errbar');
+    if(!d){d=document.createElement('div');d.id='errbar';
+      d.style.cssText='position:fixed;top:0;left:0;right:0;background:#7a1220;color:#fff;font:12px/1.4 monospace;padding:7px 11px;z-index:99999;white-space:pre-wrap';
+      (document.body||document.documentElement).appendChild(d);}
+    var msg=(e.message||'error')+'  ['+((e.filename||'').split('/').pop())+':'+(e.lineno||'?')+']';
+    d.textContent='⚠ Startup error — send George this line:\n'+msg;
+  }catch(_){}
+},true);
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
+<style>
+  :root{--ink:#1d2430;--mut:#6b7684;--rule:#d3d9e0;--red:#c1272d;--grn:#0f8a5f;--amb:#b9770a;--blu:#1a6f8b;--bg:#f6f8fa;--card:#fff;--water:#2f8fd0}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:15px;line-height:1.45}
+  header{background:linear-gradient(180deg,#12202e,#20374b);color:#fff;padding:16px 18px}
+  header h1{margin:0;font-size:19px}header p{margin:4px 0 0;font-size:12px;color:#b9c6d3}
+  .wrap{max-width:840px;margin:0 auto;padding:14px}
+  .card{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:14px 15px;margin:12px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .card h2{margin:0 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut)}
+  .card .sub{font-size:12px;color:var(--mut);margin:0 0 10px}
+  label{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}
+  input,select{width:100%;padding:9px 10px;border:1px solid var(--rule);border-radius:8px;background:#fff;font:inherit}
+  input[type=range]{padding:0}
+  .row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1;min-width:110px}
+  button{cursor:pointer;border:none;border-radius:8px;padding:9px 13px;font-weight:600;color:#fff;background:var(--ink);font:inherit}
+  button.sm{background:#374151;padding:7px 11px;font-size:13px;font-weight:500}
+  button.add{background:var(--grn)}
+  .regbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .regbtn{border:2px solid var(--rule);background:#fff;color:var(--ink);border-radius:10px;padding:9px;text-align:left;font-weight:600;font-size:13px}
+  .regbtn small{display:block;font-weight:400;color:var(--mut);font-size:11px;margin-top:2px}
+  .regbtn.on{border-color:var(--red);background:#fdf1f1}
+  .chain{display:flex;gap:6px;align-items:stretch}
+  .node{flex:1;border:1px solid var(--rule);border-radius:9px;padding:8px 5px;text-align:center;background:#fafbfc}
+  .node.ranch{border-color:var(--red);background:#fdf1f1}
+  .node .nm{font-size:10px;color:var(--mut);text-transform:uppercase}
+  .node .vv{font-size:17px;font-weight:700}.node .ex{font-size:10px;color:var(--mut)}
+  .arrow{align-self:center;color:var(--mut);font-size:14px}
+  #alert{border-radius:12px;padding:15px;color:#fff;text-align:center;margin-bottom:8px}
+  #alert .lvl{font-size:19px;font-weight:800}#alert .msg{font-size:13px;margin-top:4px;opacity:.95}
+  .big{font-size:27px;font-weight:800;text-align:center}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+  th,td{text-align:left;padding:5px 7px;border-bottom:1px solid var(--rule)}
+  th{font-size:10.5px;color:var(--mut);text-transform:uppercase}
+  .locrow td{vertical-align:middle}
+  .tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;color:#fff}
+  .learn{background:#f0f7f2;border:1px solid #bfe0cc;border-radius:8px;padding:9px 11px;font-size:12.5px;margin-top:8px}
+  .foot{font-size:11px;color:var(--mut);margin:16px 4px 40px}
+  svg{width:100%;height:auto;display:block}
+  #map{height:340px;border-radius:10px;border:1px solid var(--rule);margin-top:4px}
+  .modal{position:fixed;inset:0;background:rgba(10,15,22,.55);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px}
+  .modal .box{background:#fff;border-radius:14px;max-width:420px;width:100%;padding:18px}
+  .modal h3{margin:0 0 10px;font-size:16px}
+  .help{font-size:11px;color:var(--mut);margin-top:3px}
+  .leaflet-popup-content{font-size:12px}
+  .locLabel{background:rgba(20,30,40,.72);border:none;color:#fff;font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;box-shadow:none}
+  .locLabel:before{display:none}
+  #histTable tbody tr:hover{background:#f2f6fa}
+  .ladderHdr{font-size:11px;color:var(--mut);margin-bottom:6px}
+  .ladderWrap{border:1px solid var(--rule);border-radius:10px;overflow:hidden;max-height:420px;overflow-y:auto}
+  .lrow{display:flex;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid #eef1f4}
+  .lrow:last-child{border-bottom:none}
+  .lrow.wet{background:#eaf4fb}
+  .ldot{width:12px;height:12px;border-radius:50%;flex:none;box-shadow:0 0 0 2px #fff}
+  .lname{flex:1;font-weight:600;font-size:13.5px}
+  .lelev{color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums}
+  .ltag{color:#fff;font-weight:700;font-size:12px;padding:2px 9px;border-radius:20px;white-space:nowrap;min-width:72px;text-align:center}
+  .wline{position:relative;height:0;border-top:2px solid var(--water);margin:0}
+  .wlab{position:absolute;left:50%;top:-11px;transform:translateX(-50%);background:var(--water);color:#fff;font-size:11px;font-weight:700;padding:2px 12px;border-radius:20px;white-space:nowrap}
+  .tracksites{font-size:17px;font-weight:700;color:#eaf2f8;margin-top:5px;letter-spacing:.2px}
+  .tracksites b{color:#ffd7d3}
+  .tagline{margin:6px 0 0;font-size:12.5px;color:#b9c6d3;max-width:560px}
+  .help-btn{flex:none;background:#2f5068;color:#fff;border:1px solid #4a6c85;border-radius:9px;padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .qhelp{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#d3d9e0;color:#38414d;font-size:11px;font-weight:800;margin-left:7px;cursor:pointer;vertical-align:middle}
+  .qhelp:hover{background:#1a6f8b;color:#fff}
+  .help-body{max-height:82vh;overflow:auto}
+  .help-body h3{margin:16px 0 4px;font-size:15px;color:#12202e}
+  .help-body h3:first-child{margin-top:0}
+  .help-body p{margin:4px 0 8px;font-size:13px;color:#38414d}
+  .help-body .k{color:#c1272d;font-weight:700}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;max-width:820px;margin:0 auto">
+    <div>
+      <h1>Nueces Reach Model — Miles Ranch</h1>
+      <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
+      <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
+    </div>
+    <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
+  </div>
+</header>
+<div class="wrap">
+
+  <!-- 1 CHAIN -->
+  <div class="card">
+    <h2>1 · The gauge chain — your early-warning ladder</h2>
+    <p class="sub">Each gauge upstream buys lead time. In 2026 Asherton crested 7/19, Cotulla 7/22 — ranch ~7/27–29. Watching Asherton = 8–10 days notice.</p>
+    <div class="chain">
+      <div class="node"><div class="nm">Uvalde</div><div class="vv" id="nUvl">—</div><div class="ex">~10 d up</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="nm">Asherton</div><div class="vv" id="nAsh">—</div><div class="ex">~8 d up</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="nm">Cotulla</div><div class="vv" id="nCot">—</div><div class="ex">~5 d up</div></div>
+      <div class="arrow">→</div>
+      <div class="node ranch"><div class="nm">RANCH</div><div class="vv" id="nRanch" style="font-size:13px">—</div><div class="ex" id="nRanchEx">modeled · no gauge</div></div>
+      <div class="arrow">→</div>
+      <div class="node"><div class="nm">Tilden</div><div class="vv" id="nTil">—</div><div class="ex">~1 d down</div></div>
+    </div>
+    <button class="sm" style="width:100%;margin-top:10px" onclick="fetchChain()">↻ Refresh gauges now</button>
+    <div class="sub" id="chainNote" style="margin-top:6px">Auto-updates every 15 min while open. If your phone blocks it, type the Tilden stage in Section 3.</div>
+    <div style="margin-top:6px;font-size:12px">View live on NOAA ↗
+      <a href="https://water.noaa.gov/gauges/UVLT2" target="_blank" rel="noopener">Uvalde</a> ·
+      <a href="https://water.noaa.gov/gauges/ASRT2" target="_blank" rel="noopener">Asherton</a> ·
+      <a href="https://water.noaa.gov/gauges/COTT2" target="_blank" rel="noopener">Cotulla</a> ·
+      <a href="https://water.noaa.gov/gauges/TILT2" target="_blank" rel="noopener">Tilden</a> ·
+      <a href="https://water.noaa.gov/gauges/THET2" target="_blank" rel="noopener">Three Rivers</a>
+    </div>
+  </div>
+
+  <!-- 2 MECHANISM -->
+  <div class="card">
+    <h2>2 · Which kind of flood? (mechanism)</h2>
+    <p class="sub">Depth math is identical for all. Predicting the crest from upstream depends on the mechanism. <b>Auto</b> reads it from the live gauges; tap any button to override for a what-if.</p>
+    <div id="autoNote" style="border-radius:8px;padding:8px 11px;font-size:12.5px;margin-bottom:8px"></div>
+    <div class="regbtns" id="regBtns"></div>
+    <div class="sub" id="regNote" style="margin-top:8px"></div>
+    <label style="margin-top:8px">Antecedent channel state (manual helper)</label>
+    <select id="antec" onchange="suggestRegime()">
+      <option value="dry">Bone dry — channel at ~0 flow for days (2026 case)</option>
+      <option value="wet">Some baseflow / recently wet</option>
+      <option value="raining">Actively raining in the reach right now</option>
+      <option value="tropic">Tropical system / rain basin-wide</option>
+    </select>
+  </div>
+
+  <!-- 3 FORECAST + LOCATIONS -->
+  <div class="card">
+    <h2>3 · Forecast &amp; your locations</h2>
+    <p class="sub">Set a predicted <b>Cotulla</b> crest and the mechanism translates it to a <b>Tilden</b> crest — or drag the Tilden slider directly for what-ifs.</p>
+
+    <label style="margin-top:2px">Predicted Cotulla crest (upstream input): <b><span id="cotVal">29.0</span> ft</b></label>
+    <input id="cotCrest" type="range" min="14" max="33" step="0.1" value="29.0" oninput="onCotulla()">
+
+    <div style="background:#fdf1f1;border:1px solid var(--red);border-radius:10px;padding:10px 12px;margin-top:12px">
+      <div style="font-size:13px;color:var(--mut)">PREDICTED TILDEN CREST</div>
+      <div style="font-size:34px;font-weight:800;color:var(--red);line-height:1.1"><span id="crestVal">22.0</span> ft
+        <span id="crestBand" style="font-size:13px;font-weight:600;color:var(--mut)"></span></div>
+      <input id="crest" type="range" min="14" max="28" step="0.1" value="22.0" oninput="onTilden()" style="margin-top:6px">
+    </div>
+    <div style="background:#f2f6fa;border:1px solid var(--rule);border-radius:8px;padding:8px 11px;margin-top:8px;font-size:12px;color:#38414d">
+      <b>Note:</b> the crest is set by you, not auto-pulled. A live gauge only shows the <i>current</i> stage — which sits below the peak both while the river rises and while it falls — so auto-filling it would give a confidently wrong forecast. The gauges and mechanism are data; the crest is your judgment. It's seeded to the mechanism's historic band as a starting point.
+    </div>
+
+    <div class="big" id="ranchWSE" style="margin-top:12px">—</div>
+    <div class="sub" style="text-align:center">predicted water-surface elevation at the ranch (ft NAVD88)</div>
+    <div id="alertBox" style="margin-top:10px"></div>
+
+    <div id="ladderBox" style="margin-top:8px"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px;flex-wrap:wrap">
+      <input id="scenName" placeholder="name this scenario" style="flex:1;min-width:140px">
+      <button class="sm" onclick="saveScen()">💾 Save scenario</button>
+    </div>
+    <div id="scenList" style="margin-top:6px"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+      <b style="font-size:13px">Locations</b>
+      <button class="add sm" onclick="openLoc()">＋ Add location</button>
+    </div>
+    <table id="locTable"><thead><tr><th>name</th><th>ground</th><th>status now</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <!-- 4 SATELLITE MAP -->
+  <div class="card">
+    <h2>4 · Satellite map</h2>
+    <p class="sub">Markers turn <span style="color:var(--red)"><b>red</b></span> when the current scenario floods them, <span style="color:var(--grn)"><b>green</b></span> when dry. <b>Tap the map</b> to drop a new location (fills the Add form for you).</p>
+    <div id="map"></div>
+    <div class="sub" id="mapNote" style="margin-top:6px">Esri satellite imagery. Needs internet for tiles; everything else works offline.</div>
+  </div>
+
+  <!-- 5 REACH PROFILE -->
+  <div class="card">
+    <h2>5 · Reach profile</h2>
+    <p class="sub">Water surface down the whole chain, with flood status, travel time between gauges, and the wave's current position.</p>
+    <div id="profileSvg"></div>
+  </div>
+
+  <!-- 6 TEACH -->
+  <div class="card">
+    <h2>6 · Teach the model — log a real sighting</h2>
+    <p class="sub">Tell it where the water actually is. It converts your report into a measured “water rise above the gauge,” then re-fits its slope so every estimate matches reality. New spots you report here are saved into your Locations list above.</p>
+    <div class="row">
+      <div><label>Who is reporting</label><input id="oWho" placeholder="name"></div>
+      <div><label>Where — pick a saved location…</label><select id="oWhere" onchange="onWhere()"></select></div>
+    </div>
+    <div id="newLocFields" style="display:none">
+      <div class="row">
+        <div><label>New location name</label><input id="oName" placeholder="e.g. north crossing"></div>
+      </div>
+      <div class="row">
+        <div><label>latitude</label><input id="oLat" type="number" step="0.000001" placeholder="28.2300"></div>
+        <div><label>longitude</label><input id="oLon" type="number" step="0.000001" placeholder="-98.6487"></div>
+        <div><label>ground elev (ft) <span class="help">auto</span></label><input id="oGe" type="number" step="0.1" placeholder="auto"></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <div><label>When was it observed? <span class="help">leave blank = now; set it for a call-in from earlier</span></label>
+        <input id="oWhen" type="datetime-local"></div>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <div><label>Water depth at that spot (ft, 0 = just reaching ground)</label><input id="oDep" type="number" step="0.1" placeholder="0"></div>
+      <div><label>Tilden gauge reading at that time (ft)</label><input id="oTil" type="number" step="0.1" placeholder="auto or type"></div>
+    </div>
+    <div style="margin-top:6px">
+      <button class="sm" onclick="autoTilden()">⤓ Auto-fill Tilden gauge from NOAA</button>
+      <span class="sub" id="tilNote" style="margin-left:6px"></span>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><button class="add sm" style="width:100%" onclick="addSight()">＋ Add sighting &amp; re-fit</button></div>
+      <div><button class="sm" style="width:100%" onclick="resetSight()">↺ Reset to seed</button></div>
+      <div><button class="sm" style="width:100%" onclick="exportSight()">⬇ Export CSV</button></div>
+    </div>
+    <div class="learn" id="learnBox"></div>
+    <div id="impactBox" style="font-size:12.5px;margin-top:6px"></div>
+    <table id="sightTable"><thead><tr><th>time</th><th>who</th><th>where</th><th>dist. above gauge</th><th>water rise above gauge</th><th></th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <!-- 7 HISTORICAL -->
+  <div class="card">
+    <h2>7 · Historical context — every flood on record</h2>
+    <p class="sub">The full Tilden flood record (crests ≥ flood stage, 1935–2026). Your scenario is ranked against all of them. Tap any event for its story and a compare/contrast to what you're watching now. <b>★</b> = benchmark flood with full detail.</p>
+    <button class="sm" style="margin-bottom:8px" onclick="fetchCrests()">↻ Update record from NOAA</button>
+    <span class="sub" id="crestFetchNote"></span>
+    <div id="histRank" style="text-align:center;margin:6px 0 6px"></div>
+    <div id="histExplain" style="background:#f2f6fa;border:1px solid var(--rule);border-radius:8px;padding:9px 11px;font-size:12.5px;margin-bottom:10px"></div>
+    <div id="histDetail"></div>
+    <div style="max-height:360px;overflow:auto;border:1px solid var(--rule);border-radius:8px">
+      <table id="histTable"><thead><tr><th>#</th><th>year</th><th>Tilden</th><th>flow</th><th>mechanism</th><th>at the ranch</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <div class="foot">
+    <b>Engine.</b> Water elevation at a point = Tilden stage + 183.10 + (slope × river-miles that point sits above the gauge). Depth = that − ground (USGS 3DEP LiDAR). “Slope” starts at 1.36 ft per river-mile (fit to the 2013 ranch marks) and <b>re-fits by weighted least-squares every time you log a sighting</b>. “Water rise above gauge” (offset) = ground + observed depth − 183.10 − gauge reading — the one number the model learns. Mechanism buttons set the crest band from historic analogs (2026 dry-routed, 2018 wet-routed, 2002/2013 local-rain, 1967 Beulah tropical). Custom coordinates carry ±3 ft until a nearby sighting tightens them. <b>Decision aid only — defer to official NWS/NOAA warnings for life-safety.</b>
+  </div>
+</div>
+
+<!-- ADD/EDIT LOCATION MODAL -->
+<div class="modal" id="locModal">
+  <div class="box">
+    <h3 id="locModalTitle">Add location</h3>
+    <input type="hidden" id="mId">
+    <label>Common name / nickname</label>
+    <input id="mName" placeholder="e.g. river pump, north gate">
+    <div class="row">
+      <div><label>latitude</label><input id="mLat" type="number" step="0.000001" placeholder="28.2300" onchange="maybeAutoElev()"></div>
+      <div><label>longitude</label><input id="mLon" type="number" step="0.000001" placeholder="-98.6487" onchange="maybeAutoElev()"></div>
+    </div>
+    <label>Surface elevation (ft NAVD88)</label>
+    <input id="mElev" type="number" step="0.1" placeholder="auto-calculated from USGS">
+    <div class="help">Leave blank and tap “Auto” to pull it from USGS LiDAR, or type a known value to override.</div>
+    <div class="row" style="margin-top:12px">
+      <div><button class="sm" style="width:100%" onclick="autoElev()">⛰ Auto elevation</button></div>
+      <div><button class="add" style="width:100%" onclick="saveLoc()">Save</button></div>
+      <div><button class="sm" style="width:100%;background:#8a1f1f" onclick="closeLoc()">Cancel</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- HELP / READ-ME MODAL -->
+<div class="modal" id="helpModal">
+  <div class="box" style="max-width:640px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">How to use this model</h3>
+      <div>
+        <button class="sm" onclick="printHelp()">🖨 Print / Save PDF</button>
+        <button class="sm" style="background:#8a1f1f" onclick="closeHelp()">Close</button>
+      </div>
+    </div>
+    <div class="help-body" id="helpBody" style="margin-top:10px">
+      <p id="help-top"><b>What this is.</b> The Miles Ranch sits in the ungauged 100-mile reach between the Cotulla and Tilden river gauges, so NOAA forecasts <i>at</i> those gauges but not on your land. This tool bridges that gap: it reads the live gauges and translates them into a predicted water depth and timing at any point on the ranch, calibrated on the confirmed 2013 high-water marks. It is a <span class="k">decision aid — official NWS/NOAA warnings always govern life-safety.</span></p>
+
+      <h3 id="help-s1">1 · The gauge chain</h3>
+      <p>The row of gauges from the Hill Country down to Three Rivers. Each one upstream is earlier warning — Asherton crests ~8 days before the ranch, Cotulla ~5. The gauges show <b>stage in feet</b> (height on that gauge). The <b>Ranch</b> box has no gauge, so it shows its <b>current</b> modeled status from the live Tilden reading (DRY / RISING / HIGH / FLOODING / FLOODED) — this is “now,” not a forecast. The <i>forecast</i> for a predicted crest lives in Section 3. Gauges auto-update every 15 minutes; the links open the official NOAA pages.</p>
+
+      <h3 id="help-s2">2 · Which kind of flood (mechanism)</h3>
+      <p>The same amount of water behaves very differently depending on how the flood is made. <b>Auto</b> reads the mechanism from the live gauges (mainly the Tilden-vs-Cotulla flow ratio) and picks it for you, explaining why. Tap any button to <b>override</b> for a “what-if” — e.g. force “local rain” or “tropical” to stress-test. A green banner means auto; amber means you’ve overridden, with a link back to auto. Amplifying regimes (local rain, tropical) are the dangerous ones — the ranch can flood even when upstream looks modest.</p>
+
+      <h3 id="help-s3">3 · Forecast &amp; your locations</h3>
+      <p>Slide the <b>Cotulla crest</b> and the mechanism converts it to a predicted <b>Tilden crest</b> (the big red number) — or drag the Tilden slider directly for free what-ifs. Below, the big number is the predicted <b>water-surface elevation at the ranch</b>. The <b>ladder</b> lists every location high-to-low; the blue line is the water surface, rows above it stay dry (green), rows below flood (red) with the depth. <b>Save scenario</b> stores a crest+mechanism you can reload later. <b>＋ Add location</b> lets you add any spot by coordinates with an auto-fetched ground elevation.</p>
+
+      <h3 id="help-s4">4 · Satellite map</h3>
+      <p>Your locations on aerial imagery, colored <span style="color:#0f8a5f"><b>green</b></span> (dry) or <span style="color:#c1272d"><b>red</b></span> (flooded) for the current scenario. <b>Tap the map</b> anywhere to drop a new location — it grabs the coordinates and fetches the elevation for you.</p>
+
+      <h3 id="help-s5">5 · Reach profile</h3>
+      <p>A side-view of the water surface down the whole chain. Pills between gauges are travel time; ⚠ marks a gauge above flood stage; kcfs is live flow; 🌊 is the wave’s current position.</p>
+
+      <h3 id="help-s6">6 · Teach the model</h3>
+      <p>This is what makes it smarter over time. When someone sees where the water actually is, log it: who, where, the water depth there, and the current Tilden reading. The tool converts that into a measured “water rise above the gauge” and <b>re-fits its slope</b> so every estimate matches reality. New spots you report are saved into your Locations list. Edit or delete any sighting to recalculate. In shared (Firebase) mode, sightings go to an admin for approval before they move the shared model.</p>
+
+      <h3 id="help-s7">7 · Historical context</h3>
+      <p>Every Tilden flood on record since 1935, ranked against your scenario, with a plain-English read of where it sits. <b>★</b> marks the five benchmark floods with full detail. <b>Tap any event</b> for its story and a compare/contrast to what you’re watching. After a flood ends and NOAA logs the official crest, press <b>“Update record from NOAA”</b> to pull it in.</p>
+
+      <h3>Does it refresh itself?</h3>
+      <p>Yes. The gauges auto-pull when you open it and re-pull every 15 minutes while the tab is open, and the forecast, ladder, map and mechanism all recompute in place — no page reload needed. In shared (Firebase) mode, approved sightings appear live for everyone. Your locations, sightings and saved scenarios are stored on your device and <b>persist</b> across reloads (they are not auto-cleared). Use the button below to wipe them.</p>
+
+      <h3>A note on accuracy</h3>
+      <p>Saved ranch features carry about ±1.2 ft (calibrated on 2013); a brand-new custom coordinate carries about ±3 ft until a nearby sighting tightens it. The forecast assumes no fresh rain falls <i>in</i> the reach — if that changes, switch the mechanism to “local rain” and watch for sightings to confirm.</p>
+
+      <p style="margin-top:14px"><button class="sm" style="background:#8a1f1f" onclick="resetAll()">🗑 Reset all my saved data</button> <span class="help">clears your locations, sightings and scenarios on this device (does not touch shared/Firebase data)</span></p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= constants ================= */
+const TIL_ZERO=183.10, SIN=2.2;
+const TILG={lat:28.30889,lon:-98.55724};
+const GAUGES={UVLT2:'nUvl',ASRT2:'nAsh',COTT2:'nCot',TILT2:'nTil'};
+const GAUGE_FLOOD={Uvalde:null,Asherton:20,Cotulla:15,Tilden:14,'3 Rivers':25};
+const REG={
+ dry:   ["Dry-channel routed","attenuates hard · slow · 2026",22.0,20.5,23.5,6],
+ wet:   ["Wet-channel routed","mild attenuation · 2018-style",23.2,22.0,24.5,4],
+ rain:  ["Local rain on the reach","AMPLIFIES · fast · 2002/2013",24.5,23.5,26.0,1.5],
+ tropic:["Tropical / whole-basin","highest · Beulah-class · house at risk",26.5,25.0,28.0,1],
+};
+let REGSEL='dry';
+const RANCH_SEED={rm:18.0,off:24.4,w:1.0};
+/* full Tilden flood record (USGS/NWPS 08194500), crests >= flood stage 14 ft.
+   [stage, year, dateLabel, flow_cfs, mechanism, benchmarkKey|null] */
+const HIST=[
+ [26.57,'1967','Sep 1967',76500,'tropical','beulah'],
+ [23.70,'1935','Jun 1935',0,'multi','y1935'],
+ [23.50,'2013','Oct 2013',36000,'rain','y2013'],
+ [23.45,'2002','Jul 19 2002',35400,'rain','y2002'],
+ [23.29,'2002','Jul 16 2002',33803,'rain',null],
+ [23.18,'2003','Oct 2003',0,'rain',null],
+ [23.14,'2002','Sep 2002',32234,'rain',null],
+ [22.85,'2022','Aug 2022',21300,'routed',null],
+ [22.76,'2022','Aug 2022',20864,'routed',null],
+ [22.00,'1942','Jul 1942',0,'multi',null],
+ [21.60,'2007','Jul 2007',19540,'rain',null],
+ [21.19,'2017','Oct 2017',10061,'routed',null],
+ [21.04,'2018','Oct 2018',10444,'wet',null],
+ [20.87,'2002','Sep 2002',15008,'rain',null],
+ [20.65,'2015','May 30 2015',14215,'rain',null],
+ [20.62,'1980','Aug 1980',13800,'routed',null],
+ [20.57,'2002','Jul 11 2002',13492,'rain',null],
+ [20.43,'1982','May 1982',12900,'routed',null],
+ [20.04,'1987','Jun 1987',11200,'routed',null],
+ [19.48,'1981','May 1981',8810,'routed',null],
+ [19.13,'2018','Sep 2018',5748,'wet',null],
+ [19.01,'1985','Oct 1985',6490,'routed',null],
+ [18.98,'2004','Jul 2004',7071,'routed',null],
+ [18.79,'1997','Jul 1997',6490,'routed',null],
+ [18.77,'2015','May 22 2015',6422,'rain',null],
+ [18.66,'1990','Jul 20 1990',9040,'routed',null],
+ [18.56,'1985','May 1985',5040,'routed',null],
+ [18.38,'1981','Jun 1981',5380,'routed',null],
+ [18.33,'1992','May 1992',5250,'routed',null],
+ [18.10,'1981','Oct 1981',4720,'routed',null],
+ [18.02,'1985','Nov 1985',3980,'routed',null],
+ [17.97,'2002','Jul 2 2002',4455,'rain',null],
+ [17.53,'1984','Oct 1984',3790,'routed',null],
+ [17.45,'2004','Dec 2004',0,'routed',null],
+ [17.40,'1987','Jun 1987',3260,'routed',null],
+ [17.18,'1981','May 1981',3320,'routed',null],
+ [16.87,'1986','Jun 1986',2800,'routed',null],
+ [16.65,'1985','Jan 1985',2780,'routed',null],
+ [16.56,'1992','Feb 1992',2700,'routed',null],
+ [16.54,'2013','Jul 2013',2792,'routed',null],
+ [16.13,'2010','Jul 2010',2349,'routed',null],
+ [15.98,'1991','Dec 1991',2240,'routed',null],
+ [15.97,'2016','Oct 2016',2747,'routed',null],
+ [15.82,'2007','Jun 2007',2162,'routed',null],
+ [15.56,'2021','Jun 2021',2464,'routed',null],
+ [15.40,'1995','Nov 1995',2040,'routed',null],
+ [15.20,'1983','Sep 1983',1870,'routed',null],
+ [14.30,'2004','May 2004',0,'routed',null],
+];
+/* rich detail for the benchmark floods (from the Five-Floods comparison) */
+const BENCH={
+ beulah:{name:'Hurricane Beulah, Sep 1967',mech:'Tropical / whole-basin',cot:'16.6 ft / 7,050 cfs',vol:'589,000 AF',rec:'24 %/day',days:'15 d',wse:'234.1 ft',house:'YES — the only flood on record to reach the house',note:'Rain fell on the entire basin at once; nothing had to route. Highest crest in 90+ years, 2.9 ft above anything else. Drained fast for its size (single hurricane pulse).'},
+ y1935:{name:'June 1935',mech:'Multi-pulse season',cot:'32.4 ft / 82,600 cfs (Cotulla record)',vol:'—',rec:'—',days:'—',wse:'231.2 ft',house:'no (≈1.8 ft freeboard)',note:'A flood SEASON, not one event — the gauge dates across stations don\'t line up for a single wave. Huge at Cotulla; reached the hunting camp on the ranch. No USGS discharge at Tilden — the 23.7 ft is a historical estimate.'},
+ y2013:{name:'October 2013',mech:'Local rain (amplifying)',cot:'22.8 ft / 17,569 cfs',vol:'342,000 AF',rec:'17 %/day',days:'16 d',wse:'231.0 ft',house:'no (≈2.0 ft freeboard)',note:'CONFIRMED by the landowner to have reached the hunting camp and the Elm Creek line — the event the whole model is calibrated on. A modest Cotulla flood AMPLIFIED ×1.44 by rain falling in the reach.'},
+ y2002:{name:'July 2002',mech:'Local rain (amplifying)',cot:'21.6 ft / 18,228 cfs',vol:'605,000 AF',rec:'22 %/day',days:'24 d',wse:'230.9 ft',house:'no (≈2.1 ft freeboard)',note:'Amplified ×1.7 by local rain. Part of a multi-crest season — THREE separate crests reached the hunting-camp level in 2002 alone. Longest duration above minor of the benchmarks.'},
+ y2026:{name:'July 2026 (this event)',mech:'Routed / dry channel',cot:'29.05 ft / ~56,600 cfs',vol:'~600,000 AF (routing)',rec:'~12 %/day',days:'~21 d',wse:'see scenario',house:'no',note:'The driest-antecedent, highest-loss routed flood in the record. Cotulla crested HIGHER than 2002 or 2013, yet the ranch will likely see LESS water — 100 mi of dry channel ate ~250,000 AF with zero delivered to Tilden. Attenuates ×~0.5.'},
+};
+const SEED_LOCS=[
+ {id:'wl',name:'Water well',lat:28.232449,lon:-98.649910,elev:217.77,seed:true},
+ {id:'pad',name:'Wellhead pad #1H',lat:28.229967,lon:-98.657433,elev:225.53,seed:true},
+ {id:'elm',name:'Elm Creek reach line',lat:28.229573,lon:-98.648039,elev:228.57,seed:true},
+ {id:'pens',name:'Back pens / tractor shed',lat:28.231282,lon:-98.649992,elev:229.58,seed:true},
+ {id:'camp',name:'Hunting camp area',lat:28.230443,lon:-98.650272,elev:230.58,seed:true},
+ {id:'garcia',name:'Garcia old home',lat:28.231268,lon:-98.647425,elev:230.70,seed:true},
+ {id:'house',name:'The house',lat:28.229990,lon:-98.648663,elev:232.96,seed:true},
+];
+
+/* ================= geometry + adaptive slope ================= */
+function miAB(a,b){const dy=(b.lat-a.lat)*69.05,dx=(b.lon-a.lon)*69.05*Math.cos(a.lat*Math.PI/180);return Math.hypot(dx,dy);}
+function riverMi(pt){return miAB(TILG,pt)*SIN;}
+function sights(){try{return JSON.parse(localStorage.getItem('nueces_v2_s')||'[]')}catch(e){return[]}}
+function saveS(a){localStorage.setItem('nueces_v2_s',JSON.stringify(a));}
+function anchors(){return [RANCH_SEED,...sights().map(s=>({rm:s.rm,off:s.off,w:2.0}))];}
+function slope(){let n=0,d=0;for(const a of anchors()){n+=a.w*a.off*a.rm;d+=a.w*a.rm*a.rm;}return d>0?n/d:1.356;}
+function offsetAt(rm){return slope()*rm;}
+function wseAt(loc,crest){return TIL_ZERO+crest+offsetAt(riverMi(loc));}
+
+/* ================= location store ================= */
+function locs(){try{const u=JSON.parse(localStorage.getItem('nueces_v2_loc')||'null');return u||SEED_LOCS.slice();}catch(e){return SEED_LOCS.slice();}}
+function saveLocs(a){localStorage.setItem('nueces_v2_loc',JSON.stringify(a));}
+
+/* ================= gauge fetch ================= */
+async function fetchChain(){
+  document.getElementById('chainNote').textContent='Fetching…';let ok=0;
+  for(const[lid,el]of Object.entries(GAUGES)){
+    try{const g=await fetch('https://api.water.noaa.gov/nwps/v1/gauges/'+lid).then(r=>r.json());
+      const v=g.status.observed.primary;document.getElementById(el).textContent=(+v).toFixed(1);
+      if(g.status.observed.secondary!=null)CHAINFLOW[lid]=g.status.observed.secondary;
+      if(lid==='TILT2')document.getElementById('oTil').value=v;ok++;
+    }catch(e){document.getElementById(el).textContent='—';}
+  }
+  document.getElementById('chainNote').textContent=ok?`${ok}/4 gauges live · updated ${new Date().toLocaleTimeString()} · auto-refreshes every 15 min`:'Live fetch blocked (offline or opened as a file) — type the Tilden stage into Section 6.';
+  if(AUTO)applyAuto(); else render();
+}
+
+/* ================= mechanism ================= */
+let AUTO=true;
+const rb=document.getElementById('regBtns');
+Object.entries(REG).forEach(([k,v])=>{const b=document.createElement('button');b.className='regbtn'+(k===REGSEL?' on':'');b.id='rb_'+k;b.innerHTML=`${v[0]}<small>${v[1]}</small>`;b.onclick=()=>pickReg(k);rb.appendChild(b);});
+function selectReg(k){REGSEL=k;document.querySelectorAll('.regbtn').forEach(x=>x.classList.remove('on'));document.getElementById('rb_'+k).classList.add('on');
+  const v=REG[k];
+  document.getElementById('regNote').innerHTML=`<b>${v[0]}.</b> Historic crest band for a big Cotulla: <b>${v[3]}–${v[4]} ft</b> at Tilden, reaches the ranch in ~${v[5]} day(s). `+((k==='rain'||k==='tropic')?'<span style="color:#c1272d">Amplifying regime — the danger case; the ranch can flood even when the gauge looks modest.</span>':'');
+  onCotulla();}
+function pickReg(k){AUTO=false;selectReg(k);paintAuto();}       // user override
+function suggestRegime(){AUTO=false;selectReg({dry:'dry',wet:'wet',raining:'rain',tropic:'tropic'}[document.getElementById('antec').value]);paintAuto();}
+function backToAuto(){AUTO=true;applyAuto();}
+
+/* read the mechanism from the live gauges */
+function detectMechanism(){
+  const cotF=CHAINFLOW.COTT2, tilF=CHAINFLOW.TILT2;
+  const cotS=gval('nCot'), tilS=gval('nTil');
+  const cotUp=(cotF!=null&&cotF>3)||(cotS!=null&&cotS>=15);
+  if(!cotUp) return {reg:REGSEL,reason:'No significant upstream flood right now — nothing to classify.',conf:'idle'};
+  if(tilF!=null&&tilF>1&&cotF!=null&&cotF>1){
+    const r=tilF/cotF;
+    if(r>1.2) return {reg:'rain',reason:`Tilden flow (${tilF.toFixed(0)}k) is ${r.toFixed(1)}× Cotulla (${cotF.toFixed(0)}k) — the reach is ADDING water: local rain, amplifying.`,conf:'high'};
+    if(r>=0.6) return {reg:'wet',reason:`Tilden÷Cotulla flow = ${r.toFixed(2)} — mild loss: wet-channel routed.`,conf:'high'};
+    return {reg:'dry',reason:`Tilden÷Cotulla flow = ${r.toFixed(2)} — heavy loss: dry-channel routed.`,conf:'high'};
+  }
+  if(tilS!=null&&tilS<5) return {reg:'dry',reason:`Cotulla up (${cotF!=null?cotF.toFixed(0)+'k cfs':cotS+' ft'}) but Tilden still ~${tilS} ft — wave being absorbed by a dry channel.`,conf:'med'};
+  return {reg:REGSEL,reason:'Not enough signal yet — holding current pick.',conf:'low'};
+}
+function applyAuto(){const d=detectMechanism();selectReg(d.reg);paintAuto(d);}
+function paintAuto(d){
+  const el=document.getElementById('autoNote');
+  if(AUTO){d=d||detectMechanism();
+    el.style.background='#eef7f1';el.style.border='1px solid #bfe0cc';
+    el.innerHTML=`🛰 <b>Auto-detect:</b> ${REG[d.reg][0]}. <span style="color:#38414d">${d.reason}</span>`+
+      (d.conf==='idle'||d.conf==='low'?' <span style="color:#98a2ad">(Fetch live gauges for a firmer read.)</span>':'');
+  } else {
+    el.style.background='#fff6e6';el.style.border='1px solid #b9770a';
+    el.innerHTML=`✋ <b>Manual override:</b> ${REG[REGSEL][0]}. `+
+      `<a href="javascript:void(0)" onclick="backToAuto()" style="font-weight:700">↩ back to Auto</a>`;
+  }
+}
+
+/* ================= render ================= */
+function alertFor(t){
+  if(t<2.5)return{lvl:'DRY / STANDBY',msg:'Wave not yet arrived. Watch for the first move off ~1.9 ft.',c:'#4b5563'};
+  if(t<5)return{lvl:'WAVE ARRIVING',msg:'Begin staging stock & equipment. ~a day before the low floodplain.',c:'#1a6f8b'};
+  if(t<10)return{lvl:'MOVE NOW',msg:'~5–8 h to water over the back pens. Get off the floodplain.',c:'#b9770a'};
+  if(t<15)return{lvl:'URGENT — GET OUT',msg:'~2–4 h to the back pens; access closing.',c:'#c1272d'};
+  return{lvl:'FLOODPLAIN CUT OFF',msg:'Nueces, Winn Lake Slue, and Elm Creek all flooded.',c:'#7a1220'};
+}
+/* Cotulla → Tilden transfer factor by mechanism (ft Tilden per ft Cotulla above 29) */
+const COTK={dry:0.35,wet:0.45,rain:0.6,tropic:0.7};
+function onCotulla(){
+  const cot=parseFloat(document.getElementById('cotCrest').value);
+  document.getElementById('cotVal').textContent=cot.toFixed(1);
+  const v=REG[REGSEL], center=v[2], k=COTK[REGSEL];
+  let til=center+(cot-29.0)*k;
+  til=Math.max(14,Math.min(28,til));
+  document.getElementById('crest').value=til.toFixed(1);
+  render();
+}
+function onTilden(){render();}   // dragging Tilden directly is a free what-if
+function render(){
+  const crest=parseFloat(document.getElementById('crest').value);
+  document.getElementById('crestVal').textContent=crest.toFixed(1);
+  const v=REG[REGSEL];document.getElementById('crestBand').textContent=`(band ${v[3]}–${v[4]})`;
+  const wseR=TIL_ZERO+crest+offsetAt(18.0);
+  document.getElementById('ranchWSE').textContent=wseR.toFixed(1)+' ft';
+  // Section 1 RANCH node = CURRENT conditions from the live Tilden gauge (not the forecast crest)
+  const nowStage=gval('nTil');
+  const rn=document.getElementById('nRanch'), rx=document.getElementById('nRanchEx');
+  if(nowStage!=null){
+    const nowWSE=TIL_ZERO+nowStage+offsetAt(18.0);
+    const lowest=Math.min.apply(null, locs().map(l=>l.elev));   // water well = first to flood
+    const margin=lowest-nowWSE;                                 // + = dry headroom, − = depth over low ground
+    const ns = nowStage<2.5?['DRY','#cfe0ee']:nowStage<5?['RISING','#8fd0f0']:nowStage<10?['HIGH','#ffcf8a']:nowStage<15?['FLOODING','#ff9b9b']:['FLOODED','#ff8080'];
+    rn.textContent=ns[0]; rn.style.color=ns[1];
+    rx.textContent = margin>0 ? 'now · dry, '+margin.toFixed(1)+' ft to flood' : 'now · '+(-margin).toFixed(1)+' ft on low ground';
+    rn.title='modeled water surface ≈'+nowWSE.toFixed(0)+' ft NAVD88 (elevation, not depth)';
+  } else { rn.textContent='—'; rn.style.color='#cfe0ee'; rx.textContent='no gauge data'; }
+  // Section 3 alert = PREDICTION for the chosen crest (clearly labeled, so it isn't read as "now")
+  const A=alertFor(crest);
+  document.getElementById('alertBox').innerHTML=`<div id="alert" style="background:${A.c}">`+
+    `<div style="font-size:11px;font-weight:700;opacity:.9;letter-spacing:.3px">PREDICTED IF TILDEN CRESTS AT ${crest.toFixed(1)} FT</div>`+
+    `<div class="lvl">${A.lvl}</div><div class="msg">${A.msg}</div></div>`;
+  drawLadder(crest);drawProfile(crest);renderLocs(crest);updateMap(crest);renderHist(crest);renderScen();
+}
+
+/* ---- historical ranking (full record, clickable) ---- */
+function ranchOutcome(crest){
+  const camp=locs().find(l=>l.id==='camp'),pens=locs().find(l=>l.id==='pens'),house=locs().find(l=>l.id==='house'),pad=locs().find(l=>l.id==='pad');
+  const w=TIL_ZERO+crest+offsetAt(18.0);
+  if(house&&w>house.elev)return['HOUSE flooded','#7a1220'];
+  if(camp&&w>camp.elev)return['over hunting camp','#c1272d'];
+  if(pens&&w>pens.elev)return['over back pens','#c1272d'];
+  if(pad&&w>pad.elev)return['pad & low ground','#b9770a'];
+  return['low draw only','#0f8a5f'];
+}
+const MECHNAME={tropical:'Tropical',rain:'Local rain',routed:'Routed',wet:'Wet routed',multi:'Multi-pulse'};
+/* live-updatable copy of the record (merges NOAA crests, persists) */
+let HISTX = (function(){try{const u=JSON.parse(localStorage.getItem('nueces_v2_hist')||'null');return u||HIST.map(h=>h.slice());}catch(e){return HIST.map(h=>h.slice());}})();
+async function fetchCrests(){
+  const note=document.getElementById('crestFetchNote');note.textContent=' fetching…';
+  try{
+    const g=await fetch('https://api.water.noaa.gov/nwps/v1/gauges/TILT2').then(r=>r.json());
+    const cr=(g.flood&&g.flood.crests&&g.flood.crests.historic)||[];
+    let added=0;
+    cr.forEach(c=>{
+      const st=+c.stage; if(!(st>=14))return;
+      const yr=(c.occurredTime||'').slice(0,4);
+      const dl=(c.occurredTime||'').slice(0,10);
+      const exists=HISTX.some(h=>h[1]===yr && Math.abs(h[0]-st)<0.06);
+      if(!exists){HISTX.push([st,yr,dl,+c.flow||0,'—',null]);added++;}
+    });
+    HISTX.sort((a,b)=>b[0]-a[0]);
+    localStorage.setItem('nueces_v2_hist',JSON.stringify(HISTX));
+    note.textContent = added? ` added ${added} new crest(s) from NOAA.` : ' record already current.';
+    render();
+  }catch(e){note.textContent=' fetch blocked by browser — open water.noaa.gov/gauges/TILT2 to view crests.';}
+}
+function renderHist(crest){
+  const rows=HISTX.map(h=>({s:h[0],y:h[1],dl:h[2],f:h[3],m:h[4],bk:h[5]}));
+  const all=[...rows,{s:crest,now:true}].sort((a,b)=>b.s-a.s);
+  const rank=all.findIndex(x=>x.now)+1,N=all.length,below=N-rank;
+  document.getElementById('histRank').innerHTML=
+    `<span style="font-size:24px;font-weight:800">#${rank} of ${N}</span> `+
+    `<span style="color:#6b7684">— higher than ${below} of the ${N-1} floods on record</span>`;
+  // current-flood explanation
+  const v=REG[REGSEL], near=rows.slice().sort((a,b)=>Math.abs(a.s-crest)-Math.abs(b.s-crest))[0];
+  const out=ranchOutcome(crest);
+  document.getElementById('histExplain').innerHTML=
+    `<b>Reading this scenario:</b> a ${crest.toFixed(1)} ft Tilden crest under the <b>${v[0].toLowerCase()}</b> mechanism. `+
+    `That ranks #${rank} of ${N} since 1935 and puts water <b style="color:${out[1]}">${out[0]}</b> on the ranch. `+
+    `Closest historical match: <b>${near.y} (${near.s.toFixed(1)} ft)</b>. `+
+    (REGSEL==='dry'?'An attenuating routed flood — a big Cotulla crest arriving diminished across a dry channel, so the ranch sees less than the upstream size suggests.':
+     REGSEL==='rain'||REGSEL==='tropic'?'An amplifying flood — rain in the reach itself, so the ranch can flood even when upstream looks modest. The high-risk pattern.':
+     'A routed flood with a partly-wet channel — moderate attenuation between Cotulla and the ranch.');
+  // full table, clickable
+  const b=document.querySelector('#histTable tbody');b.innerHTML='';
+  // scenario marker row
+  const tr0=document.createElement('tr');tr0.style.background='#fdf1f1';
+  tr0.innerHTML=`<td><b>#${rank}</b></td><td><b>▶ NOW</b></td><td><b>${crest.toFixed(2)} ft</b></td><td>—</td><td>${MECHNAME[REGSEL==='rain'?'rain':REGSEL==='tropic'?'tropical':REGSEL==='wet'?'wet':'routed']}</td><td style="color:${out[1]}">${out[0]}</td>`;
+  b.appendChild(tr0);
+  rows.forEach((r)=>{const rk=all.findIndex(x=>!x.now&&x.s===r.s&&x.y===r.y)+1;const o=ranchOutcome(r.s);
+    const tr=document.createElement('tr');tr.style.cursor='pointer';
+    tr.onclick=()=>showFloodDetail(r,crest);
+    const star=r.bk?' ★':'';
+    tr.innerHTML=`<td>${rk}</td><td>${r.y}${star}<br><span style="color:#98a2ad;font-size:10px">${r.dl}</span></td>`+
+      `<td><b>${r.s.toFixed(2)}</b></td><td>${r.f?(r.f/1000).toFixed(0)+'k':'—'}</td>`+
+      `<td>${MECHNAME[r.m]||'—'}</td><td style="color:${o[1]}">${o[0]}</td>`;
+    b.appendChild(tr);});
+}
+function showFloodDetail(r,crest){
+  const d=document.getElementById('histDetail');
+  const o=ranchOutcome(r.s), oc=ranchOutcome(crest);
+  const dd=r.s-crest;
+  let rich='';
+  if(r.bk&&BENCH[r.bk]){const B=BENCH[r.bk];
+    rich=`<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:12px;margin-top:6px">`+
+     `<div style="color:#6b7684">Mechanism</div><div>${B.mech}</div>`+
+     `<div style="color:#6b7684">Cotulla peak</div><div>${B.cot}</div>`+
+     `<div style="color:#6b7684">Event volume</div><div>${B.vol}</div>`+
+     `<div style="color:#6b7684">Recession</div><div>${B.rec}</div>`+
+     `<div style="color:#6b7684">Days ≥ minor</div><div>${B.days}</div>`+
+     `<div style="color:#6b7684">Ranch water surface</div><div>${B.wse}</div>`+
+     `<div style="color:#6b7684">Flooded house?</div><div>${B.house}</div></div>`+
+     `<div style="font-size:12px;margin-top:8px;color:#38414d">${B.note}</div>`;
+  }
+  d.innerHTML=`<div style="border:1px solid #c9d0d8;border-left:4px solid #c1272d;border-radius:8px;padding:11px 13px;margin-bottom:10px;background:#fff">`+
+    `<div style="display:flex;justify-content:space-between"><b style="font-size:14px">${r.bk&&BENCH[r.bk]?BENCH[r.bk].name:r.dl+' — '+r.y}</b>`+
+    `<span onclick="document.getElementById('histDetail').innerHTML=''" style="cursor:pointer;color:#98a2ad">✕</span></div>`+
+    `<div style="font-size:12.5px;margin-top:4px">Tilden crest <b>${r.s.toFixed(2)} ft</b>${r.f?` · ${(r.f/1000).toFixed(1)}k cfs`:''} · put water <b style="color:${o[1]}">${o[0]}</b> on the ranch.</div>`+
+    rich+
+    `<div style="background:#f2f6fa;border-radius:6px;padding:8px 10px;margin-top:9px;font-size:12.5px">`+
+    `<b>vs. what you're watching (${crest.toFixed(1)} ft):</b> this event was <b>${Math.abs(dd)<0.05?'the same height':(dd>0?dd.toFixed(1)+' ft HIGHER':Math.abs(dd).toFixed(1)+' ft LOWER')}</b>. `+
+    `It reached <b style="color:${o[1]}">${o[0]}</b>; your scenario reaches <b style="color:${oc[1]}">${oc[0]}</b>.</div></div>`;
+  d.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ---- saved scenarios ---- */
+function scens(){try{return JSON.parse(localStorage.getItem('nueces_v2_scen')||'[]')}catch(e){return[]}}
+function saveScenStore(a){localStorage.setItem('nueces_v2_scen',JSON.stringify(a));}
+function saveScen(){const nm=document.getElementById('scenName').value.trim()||('scenario '+(scens().length+1));
+  const a=scens();a.unshift({id:'sc'+Date.now(),name:nm,crest:parseFloat(document.getElementById('crest').value),reg:REGSEL});
+  saveScenStore(a);document.getElementById('scenName').value='';renderScen();}
+function loadScen(id){const s=scens().find(x=>x.id===id);if(!s)return;selectReg(s.reg);document.getElementById('crest').value=s.crest;render();}
+function delScen(id){saveScenStore(scens().filter(x=>x.id!==id));renderScen();}
+function renderScen(){const el=document.getElementById('scenList');const a=scens();
+  if(!a.length){el.innerHTML='<span style="color:#98a2ad;font-size:11.5px">No saved scenarios yet. Set a crest + mechanism, name it, and Save.</span>';return;}
+  el.innerHTML=a.map(s=>`<span style="display:inline-flex;align-items:center;gap:4px;background:#eef2f5;border:1px solid #d3d9e0;border-radius:20px;padding:3px 4px 3px 10px;margin:2px 4px 2px 0;font-size:12px">`+
+    `<b onclick="loadScen('${s.id}')" style="cursor:pointer">${s.name}</b> <span style="color:#6b7684">${s.crest.toFixed(1)}ft·${s.reg}</span> `+
+    `<span onclick="delScen('${s.id}')" style="cursor:pointer;color:#8a1f1f;font-weight:700;padding:0 4px">✕</span></span>`).join('');
+}
+
+/* ---- HTML row ladder: each location one aligned row; water line sits between
+        the last-dry and first-wet rows with a centered label. Scales & scrolls. ---- */
+function drawLadder(crest){
+  const L=locs().slice().sort((a,b)=>b.elev-a.elev);   // highest at top
+  const wseR=TIL_ZERO+crest+offsetAt(18.0);
+  let html='';
+  let lineDrawn=false;
+  L.forEach((l,i)=>{
+    const d=wseR-l.elev, under=d>0, c=under?'#c1272d':'#0f8a5f';
+    // draw the water line just above the first underwater row
+    if(under && !lineDrawn){
+      html+=`<div class="wline"><span class="wlab">💧 water surface ${wseR.toFixed(1)} ft</span></div>`;
+      lineDrawn=true;
+    }
+    html+=`<div class="lrow${under?' wet':''}">`+
+      `<span class="ldot" style="background:${c}"></span>`+
+      `<span class="lname">${l.name}</span>`+
+      `<span class="lelev">${l.elev.toFixed(1)} ft</span>`+
+      `<span class="ltag" style="background:${c}">${under?d.toFixed(1)+' ft under':(-d).toFixed(1)+' ft dry'}</span>`+
+      `</div>`;
+  });
+  if(!lineDrawn){ // water below everything
+    html+=`<div class="wline"><span class="wlab">💧 water surface ${wseR.toFixed(1)} ft — below all points</span></div>`;
+  }
+  document.getElementById('ladderBox').innerHTML=
+    `<div class="ladderHdr">Highest at top. Rows above the blue line stay dry (green); below it flood (red).</div>`+
+    `<div class="ladderWrap">${html}</div>`;
+}
+
+/* ---- reach profile with overlays ---- */
+function gval(id){const t=document.getElementById(id).textContent;return t==='—'||t==='?'?null:parseFloat(t);}
+let CHAINFLOW={};   // filled by fetchChain: {ASRT2:kcfs,...}
+function drawProfile(crest){
+  const W=800,H=234,padB=64,padT=44;
+  const wseR=TIL_ZERO+crest+offsetAt(18.0);
+  const nodes=[
+   {n:'Uvalde',x:0.00,e:520,g:gval('nUvl'),f:CHAINFLOW.UVLT2},
+   {n:'Asherton',x:0.20,e:470,g:gval('nAsh'),f:CHAINFLOW.ASRT2},
+   {n:'Cotulla',x:0.42,e:397,g:gval('nCot'),f:CHAINFLOW.COTT2},
+   {n:'RANCH',x:0.62,e:wseR,g:null,f:null},
+   {n:'Tilden',x:0.80,e:TIL_ZERO+crest,g:gval('nTil'),f:CHAINFLOW.TILT2},
+   {n:'3 Rivers',x:1.00,e:140,g:null,f:null},
+  ];
+  const segLabel=['~2 d','~3 d','~5 d','~1 d','~2 d'];   // between consecutive nodes
+  const xs=v=>44+v*(W-88), lo=120,hi=545, ys=e=>H-padB-(e-lo)/(hi-lo)*(H-padT-padB);
+  let path='',dots='',labs='',segl='';
+  nodes.forEach((p,i)=>{const x=xs(p.x),y=ys(p.e);path+=(i?'L':'M')+x+' '+y+' ';});
+  // travel-time labels at segment midpoints, ON the line
+  for(let i=0;i<nodes.length-1;i++){
+    const xm=(xs(nodes[i].x)+xs(nodes[i+1].x))/2, ym=(ys(nodes[i].e)+ys(nodes[i+1].e))/2;
+    segl+=`<rect x="${xm-15}" y="${ym-19}" width="30" height="13" rx="6" fill="#fff" stroke="#d3d9e0"/>`;
+    segl+=`<text x="${xm}" y="${ym-9}" font-size="8.5" fill="#6b7684" text-anchor="middle">${segLabel[i]}</text>`;
+  }
+  nodes.forEach(p=>{const x=xs(p.x),y=ys(p.e);
+    const fl=GAUGE_FLOOD[p.n],flooding=(p.g!=null&&fl!=null&&p.g>=fl);
+    const c=p.n==='RANCH'?'#c1272d':(flooding?'#c1272d':'#20374b');
+    dots+=`<circle cx="${x}" cy="${y}" r="${p.n==='RANCH'?6:4.5}" fill="${c}"/>`;
+    if(flooding)dots+=`<circle cx="${x}" cy="${y}" r="9" fill="none" stroke="#c1272d" stroke-width="1.5" opacity=".6"/>`;
+    labs+=`<text x="${x}" y="${y-9}" font-size="9" fill="${c}" text-anchor="middle">${p.e.toFixed(0)} ft</text>`;
+    labs+=`<text x="${x}" y="${H-32}" font-size="10.5" font-weight="600" fill="#1d2430" text-anchor="middle">${p.n}</text>`;
+    let sub = p.g!=null ? `${p.g.toFixed(1)} ft${flooding?' ⚠':''}` : (p.n==='RANCH'?'predicted':'');
+    labs+=`<text x="${x}" y="${H-19}" font-size="9" font-weight="700" fill="${flooding?'#c1272d':(p.n==='RANCH'?'#c1272d':'#0f8a5f')}" text-anchor="middle">${sub}</text>`;
+    if(p.f!=null)labs+=`<text x="${x}" y="${H-8}" font-size="8.5" fill="#6b7684" text-anchor="middle">${(+p.f).toFixed(0)} kcfs</text>`;
+  });
+  let front=null;nodes.forEach(p=>{const fl=GAUGE_FLOOD[p.n];if(p.g!=null&&fl!=null&&p.g>=fl)front=p;});
+  let wave='';if(front){const x=xs(front.x),y=ys(front.e);wave=`<text x="${x}" y="${y+20}" font-size="14" text-anchor="middle">🌊</text>`;}
+  const leg=`<text x="44" y="16" font-size="10" fill="#6b7684">Water-surface elevation down the reach</text>`+
+    `<text x="44" y="30" font-size="9" fill="#98a2ad">pills = travel time between gauges · ⚠ = gauge above flood stage · kcfs = live flow · 🌊 = wave front now</text>`;
+  document.getElementById('profileSvg').innerHTML=`<svg viewBox="0 0 ${W} ${H}"><path d="${path}" fill="none" stroke="#9fb0c0" stroke-width="1.5" stroke-dasharray="4 3"/>${segl}${dots}${labs}${wave}${leg}</svg>`;
+}
+
+/* ---- location table ---- */
+function renderLocs(crest){
+  const b=document.querySelector('#locTable tbody');b.innerHTML='';
+  locs().sort((a,b)=>a.elev-b.elev).forEach(l=>{
+    const wse=wseAt(l,crest), d=wse-l.elev, under=d>0;
+    const tag=under?`<span class="tag" style="background:#c1272d">${d.toFixed(1)}′ under</span>`:`<span class="tag" style="background:#0f8a5f">${(-d).toFixed(1)}′ dry</span>`;
+    const tr=document.createElement('tr');tr.className='locrow';
+    tr.innerHTML=`<td>${l.name}</td><td>${l.elev.toFixed(1)}</td><td>${tag}</td>`+
+      `<td style="white-space:nowrap"><button class="sm" style="padding:4px 8px" onclick="openLoc('${l.id}')">edit</button> ${l.seed?'':`<button class="sm" style="padding:4px 8px;background:#8a1f1f" onclick="delLoc('${l.id}')">✕</button>`}</td>`;
+    b.appendChild(tr);
+  });
+  refreshWhere();
+}
+
+/* ================= location modal ================= */
+function openLoc(id){const m=document.getElementById('locModal');document.getElementById('mId').value=id||'';
+  const L=locs();const l=id?L.find(x=>x.id===id):null;
+  document.getElementById('locModalTitle').textContent=l?'Edit location':'Add location';
+  document.getElementById('mName').value=l?l.name:'';document.getElementById('mLat').value=l?l.lat:'';
+  document.getElementById('mLon').value=l?l.lon:'';document.getElementById('mElev').value=l?l.elev:'';
+  m.style.display='flex';}
+function closeLoc(){document.getElementById('locModal').style.display='none';}
+function maybeAutoElev(){const lat=parseFloat(document.getElementById('mLat').value),lon=parseFloat(document.getElementById('mLon').value),e=document.getElementById('mElev').value;
+  if(!isNaN(lat)&&!isNaN(lon)&&!e)autoElev();}
+async function autoElev(){const lat=parseFloat(document.getElementById('mLat').value),lon=parseFloat(document.getElementById('mLon').value);
+  if(isNaN(lat)||isNaN(lon)){alert('Enter latitude and longitude first.');return;}
+  document.getElementById('mElev').placeholder='fetching…';const v=await fetchElev(lat,lon);
+  if(v!=null)document.getElementById('mElev').value=v.toFixed(1);else alert('Could not fetch elevation (offline?). Enter it manually.');}
+async function saveLoc(){
+  const id=document.getElementById('mId').value;
+  const name=document.getElementById('mName').value.trim()||'unnamed';
+  const lat=parseFloat(document.getElementById('mLat').value),lon=parseFloat(document.getElementById('mLon').value);
+  if(isNaN(lat)||isNaN(lon)){alert('Enter valid coordinates.');return;}
+  let elev=parseFloat(document.getElementById('mElev').value);
+  if(isNaN(elev)){const v=await fetchElev(lat,lon);if(v!=null)elev=+v.toFixed(1);else{alert('Enter an elevation or connect to fetch it.');return;}}
+  const L=locs();
+  if(id){const l=L.find(x=>x.id===id);Object.assign(l,{name,lat,lon,elev});}
+  else L.push({id:'u'+Date.now(),name,lat,lon,elev,seed:false});
+  saveLocs(L);closeLoc();render();
+}
+function delLoc(id){if(confirm('Delete this location?')){saveLocs(locs().filter(x=>x.id!==id));render();}}
+
+/* ================= satellite map ================= */
+let MAP=null, MARKERS=[];
+function initMap(){
+  try{
+    MAP=L.map('map',{zoomControl:true});
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      {maxZoom:19,attribution:'Imagery © Esri'}).addTo(MAP);
+    MAP.on('click',e=>{ // drop a new location
+      openLoc();document.getElementById('mLat').value=e.latlng.lat.toFixed(6);
+      document.getElementById('mLon').value=e.latlng.lng.toFixed(6);autoElev();
+    });
+    const L0=locs();MAP.setView([L0[0].lat,L0[0].lon],14);
+  }catch(e){document.getElementById('mapNote').textContent='Map library unavailable (offline). The rest of the tool works.';}
+}
+function updateMap(crest){
+  if(!MAP)return;
+  MARKERS.forEach(m=>MAP.removeLayer(m));MARKERS=[];
+  const pts=[];
+  locs().forEach(l=>{const wse=wseAt(l,crest),d=wse-l.elev,under=d>0;
+    const mk=L.circleMarker([l.lat,l.lon],{radius:9,color:'#fff',weight:2,fillColor:under?'#e01b1b':'#11b866',fillOpacity:.95});
+    mk.bindPopup(`<b>${l.name}</b><br>${l.elev.toFixed(1)} ft ground<br>${under?'<span style="color:#c1272d">'+d.toFixed(1)+' ft UNDER</span>':'<span style="color:#0f8a5f">'+(-d).toFixed(1)+' ft dry</span>'}`);
+    mk.bindTooltip(l.name,{permanent:true,direction:'right',offset:[8,0],className:'locLabel'});
+    mk.addTo(MAP);MARKERS.push(mk);pts.push([l.lat,l.lon]);
+  });
+  if(pts.length&&!MAP._fitOnce){MAP.fitBounds(pts,{padding:[30,30],maxZoom:15});MAP._fitOnce=true;}
+}
+
+/* ================= sightings ================= */
+async function fetchElev(lat,lon){try{const r=await fetch(`https://epqs.nationalmap.gov/v1/json?x=${lon}&y=${lat}&units=Feet&wkid=4326`).then(r=>r.json());return r.value;}catch(e){return null;}}
+function refreshWhere(){const s=document.getElementById('oWhere');const cur=s.value;s.innerHTML='';
+  locs().forEach(l=>{const o=document.createElement('option');o.value=l.id;o.textContent=l.name;s.appendChild(o);});
+  const o=document.createElement('option');o.value='__new';o.textContent='➕ new location…';s.appendChild(o);
+  if(cur)s.value=cur;}
+function onWhere(){document.getElementById('newLocFields').style.display=document.getElementById('oWhere').value==='__new'?'block':'none';}
+/* pull the Tilden gauge reading — live if "when" is blank, else the historical
+   value nearest the observed time from the USGS instantaneous record */
+async function autoTilden(){
+  const note=document.getElementById('tilNote'); note.textContent='fetching…';
+  const whenVal=document.getElementById('oWhen').value;
+  try{
+    if(!whenVal){
+      const g=await fetch('https://api.water.noaa.gov/nwps/v1/gauges/TILT2').then(r=>r.json());
+      const v=g.status.observed.primary; document.getElementById('oTil').value=v;
+      note.textContent=`current Tilden ${(+v).toFixed(2)} ft (${new Date(g.status.observed.validTime).toLocaleString()})`;
+      return;
+    }
+    const target=new Date(whenVal).getTime();
+    const d0=whenVal.slice(0,10);
+    const d1=new Date(target+86400000).toISOString().slice(0,10);
+    const url=`https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08194500&parameterCd=00065&startDT=${d0}&endDT=${d1}`;
+    const j=await fetch(url).then(r=>r.json());
+    const arr=j.value.timeSeries[0].values[0].value;
+    let best=null,bd=1e15;
+    arr.forEach(v=>{const t=new Date(v.dateTime).getTime();const dd=Math.abs(t-target);if(dd<bd){bd=dd;best=v;}});
+    if(best){document.getElementById('oTil').value=parseFloat(best.value).toFixed(2);
+      note.textContent=`Tilden was ${parseFloat(best.value).toFixed(2)} ft at ${new Date(best.dateTime).toLocaleString()} (nearest reading)`;}
+    else note.textContent='no gauge data found for that time — enter manually.';
+  }catch(e){note.textContent='could not auto-pull (browser blocked or no data) — read it off water.noaa.gov/gauges/TILT2 and type it.';}
+}
+async function addSight(){
+  const who=document.getElementById('oWho').value.trim()||'—';
+  const til=parseFloat(document.getElementById('oTil').value), dep=parseFloat(document.getElementById('oDep').value);
+  if(isNaN(til)){alert('Enter the current Tilden gauge reading.');return;}
+  if(isNaN(dep)){alert('Enter the water depth at the spot (0 if just reaching the ground).');return;}
+  let loc, where=document.getElementById('oWhere').value;
+  if(where==='__new'){
+    const name=document.getElementById('oName').value.trim()||'sighting';
+    const lat=parseFloat(document.getElementById('oLat').value),lon=parseFloat(document.getElementById('oLon').value);
+    if(isNaN(lat)||isNaN(lon)){alert('Enter coordinates for the new location.');return;}
+    let ge=parseFloat(document.getElementById('oGe').value);
+    if(isNaN(ge)){const v=await fetchElev(lat,lon);if(v!=null)ge=+v.toFixed(1);else{alert('Enter a ground elevation for the new spot.');return;}}
+    loc={id:'u'+Date.now(),name,lat,lon,elev:ge,seed:false};
+    const L=locs();L.push(loc);saveLocs(L);          // <-- new sighting spot saved into Locations (Section 3)
+  } else {
+    loc=locs().find(x=>x.id===where);
+    if(!loc){alert('Pick a location.');return;}
+  }
+  const rm=riverMi(loc);
+  const off=loc.elev+dep-TIL_ZERO-til;                 // implied "water rise above gauge"
+  const crest=parseFloat(document.getElementById('crest').value);
+  const before=TIL_ZERO+crest+offsetAt(18.0);          // ranch WSE before this sighting
+  const whenVal=document.getElementById('oWhen').value;
+  const tstamp = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : new Date().toLocaleString();
+  const a=sights();
+  a.unshift({id:'s'+Date.now(),t:tstamp,who,where:loc.name,rm:+rm.toFixed(1),off:+off.toFixed(1)});
+  saveS(a);
+  const after=TIL_ZERO+crest+offsetAt(18.0);           // ranch WSE after
+  const dw=after-before;
+  document.getElementById('impactBox').innerHTML=
+    `<span style="color:${Math.abs(dw)<0.05?'#6b7684':'#0f8a5f'}">✓ Sighting added. It moved the predicted ranch water surface by <b>${dw>=0?'+':''}${dw.toFixed(2)} ft</b> `+
+    (Math.abs(dw)<0.05?'(this sighting agrees with the current model — no change needed, which is itself confirmation).':'(watch Section 3 update).')+`</span>`;
+  renderSights();render();
+  document.getElementById('oDep').value='';document.getElementById('oWhen').value='';
+}
+function resetSight(){if(confirm('Clear all sightings and return the model to its seed slope?')){localStorage.removeItem('nueces_v2_s');document.getElementById('impactBox').innerHTML='';renderSights();render();}}
+function editSight(id){const s=sights().find(x=>x.id===id);if(!s)return;
+  document.getElementById('oWho').value=s.who;
+  // load into form as a new-location edit (keeps coords implicit; user re-enters depth/gauge)
+  alert('Loaded "'+s.where+'" into the form. Adjust the depth or gauge reading and press Add to re-record; the old entry has been removed so the model recalculates.');
+  saveS(sights().filter(x=>x.id!==id));renderSights();render();
+}
+function delSight(id){saveS(sights().filter(x=>x.id!==id));document.getElementById('impactBox').innerHTML='<span style="color:#6b7684">Sighting deleted — model recalculated.</span>';renderSights();render();}
+function renderSights(){
+  const b=document.querySelector('#sightTable tbody');b.innerHTML='';
+  sights().forEach(s=>{const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${s.t}</td><td>${s.who}</td><td>${s.where}</td><td>${s.rm} mi</td><td>${s.off} ft</td>`+
+      `<td style="white-space:nowrap"><button class="sm" style="padding:3px 7px" onclick="editSight('${s.id}')">edit</button> <button class="sm" style="padding:3px 7px;background:#8a1f1f" onclick="delSight('${s.id}')">✕</button></td>`;
+    b.appendChild(tr);});
+  const sl=slope(),n=sights().length,moved=((sl-1.356)/1.356*100);
+  document.getElementById('learnBox').innerHTML= n===0?
+    `<b>Model state:</b> slope <b>1.356 ft per river-mile</b> (seed, from the 2013 ranch marks). Log a sighting and it re-fits. <span style="color:#6b7684">“Dist. above gauge” = how far upstream of Tilden the spot is; “water rise above gauge” = how high the water sits above the gauge reading there — the number the model learns.</span>`:
+    `<b>Learned from ${n} sighting(s):</b> slope now <b>${sl.toFixed(3)} ft/river-mile</b> (${moved>=0?'+':''}${moved.toFixed(0)}% vs seed). Every estimate above now uses this. `+
+    (Math.abs(moved)>12?'<span style="color:#c1272d">Large shift — reach behaving unlike the seed; likely a different mechanism than picked.</span>':'');
+}
+function exportSight(){const a=sights();if(!a.length){alert('No sightings yet.');return;}
+  const rows=[['time','who','where','river_mi_above_tilden','water_rise_above_gauge_ft'],...a.map(s=>[s.t,s.who,s.where,s.rm,s.off])];
+  const csv=rows.map(r=>r.map(x=>`"${x}"`).join(',')).join('\n');
+  const u=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));const el=document.createElement('a');el.href=u;el.download='nueces_sightings.csv';el.click();}
+
+/* ================= help ================= */
+function openHelp(anchor){const m=document.getElementById('helpModal');m.style.display='flex';
+  const b=document.getElementById('helpBody');
+  if(anchor&&anchor!=='top'){const el=document.getElementById('help-'+anchor);if(el)b.scrollTop=el.offsetTop-b.offsetTop-8;}
+  else b.scrollTop=0;}
+function closeHelp(){document.getElementById('helpModal').style.display='none';}
+function resetAll(){if(confirm('Clear ALL your saved locations, sightings and scenarios on this device? This cannot be undone.')){
+  ['nueces_v2_loc','nueces_v2_s','nueces_v2_scen','nueces_v2_hist'].forEach(k=>localStorage.removeItem(k));
+  location.reload();}}
+function printHelp(){const w=window.open('','_blank');
+  w.document.write('<html><head><title>Nueces Reach Model — How to use</title><style>body{font-family:Georgia,serif;max-width:640px;margin:24px auto;padding:0 16px;line-height:1.5}h3{color:#12202e;margin-top:18px}p{font-size:14px;color:#222}</style></head><body><h1>Nueces Reach Model — Miles Ranch · How to use</h1>'+document.getElementById('helpBody').innerHTML+'</body></html>');
+  w.document.close();setTimeout(()=>w.print(),300);}
+function addHelpIcons(){document.querySelectorAll('.card h2').forEach((h,i)=>{
+  if(h.querySelector('.qhelp'))return;
+  const s=document.createElement('span');s.className='qhelp';s.textContent='?';s.title='How this section works';
+  s.onclick=()=>openHelp('s'+(i+1));h.appendChild(s);});}
+
+/* ================= init ================= */
+function initDefaults(){
+  // last-known values for the July 2026 event so the profile populates before a live fetch
+  document.getElementById('nAsh').textContent='28.1';
+  document.getElementById('nCot').textContent='26.3';
+  document.getElementById('nTil').textContent='1.9';
+  CHAINFLOW={ASRT2:6.8,COTT2:36,TILT2:0};
+  document.getElementById('chainNote').innerHTML='Showing last-known July 2026 values — press <b>Fetch live gauges</b> to update.';
+}
+function step(fn){try{fn();}catch(e){if(window.console)console.warn('step failed:',e);}}
+function boot(){
+  step(initDefaults);
+  step(addHelpIcons);
+  step(function(){ if(AUTO){applyAuto();} });
+  step(renderSights);
+  step(render);
+  // map last, and only if Leaflet actually loaded — never let it block the rest
+  if(window.L && L.map){ step(initMap); step(function(){render();}); }
+  else { var mn=document.getElementById('mapNote'); if(mn)mn.textContent='Map library did not load (offline or blocked) — every other section still works.'; }
+  // auto-pull live gauges on open, then keep them fresh every 15 min while the tab is visible
+  step(function(){ if(window.fetchChain) fetchChain(); });
+  try{ setInterval(function(){ if(document.visibilityState!=='hidden' && window.fetchChain) fetchChain(); }, 900000); }catch(e){}
+}
+if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',boot); else boot();
+</script>
+
+<!-- ============================================================= -->
+<!--  FIREBASE SHARED + MODERATED LAYER                            -->
+<!--  Paste your firebaseConfig in the ONE place marked below.     -->
+<!--  Leave it as PASTE_HERE to run the tool in local-only mode.   -->
+<!-- ============================================================= -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getFirestore, collection, addDoc, onSnapshot, query, where, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+/* ▼▼▼ PASTE YOUR firebaseConfig HERE (Firebase console → Project settings → Your apps) ▼▼▼ */
+const firebaseConfig = {
+  apiKey:            "AIzaSyBsXL_nH9YB0gfQV8XYkw_JcnZEL_0b_E8",
+  authDomain:        "nueces-tracker.firebaseapp.com",
+  projectId:         "nueces-tracker",
+  storageBucket:     "nueces-tracker.firebasestorage.app",
+  messagingSenderId: "118865121927",
+  appId:             "1:118865121927:web:72f9d7eaceeffff1a69e22"
+};
+/* ▲▲▲ ------------------------------------------------------------------------------------- ▲▲▲ */
+
+const TILZ = 183.10;
+if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
+  const db = getFirestore(initializeApp(firebaseConfig));
+  const badge = document.createElement('div');
+  badge.style.cssText='position:fixed;bottom:8px;right:8px;background:#0f8a5f;color:#fff;font:600 11px sans-serif;padding:4px 9px;border-radius:20px;z-index:9998;opacity:.9';
+  badge.textContent='🔗 shared mode'; document.body.appendChild(badge);
+
+  window.addSight = async function () {
+    const who = document.getElementById('oWho').value.trim() || '—';
+    const til = parseFloat(document.getElementById('oTil').value);
+    const dep = parseFloat(document.getElementById('oDep').value);
+    if (isNaN(til)) { alert('Enter the current Tilden gauge reading.'); return; }
+    if (isNaN(dep)) { alert('Enter the water depth at the spot (0 if just reaching ground).'); return; }
+    let loc, where = document.getElementById('oWhere').value;
+    if (where === '__new') {
+      const name = document.getElementById('oName').value.trim() || 'sighting';
+      const lat = parseFloat(document.getElementById('oLat').value), lon = parseFloat(document.getElementById('oLon').value);
+      if (isNaN(lat) || isNaN(lon)) { alert('Enter coordinates for the new location.'); return; }
+      let ge = parseFloat(document.getElementById('oGe').value);
+      if (isNaN(ge)) { const v = await window.fetchElev(lat, lon); if (v != null) ge = +v.toFixed(1); else { alert('Enter a ground elevation.'); return; } }
+      loc = { name, lat, lon, elev: ge };
+      const L = window.locs(); L.push({ id:'u'+Date.now(), ...loc, seed:false });
+      localStorage.setItem('nueces_v2_loc', JSON.stringify(L));
+    } else {
+      loc = window.locs().find(x => x.id === where);
+      if (!loc) { alert('Pick a location.'); return; }
+    }
+    const rm = window.riverMi(loc);
+    const off = loc.elev + dep - TILZ - til;
+    const whenVal = document.getElementById('oWhen').value;
+    const obsAt = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : null;
+    if (off < -20 || off > 80) { alert('That reading looks out of range — double-check the depth and gauge value.'); return; }
+    try {
+      await addDoc(collection(db, 'sightings'),
+        { who, where: loc.name, rm:+rm.toFixed(1), off:+off.toFixed(1), obsAt, status:'pending', t: serverTimestamp() });
+      document.getElementById('impactBox').innerHTML =
+        '<span style="color:#1a6f8b">✓ Sent for approval. It will move the shared model once an admin approves it.</span>';
+      document.getElementById('oDep').value = ''; document.getElementById('oWhen').value = '';
+    } catch (e) { alert('Could not submit: ' + (e.code||e.message) + '. Check your internet.'); }
+  };
+
+  onSnapshot(query(collection(db, 'sightings'), where('status','==','approved')), snap => {
+    const arr = snap.docs.map(d => { const s = d.data();
+      return { id:d.id, t:(s.obsAt||'(shared)'), who:s.who, where:s.where, rm:s.rm, off:s.off }; });
+    localStorage.setItem('nueces_v2_s', JSON.stringify(arr));
+    if (window.render) window.render();
+  });
+}
+</script>
+</body>
+</html>

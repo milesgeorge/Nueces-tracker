@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nueces Tracker — Moderation</title>
+<style>
+  body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f6f8fa;color:#1d2430;margin:0;font-size:15px}
+  .wrap{max-width:640px;margin:0 auto;padding:16px}
+  h1{font-size:19px}
+  .card{background:#fff;border:1px solid #d3d9e0;border-radius:12px;padding:14px;margin:12px 0}
+  input{width:100%;padding:9px 10px;border:1px solid #d3d9e0;border-radius:8px;font:inherit;margin:4px 0}
+  button{cursor:pointer;border:none;border-radius:8px;padding:9px 13px;font-weight:600;color:#fff;background:#1d2430;font:inherit}
+  button.ok{background:#0f8a5f}button.no{background:#8a1f1f}button.sm{padding:6px 10px;font-size:13px}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #eef1f4;padding:9px 0}
+  .muted{color:#6b7684;font-size:12px}
+  .flag{color:#c1272d;font-weight:700}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Nueces Tracker — Moderation</h1>
+  <p class="muted">Approve or reject incoming sightings. Only approved ones move the shared model.</p>
+
+  <div class="card" id="loginCard">
+    <b>Admin sign-in</b>
+    <input id="email" type="email" placeholder="admin email">
+    <input id="pass" type="password" placeholder="password">
+    <button onclick="doLogin()">Sign in</button>
+    <div class="muted" id="loginMsg" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card hide" id="modCard">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b>Pending sightings (<span id="cnt">0</span>)</b>
+      <button class="sm no" onclick="doLogout()">Sign out</button>
+    </div>
+    <div id="list" style="margin-top:8px"></div>
+    <div class="muted" id="empty" style="margin-top:8px">Nothing pending. 👍</div>
+  </div>
+
+  <p class="muted">Config below must match the one in your tracker. Sanity range: a sighting whose “water rise above gauge” is outside −20…+80 ft is auto-flagged <span class="flag">⚠ check</span>.</p>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, deleteDoc }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+/* ▼▼▼ PASTE THE SAME firebaseConfig YOU PUT IN THE TRACKER ▼▼▼ */
+const firebaseConfig = {
+  apiKey: "AIzaSyBsXL_nH9YB0gfQV8XYkw_JcnZEL_0b_E8",
+  authDomain: "nueces-tracker.firebaseapp.com",
+  projectId: "nueces-tracker",
+  storageBucket: "nueces-tracker.firebasestorage.app",
+  messagingSenderId: "118865121927",
+  appId: "1:118865121927:web:72f9d7eaceeffff1a69e22"
+};
+/* ▲▲▲ ---------------------------------------------------- ▲▲▲ */
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+let unsub = null;
+
+window.doLogin = async () => {
+  const e = document.getElementById('email').value, p = document.getElementById('pass').value;
+  document.getElementById('loginMsg').textContent = 'Signing in…';
+  try { await signInWithEmailAndPassword(auth, e, p); }
+  catch(err){ document.getElementById('loginMsg').textContent = 'Sign-in failed: ' + err.code; }
+};
+window.doLogout = () => signOut(auth);
+
+onAuthStateChanged(auth, user => {
+  document.getElementById('loginCard').classList.toggle('hide', !!user);
+  document.getElementById('modCard').classList.toggle('hide', !user);
+  if (user) watchPending(); else if (unsub) unsub();
+});
+
+function watchPending(){
+  const q = query(collection(db,'sightings'), where('status','==','pending'));
+  unsub = onSnapshot(q, snap => {
+    const list = document.getElementById('list'); list.innerHTML = '';
+    document.getElementById('cnt').textContent = snap.size;
+    document.getElementById('empty').style.display = snap.size ? 'none' : 'block';
+    snap.forEach(d => {
+      const s = d.data();
+      const bad = (s.off < -20 || s.off > 80);
+      const el = document.createElement('div'); el.className = 'row';
+      el.innerHTML = `<div><b>${esc(s.where)}</b> — ${esc(s.who)}<br>
+        <span class="muted">rise above gauge ${(+s.off).toFixed(1)} ft · ${(+s.rm).toFixed(1)} river-mi ${bad?'<span class="flag">⚠ check</span>':''}${s.obsAt?' · observed '+esc(s.obsAt):''}</span></div>
+        <div style="white-space:nowrap">
+          <button class="sm ok" data-a="ok" data-id="${d.id}">Approve</button>
+          <button class="sm no" data-a="no" data-id="${d.id}">Reject</button></div>`;
+      list.appendChild(el);
+    });
+    list.querySelectorAll('button').forEach(b => b.onclick = () => act(b.dataset.a, b.dataset.id));
+  });
+}
+async function act(a, id){
+  const ref = doc(db,'sightings',id);
+  if (a === 'ok') await updateDoc(ref, { status:'approved' });
+  else await deleteDoc(ref);
+}
+function esc(x){ return String(x||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+</script>
+</body>
+</html>
