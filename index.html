@@ -216,9 +216,10 @@ window.addEventListener('error',function(e){
         <div><label>ground elev (ft) <span class="help">auto</span></label><input id="oGe" type="number" step="0.1" placeholder="auto"></div>
       </div>
     </div>
-    <div class="row" style="margin-top:6px">
-      <div><label>When was it observed? <span class="help">leave blank = now; set it for a call-in from earlier</span></label>
-        <input id="oWhen" type="datetime-local"></div>
+    <div style="background:#fff6e6;border:1px solid var(--amb);border-radius:8px;padding:9px 11px;margin-top:8px">
+      <label style="color:#7a5108;font-weight:700;margin-top:0">🕐 When was it seen? — set this to backdate a report</label>
+      <span class="help" style="color:#8a6d3b;display:block;margin-bottom:5px">Leave blank if it's happening <b>right now</b>. Set an earlier time if you saw it earlier today, or someone called it in from before.</span>
+      <input id="oWhen" type="datetime-local">
     </div>
     <div class="row" style="margin-top:6px">
       <div><label>Water depth at that spot (ft, 0 = just reaching ground)</label><input id="oDep" type="number" step="0.1" placeholder="0"></div>
@@ -722,7 +723,8 @@ function openLoc(id){const m=document.getElementById('locModal');document.getEle
   document.getElementById('mName').value=l?l.name:'';document.getElementById('mLat').value=l?l.lat:'';
   document.getElementById('mLon').value=l?l.lon:'';document.getElementById('mElev').value=l?l.elev:'';
   m.style.display='flex';}
-function closeLoc(){document.getElementById('locModal').style.display='none';}
+function closeLoc(){document.getElementById('locModal').style.display='none';
+  const w=document.getElementById('oWhere'); if(w&&w.value==='__new')w.selectedIndex=0;}  // cancelled add → reset the Section-6 picker
 function maybeAutoElev(){const lat=parseFloat(document.getElementById('mLat').value),lon=parseFloat(document.getElementById('mLon').value),e=document.getElementById('mElev').value;
   if(!isNaN(lat)&&!isNaN(lon)&&!e)autoElev();}
 async function autoElev(){const lat=parseFloat(document.getElementById('mLat').value),lon=parseFloat(document.getElementById('mLon').value);
@@ -738,7 +740,7 @@ async function saveLoc(){
   if(isNaN(elev)){const v=await fetchElev(lat,lon);if(v!=null)elev=+v.toFixed(1);else{alert('Enter an elevation or connect to fetch it.');return;}}
   const L=locs();
   if(id){const l=L.find(x=>x.id===id);Object.assign(l,{name,lat,lon,elev});}
-  else L.push({id:'u'+Date.now(),name,lat,lon,elev,seed:false});
+  else {const nid='u'+Date.now(); L.push({id:nid,name,lat,lon,elev,seed:false}); window.__selectWhere=nid;}  // auto-select in Section 6
   saveLocs(L);closeLoc();render();
 }
 function delLoc(id){if(confirm('Delete this location?')){saveLocs(locs().filter(x=>x.id!==id));render();}}
@@ -774,9 +776,12 @@ function updateMap(crest){
 async function fetchElev(lat,lon){try{const r=await fetch(`https://epqs.nationalmap.gov/v1/json?x=${lon}&y=${lat}&units=Feet&wkid=4326`).then(r=>r.json());return r.value;}catch(e){return null;}}
 function refreshWhere(){const s=document.getElementById('oWhere');const cur=s.value;s.innerHTML='';
   locs().forEach(l=>{const o=document.createElement('option');o.value=l.id;o.textContent=l.name;s.appendChild(o);});
-  const o=document.createElement('option');o.value='__new';o.textContent='➕ new location…';s.appendChild(o);
-  if(cur)s.value=cur;}
-function onWhere(){document.getElementById('newLocFields').style.display=document.getElementById('oWhere').value==='__new'?'block':'none';}
+  const o=document.createElement('option');o.value='__new';o.textContent='➕ add a new location (map / coordinates)…';s.appendChild(o);
+  if(window.__selectWhere){s.value=window.__selectWhere;window.__selectWhere=null;}
+  else if(cur)s.value=cur;}
+/* Section 6 "new location" now opens the SAME Add-Location modal as Section 3
+   (coordinates + auto-elevation + tap-the-map), then auto-selects it here. */
+function onWhere(){ if(document.getElementById('oWhere').value==='__new'){ openLoc(); } }
 /* pull the Tilden gauge reading — live if "when" is blank, else the historical
    value nearest the observed time from the USGS instantaneous record */
 async function autoTilden(){
