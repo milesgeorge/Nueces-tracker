@@ -222,17 +222,26 @@ window.addEventListener('error',function(e){
 
     <!-- Part B: HIGH-WATER MARK (calibration) -->
     <div style="border:1px solid var(--grn);border-radius:10px;padding:11px;margin-top:12px;background:#f0f7f2">
-      <b style="font-size:13.5px;color:#0f6b45">🎯 Add a high-water mark — calibrate the model</b>
-      <span class="help" style="display:block;margin-top:3px">Use this <b>after a flood peaks</b> (or for a known past flood): mark the high-water line at a spot and give that flood's <b>peak</b> Tilden crest. This is the only thing that re-fits the forecast — and (in shared mode) only after you approve it.</span>
-      <div class="row" style="margin-top:6px">
-        <div><label>Where — the high-water line</label><select id="hWhere" onchange="onWhereH()"></select></div>
+      <b style="font-size:13.5px;color:#0f6b45">🎯 High-water mark — makes the forecast smarter (optional)</b>
+      <span class="help" style="display:block;margin-top:3px">You don't have to do this — the forecast already works. But after a flood, a high-water mark makes every future forecast sharper. <b>You can't miss the window:</b> the mud/debris line stays on posts, fences and trees for weeks, so you record it whenever it's safe to walk out — no need to be there at the crest.</span>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer;font-weight:600;font-size:12.5px;color:#0f6b45">▸ How to add one (3 steps)</summary>
+        <div style="font-size:12.5px;color:#38414d;margin-top:6px;line-height:1.5">
+          <b>1.</b> After the water drops, go to a spot you can point to on the map (a gate, a pen, a pole, the pad).<br>
+          <b>2.</b> Find the <b>mud/debris line</b> — the highest the water reached. Measure <b>how far above the ground</b> that line sits (0 if it's right at ground level).<br>
+          <b>3.</b> Below: pick that spot, enter that height, and this flood's <b>peak</b> Tilden crest (tap “⤓ peak” to fill it), then Add.<br>
+          <span style="color:#6b7684">That's it. You're telling the model “at this exact place, the flood's high-water line was here, and the gauge crested at that number.” It doesn't matter that the ranch and the gauge peak at different times — a mark plus that flood's crest is all it needs.</span>
+        </div>
+      </details>
+      <div class="row" style="margin-top:8px">
+        <div><label>Where the high-water line is</label><select id="hWhere" onchange="onWhereH()"></select></div>
       </div>
       <div class="row" style="margin-top:6px">
-        <div><label>Depth at the line (ft · 0 = the debris/mud line at the ground)</label><input id="hDep" type="number" step="0.1" placeholder="0"></div>
-        <div><label>That flood's PEAK Tilden crest (ft)</label><input id="hPeak" type="number" step="0.1" placeholder="e.g. 23.1"></div>
+        <div><label>How high the water got here <span class="help">ft above the ground · 0 = mud line at ground level</span></label><input id="hDep" type="number" step="0.1" placeholder="0"></div>
+        <div><label>This flood's PEAK Tilden crest (ft)</label><input id="hPeak" type="number" step="0.1" placeholder="e.g. 23.1"></div>
       </div>
       <div style="margin-top:6px">
-        <button class="sm" onclick="autoPeak()">⤓ Use this event's forecast crest</button>
+        <button class="sm" onclick="autoPeak()">⤓ Fill this flood's peak crest</button>
         <span class="sub" id="peakNote" style="margin-left:6px"></span>
       </div>
       <div class="row" style="margin-top:8px">
@@ -434,15 +443,26 @@ function saveLocs(a){localStorage.setItem('nueces_v2_loc',JSON.stringify(a));}
 
 /* ================= gauge fetch ================= */
 async function fetchChain(){
-  document.getElementById('chainNote').textContent='Fetching…';let ok=0;
-  for(const[lid,el]of Object.entries(GAUGES)){
-    try{const g=await fetch('https://api.water.noaa.gov/nwps/v1/gauges/'+lid).then(r=>r.json());
-      const v=g.status.observed.primary;document.getElementById(el).textContent=(+v).toFixed(1);
-      if(g.status.observed.secondary!=null)CHAINFLOW[lid]=g.status.observed.secondary;
-      if(lid==='TILT2')document.getElementById('oTil').value=v;ok++;
-    }catch(e){document.getElementById(el).textContent='—';}
+  document.getElementById('chainNote').textContent='Fetching…';
+  // FRESH values straight from USGS instantaneous data (the NWPS "observed" field lags a day).
+  const SITE={'08193000':'nAsh','08194000':'nCot','08194500':'nTil'};        // USGS site -> chain node
+  const FLOW={'08193000':'ASRT2','08194000':'COTT2','08194500':'TILT2'};     // USGS site -> flow key
+  try{
+    const j=await fetch('https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08193000,08194000,08194500&parameterCd=00065,00060').then(r=>r.json());
+    let ok=0;
+    (j.value.timeSeries||[]).forEach(ts=>{
+      const site=ts.sourceInfo.siteCode[0].value, pc=ts.variable.variableCode[0].value;
+      const val=parseFloat(ts.values[0].value[0].value);
+      if(isNaN(val))return;
+      if(pc==='00065'&&SITE[site]){ document.getElementById(SITE[site]).textContent=val.toFixed(1); ok++; }
+      if(pc==='00060'&&FLOW[site]){ CHAINFLOW[FLOW[site]]=val/1000; }
+    });
+    document.getElementById('chainNote').textContent = ok
+      ? `live · updated ${new Date().toLocaleTimeString()} · auto-refreshes every 15 min`
+      : 'no data returned — will retry next cycle.';
+  }catch(e){
+    document.getElementById('chainNote').textContent='Live fetch blocked (offline or content-blocker) — showing last-known values.';
   }
-  document.getElementById('chainNote').textContent=ok?`${ok}/4 gauges live · updated ${new Date().toLocaleTimeString()} · auto-refreshes every 15 min`:'Live fetch blocked (offline or opened as a file) — type the Tilden stage into Section 6.';
   if(AUTO)applyAuto(); else render();
 }
 
@@ -838,13 +858,15 @@ function validCalib(off,rm,peak){
   return true;
 }
 async function autoPeak(){
-  const note=document.getElementById('peakNote');note.textContent='fetching forecast crest…';
+  const note=document.getElementById('peakNote');note.textContent='finding this flood’s peak…';
   try{
-    const f=await fetch('https://api.water.noaa.gov/nwps/v1/gauges/TILT2/stageflow/forecast').then(r=>r.json());
-    const mx=Math.max.apply(null, f.data.map(d=>d.primary));
+    const j=await fetch('https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08194500&parameterCd=00065&period=P21D').then(r=>r.json());
+    const arr=j.value.timeSeries[0].values[0].value;
+    let mx=-1e9,when='';
+    arr.forEach(v=>{const x=parseFloat(v.value);if(x>mx){mx=x;when=v.dateTime;}});
     document.getElementById('hPeak').value=mx.toFixed(1);
-    note.textContent='forecast crest '+mx.toFixed(1)+' ft';
-  }catch(e){note.textContent='could not fetch — enter the crest manually from water.noaa.gov/gauges/TILT2.';}
+    note.textContent=`highest in the last 3 weeks: ${mx.toFixed(1)} ft (${new Date(when).toLocaleString()}). If the river is still rising, wait until it crests.`;
+  }catch(e){note.textContent='could not fetch — look up the crest on water.noaa.gov/gauges/TILT2 and type it.';}
 }
 async function addHWM(){
   const loc=locs().find(x=>x.id===document.getElementById('hWhere').value);
@@ -896,11 +918,11 @@ function addHelpIcons(){document.querySelectorAll('.card h2').forEach((h,i)=>{
 
 /* ================= init ================= */
 function initDefaults(){
-  // last-known values for the July 2026 event so the profile populates before a live fetch
-  document.getElementById('nAsh').textContent='28.1';
-  document.getElementById('nCot').textContent='26.3';
-  document.getElementById('nTil').textContent='1.9';
-  CHAINFLOW={ASRT2:6.8,COTT2:36,TILT2:0};
+  // last-known values so the profile populates before/without a live fetch (overwritten on fetch)
+  document.getElementById('nAsh').textContent='25.2';
+  document.getElementById('nCot').textContent='23.6';
+  document.getElementById('nTil').textContent='7.9';
+  CHAINFLOW={ASRT2:5.1,COTT2:18.9,TILT2:0.3};
   document.getElementById('chainNote').innerHTML='Showing last-known July 2026 values — press <b>Fetch live gauges</b> to update.';
 }
 function step(fn){try{fn();}catch(e){if(window.console)console.warn('step failed:',e);}}
