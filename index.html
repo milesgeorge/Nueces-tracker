@@ -206,7 +206,7 @@ window.addEventListener('error',function(e){
     <!-- Part A: LIVE REPORT (map only) -->
     <div style="border:1px solid var(--rule);border-radius:10px;padding:11px">
       <b style="font-size:13.5px">📍 Report water now</b>
-      <span class="help" style="display:block;margin-top:2px">Shows on the shared map. Does <b>not</b> change the forecast.</span>
+      <span class="help" style="display:block;margin-top:2px">Shows on the shared map. Walking to the <b>water's edge</b> and entering depth <b>0</b> is exactly right. Reports don't change the forecast on their own — but after a flood crests, tap <b>“→ mark”</b> on the farthest/highest one to turn it into a high-water mark that sharpens the forecast.</span>
       <div class="row" style="margin-top:6px">
         <div><label>Who</label><input id="rWho" placeholder="name"></div>
         <div><label>Where</label><select id="rWhere" onchange="onWhereR()"></select></div>
@@ -839,8 +839,27 @@ function renderReports(){
   const b=document.querySelector('#reportTable tbody');if(!b)return;b.innerHTML='';
   reports().slice(0,25).forEach(r=>{const tr=document.createElement('tr');
     tr.innerHTML=`<td>${r.t}</td><td>${r.who}</td><td>${r.where}</td><td>${r.depth} ft</td>`+
-      `<td><button class="sm" style="padding:3px 7px;background:#8a1f1f" onclick="delReport('${r.id}')">✕</button></td>`;
+      `<td style="white-space:nowrap"><button class="sm" style="padding:3px 7px" title="Promote to a high-water mark (calibrates the model)" onclick="promoteReport('${r.id}')">→ mark</button> <button class="sm" style="padding:3px 7px;background:#8a1f1f" onclick="delReport('${r.id}')">✕</button></td>`;
     b.appendChild(tr);});
+}
+/* Turn a live report (usually the farthest/deepest one at a spot) into a high-water
+   mark: prefill the calibration form with its location + depth and this flood's peak,
+   then let the normal Add flow (with approval) apply it. */
+async function promoteReport(id){
+  const r=reports().find(x=>x.id===id); if(!r){return;}
+  let loc=locs().find(l=>l.name===r.where);
+  if(!loc){
+    let elev=(r.lat!=null&&r.lon!=null)?await fetchElev(r.lat,r.lon):null;
+    if(elev==null){alert('Could not get a ground elevation for this spot. Add it as a location first, then promote.');return;}
+    loc={id:'u'+Date.now(),name:r.where,lat:r.lat,lon:r.lon,elev:+(+elev).toFixed(1),seed:false};
+    const L=locs();L.push(loc);saveLocs(L);
+  }
+  refreshWhere();
+  document.getElementById('hWhere').value=loc.id;
+  document.getElementById('hDep').value=(r.depth!=null?r.depth:0);
+  await autoPeak();   // fill this flood's peak crest
+  document.getElementById('hWhere').scrollIntoView({behavior:'smooth',block:'center'});
+  document.getElementById('peakNote').textContent='Prefilled from "'+r.where+'". Confirm the flood’s PEAK crest above is right, then press ＋ Add high-water mark.';
 }
 
 /* ----- HIGH-WATER MARK: peak-to-peak, the only thing that calibrates ----- */
