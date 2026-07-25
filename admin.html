@@ -34,7 +34,10 @@
   <div class="card hide" id="modCard">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <b>Pending sightings (<span id="cnt">0</span>)</b>
-      <button class="sm no" onclick="doLogout()">Sign out</button>
+      <div style="white-space:nowrap">
+        <button class="sm ok" id="approveAll" onclick="approveAll()">Approve all ✓</button>
+        <button class="sm no" onclick="doLogout()">Sign out</button>
+      </div>
     </div>
     <div id="list" style="margin-top:8px"></div>
     <div class="muted" id="empty" style="margin-top:8px">Nothing pending. 👍</div>
@@ -80,10 +83,17 @@ onAuthStateChanged(auth, user => {
   if (user) watchPending(); else if (unsub) unsub();
 });
 
+let PENDING = [];
+window.approveAll = async () => {
+  if (!PENDING.length) return;
+  if (!confirm('Approve all '+PENDING.length+' pending marks? (Any ⚠ flagged ones are included — reject those individually instead if unsure.)')) return;
+  for (const id of PENDING.slice()) { try { await updateDoc(doc(db,'hwm',id), { status:'approved' }); } catch(e){} }
+};
 function watchPending(){
   const q = query(collection(db,'hwm'), where('status','==','pending'));
   unsub = onSnapshot(q, snap => {
     const list = document.getElementById('list'); list.innerHTML = '';
+    PENDING = snap.docs.map(d => d.id);
     document.getElementById('cnt').textContent = snap.size;
     document.getElementById('empty').style.display = snap.size ? 'none' : 'block';
     snap.forEach(d => {

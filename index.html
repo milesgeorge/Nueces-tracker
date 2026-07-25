@@ -248,6 +248,10 @@ window.addEventListener('error',function(e){
         <div><button class="add sm" style="width:100%" onclick="addHWM()">＋ Add high-water mark &amp; re-fit</button></div>
         <div><button class="sm" style="width:100%" onclick="resetHWM()">↺ Reset to seed (2013)</button></div>
       </div>
+      <div style="margin-top:8px">
+        <button class="sm" style="width:100%;background:#eef6f0;border-color:#0f8a5f;color:#0f6a4a" onclick="harvestReports()">🔄 Build marks from ALL reports (peak per spot)</button>
+        <div class="sub" style="margin-top:4px">Uses every “Report water now” pin at once: for each spot it takes the <b>highest</b> water reported there (random samples converge on the true high-water line) and pairs it with this flood’s peak crest. Do it near/after the crest. In shared mode the built marks wait for your approval on the admin page.</div>
+      </div>
       <div class="learn" id="learnBox"></div>
       <table id="hwmTable"><thead><tr><th>event</th><th>where</th><th>peak gauge</th><th>rise / river-mi</th><th></th></tr></thead><tbody></tbody></table>
     </div>
@@ -861,6 +865,37 @@ async function promoteReport(id){
   document.getElementById('hWhere').scrollIntoView({behavior:'smooth',block:'center'});
   document.getElementById('peakNote').textContent='Prefilled from "'+r.where+'". Confirm the flood’s PEAK crest above is right, then press ＋ Add high-water mark.';
 }
+/* HARVEST: turn ALL reports into calibration at once. For each location it takes the
+   HIGHEST water-surface elevation reported (the envelope peak — random samples converge
+   on the true high-water line) and pairs it with this flood's peak crest. */
+async function harvestReports(){
+  let peak=parseFloat(document.getElementById('hPeak').value);
+  if(isNaN(peak)){ await autoPeak(); peak=parseFloat(document.getElementById('hPeak').value); }
+  if(isNaN(peak)){alert('First tap “⤓ Fill this flood’s peak crest,” then Build.');return;}
+  const R=reports(); if(!R.length){alert('No reports yet to build from.');return;}
+  const groups={};
+  for(const r of R){
+    let loc=locs().find(l=>l.name===r.where);
+    let elev=loc?loc.elev:((r.lat!=null&&r.lon!=null)?await fetchElev(r.lat,r.lon):null);
+    if(elev==null)continue;
+    const wse=(+elev)+(+r.depth||0);
+    if(!groups[r.where]||wse>groups[r.where].wse) groups[r.where]={name:r.where,lat:r.lat,lon:r.lon,wse};
+  }
+  let added=0,skip=0;
+  for(const k in groups){
+    const g=groups[k]; if(g.lat==null||g.lon==null){skip++;continue;}
+    const rm=riverMi({lat:g.lat,lon:g.lon});
+    const off=g.wse-TIL_ZERO-peak, sl=off/rm;
+    if(rm<3||sl<0.6||sl>2.0){skip++;continue;}
+    const mark={event:'peak '+peak.toFixed(1)+' ft (built from reports)',where:g.name,rm:+rm.toFixed(1),off:+off.toFixed(1),peak:+peak.toFixed(1)};
+    if(window.__submitHWM){ await window.__submitHWM(mark); }
+    else { const a=hwm(); a.unshift({id:'h'+Date.now()+Math.random().toString(36).slice(2,6),t:new Date().toLocaleString(),...mark}); saveHWM(a); }
+    added++;
+  }
+  render();
+  alert('Built '+added+' high-water mark(s) from the report envelope'+(skip?' (skipped '+skip+' out-of-range or without coordinates)':'')+
+    (window.__submitHWM?'.\nThey are pending your approval on the admin page.':'.\nThey now calibrate the forecast.'));
+}
 
 /* ----- HIGH-WATER MARK: peak-to-peak, the only thing that calibrates ----- */
 function validCalib(off,rm,peak){
@@ -1026,6 +1061,12 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
       document.getElementById('hDep').value='';
       alert('High-water mark sent for approval. It will re-fit the shared forecast once an admin approves it.');
     } catch(e){ alert('Could not send: '+(e.code||e.message)); }
+  };
+  /* Bulk "Build marks from all reports" submits each built mark as PENDING (moderated). */
+  window.__submitHWM = async function(m){
+    try{ await addDoc(collection(db,'hwm'),
+      { event:m.event, where:m.where, rm:m.rm, off:m.off, peak:m.peak, status:'pending', t: serverTimestamp() }); }
+    catch(e){ console.warn('submitHWM', e); }
   };
   onSnapshot(query(collection(db,'hwm'), where('status','==','approved')), snap => {
     const arr = snap.docs.map(d => { const s=d.data();
