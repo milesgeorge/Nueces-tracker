@@ -201,6 +201,7 @@ window.addEventListener('error',function(e){
   <div class="card">
     <h2>6 · Teach the model — log a real sighting</h2>
     <p class="sub">Tell it where the water actually is. It converts your report into a measured “water rise above the gauge,” then re-fits its slope so every estimate matches reality. New spots you report here are saved into your Locations list above.</p>
+    <a href="log.html" style="display:block;text-align:center;background:#1a6f8b;color:#fff;font-weight:700;text-decoration:none;padding:12px;border-radius:10px;margin-bottom:12px">📍 In the field on a phone? Use the Quick Field Log — it grabs GPS for you →</a>
     <div class="row">
       <div><label>Who is reporting</label><input id="oWho" placeholder="name"></div>
       <div><label>Where — pick a saved location…</label><select id="oWhere" onchange="onWhere()"></select></div>
@@ -406,6 +407,7 @@ const SEED_LOCS=[
  {id:'garcia',name:'Garcia old home',lat:28.231268,lon:-98.647425,elev:230.70,seed:true},
  {id:'house',name:'The house',lat:28.229990,lon:-98.648663,elev:232.96,seed:true},
 ];
+window.__seedLocs=SEED_LOCS;   // exposed so the shared-locations layer can merge seeds + remote
 
 /* ================= geometry + adaptive slope ================= */
 function miAB(a,b){const dy=(b.lat-a.lat)*69.05,dx=(b.lon-a.lon)*69.05*Math.cos(a.lat*Math.PI/180);return Math.hypot(dx,dy);}
@@ -904,16 +906,13 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
 </script>
 
 <!-- ============================================================= -->
-<!--  FIREBASE SHARED + MODERATED LAYER                            -->
-<!--  Paste your firebaseConfig in the ONE place marked below.     -->
-<!--  Leave it as PASTE_HERE to run the tool in local-only mode.   -->
+<!--  FIREBASE SHARED + MODERATED LAYER (config already pasted)     -->
 <!-- ============================================================= -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getFirestore, collection, addDoc, onSnapshot, query, where, serverTimestamp }
+import { getFirestore, collection, addDoc, setDoc, deleteDoc, doc, onSnapshot, query, where, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
-/* ▼▼▼ PASTE YOUR firebaseConfig HERE (Firebase console → Project settings → Your apps) ▼▼▼ */
 const firebaseConfig = {
   apiKey:            "AIzaSyBsXL_nH9YB0gfQV8XYkw_JcnZEL_0b_E8",
   authDomain:        "nueces-tracker.firebaseapp.com",
@@ -922,17 +921,17 @@ const firebaseConfig = {
   messagingSenderId: "118865121927",
   appId:             "1:118865121927:web:72f9d7eaceeffff1a69e22"
 };
-/* ▲▲▲ ------------------------------------------------------------------------------------- ▲▲▲ */
 
 const TILZ = 183.10;
 if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   const db = getFirestore(initializeApp(firebaseConfig));
   const badge = document.createElement('div');
   badge.style.cssText='position:fixed;bottom:8px;right:8px;background:#0f8a5f;color:#fff;font:600 11px sans-serif;padding:4px 9px;border-radius:20px;z-index:9998;opacity:.9';
-  badge.textContent='🔗 shared mode'; document.body.appendChild(badge);
+  badge.textContent='\u{1F517} shared mode'; document.body.appendChild(badge);
 
+  /* ---------- SIGHTINGS: submit as pending, stream approved into the model ---------- */
   window.addSight = async function () {
-    const who = document.getElementById('oWho').value.trim() || '—';
+    const who = document.getElementById('oWho').value.trim() || '\u2014';
     const til = parseFloat(document.getElementById('oTil').value);
     const dep = parseFloat(document.getElementById('oDep').value);
     if (isNaN(til)) { alert('Enter the current Tilden gauge reading.'); return; }
@@ -944,31 +943,47 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
       if (isNaN(lat) || isNaN(lon)) { alert('Enter coordinates for the new location.'); return; }
       let ge = parseFloat(document.getElementById('oGe').value);
       if (isNaN(ge)) { const v = await window.fetchElev(lat, lon); if (v != null) ge = +v.toFixed(1); else { alert('Enter a ground elevation.'); return; } }
-      loc = { name, lat, lon, elev: ge };
-      const L = window.locs(); L.push({ id:'u'+Date.now(), ...loc, seed:false });
-      localStorage.setItem('nueces_v2_loc', JSON.stringify(L));
+      loc = { id:'u'+Date.now(), name, lat, lon, elev: ge, seed:false };
+      const L = window.locs(); L.push(loc); localStorage.setItem('nueces_v2_loc', JSON.stringify(L));
+      pushLoc(loc);   // share the new pin
     } else {
       loc = window.locs().find(x => x.id === where);
       if (!loc) { alert('Pick a location.'); return; }
     }
     const rm = window.riverMi(loc);
     const off = loc.elev + dep - TILZ - til;
+    if (off < -20 || off > 80) { alert('That reading looks out of range \u2014 double-check the depth and gauge value.'); return; }
     const whenVal = document.getElementById('oWhen').value;
     const obsAt = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : null;
-    if (off < -20 || off > 80) { alert('That reading looks out of range — double-check the depth and gauge value.'); return; }
     try {
       await addDoc(collection(db, 'sightings'),
         { who, where: loc.name, rm:+rm.toFixed(1), off:+off.toFixed(1), obsAt, status:'pending', t: serverTimestamp() });
       document.getElementById('impactBox').innerHTML =
-        '<span style="color:#1a6f8b">✓ Sent for approval. It will move the shared model once an admin approves it.</span>';
+        '<span style="color:#1a6f8b">\u2713 Sent for approval. It will move the shared model once an admin approves it.</span>';
       document.getElementById('oDep').value = ''; document.getElementById('oWhen').value = '';
     } catch (e) { alert('Could not submit: ' + (e.code||e.message) + '. Check your internet.'); }
   };
-
   onSnapshot(query(collection(db, 'sightings'), where('status','==','approved')), snap => {
     const arr = snap.docs.map(d => { const s = d.data();
-      return { id:d.id, t:(s.obsAt||'(shared)'), who:s.who, where:s.where, rm:s.rm, off:s.off }; });
+      return { id:d.id, t:(s.obsAt||'(shared)'), who:s.who, where:s.where, rm:s.rm, off:s.off }; })
+      .filter(s => typeof s.off === 'number');   // skip field logs that lacked gauge/elevation
     localStorage.setItem('nueces_v2_s', JSON.stringify(arr));
+    if (window.render) window.render();
+  });
+
+  /* ---------- LOCATIONS: open shared map (everyone sees the same pins) ---------- */
+  async function pushLoc(l){ try{ await setDoc(doc(db,'locations',l.id), {name:l.name,lat:l.lat,lon:l.lon,elev:l.elev}); }catch(e){} }
+  async function pushAllUserLocs(){ for(const l of window.locs()){ if(!l.seed) await pushLoc(l); } }
+  const _saveLoc = window.saveLoc;
+  window.saveLoc = async function(){ await _saveLoc(); pushAllUserLocs(); };
+  const _delLoc = window.delLoc;
+  window.delLoc = function(id){ _delLoc(id); try{ deleteDoc(doc(db,'locations',id)); }catch(e){} };
+  onSnapshot(collection(db,'locations'), snap => {
+    const remote = snap.docs.map(d => { const x=d.data(); return {id:d.id,name:x.name,lat:x.lat,lon:x.lon,elev:x.elev,seed:false}; });
+    const remoteIds = new Set(remote.map(r=>r.id));
+    const localExtra = window.locs().filter(l => !l.seed && !remoteIds.has(l.id));  // not yet synced up
+    const merged = (window.__seedLocs||[]).concat(remote, localExtra);
+    localStorage.setItem('nueces_v2_loc', JSON.stringify(merged));
     if (window.render) window.render();
   });
 }

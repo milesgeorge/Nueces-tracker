@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nueces — Quick Field Log</title>
+<style>
+  :root{--ink:#12202e;--mut:#6b7684;--rule:#d3d9e0;--grn:#0f8a5f;--blu:#1a6f8b;--red:#c1272d}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#0f1c28;color:#eaf2f8;font-size:17px;line-height:1.4}
+  .wrap{max-width:480px;margin:0 auto;padding:16px}
+  h1{font-size:20px;margin:6px 0 2px}
+  .sub{color:#9fb4c6;font-size:13px;margin:0 0 14px}
+  .card{background:#17293a;border:1px solid #24405a;border-radius:14px;padding:15px;margin:12px 0}
+  label{display:block;font-size:13px;color:#9fb4c6;margin:10px 0 4px}
+  input{width:100%;padding:14px;border:1px solid #2c4b68;border-radius:10px;background:#0f1c28;color:#eaf2f8;font-size:18px}
+  button{width:100%;cursor:pointer;border:none;border-radius:12px;padding:16px;font-size:18px;font-weight:700;color:#fff}
+  .gps{background:var(--blu)}
+  .go{background:var(--grn);margin-top:14px}
+  .go:disabled{background:#39505f;color:#8fa3b3}
+  .grab{background:#122536;border:1px solid #24405a;border-radius:10px;padding:11px 13px;margin-top:10px;font-size:14px}
+  .grab b{color:#7fd3ff}
+  .ok{color:#63d69b}.err{color:#ff9b9b}
+  .big{font-size:20px}
+  .foot{color:#6b8299;font-size:12px;margin:16px 4px 40px;text-align:center}
+  a{color:#7fd3ff}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Nueces — Quick Field Log</h1>
+  <p class="sub">See water? Log it in 10 seconds. Your phone grabs the location — you just add the depth.</p>
+
+  <div class="card">
+    <button class="gps" onclick="getLoc()">📍 Use my GPS location</button>
+    <div class="grab" id="locBox" style="display:none"></div>
+    <div id="manual" style="display:none">
+      <label>latitude</label><input id="lat" type="number" step="0.000001" inputmode="decimal" placeholder="28.2305">
+      <label>longitude</label><input id="lon" type="number" step="0.000001" inputmode="decimal" placeholder="-98.6489">
+      <button class="gps" style="background:#39505f;margin-top:10px" onclick="useManual()">Use these coordinates</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>Your name</label>
+    <input id="who" placeholder="who's reporting">
+    <label>Water depth here (feet · 0 = just reaching the ground)</label>
+    <input id="dep" class="big" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 1.5">
+    <label>Spot nickname (optional)</label>
+    <input id="nick" placeholder="e.g. river pump, low crossing">
+    <button class="go" id="submitBtn" onclick="submit()" disabled>Get location first ↑</button>
+    <div id="msg" style="margin-top:12px;font-size:15px"></div>
+  </div>
+
+  <p class="foot">Time is stamped automatically. This waits for approval before it moves the forecast.<br>
+  Full tracker: <a href="index.html">open the map & forecast →</a><br>
+  Helper only — follow official NWS/NOAA warnings for anything dangerous.</p>
+</div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getFirestore, collection, addDoc, serverTimestamp }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey:            "AIzaSyBsXL_nH9YB0gfQV8XYkw_JcnZEL_0b_E8",
+  authDomain:        "nueces-tracker.firebaseapp.com",
+  projectId:         "nueces-tracker",
+  storageBucket:     "nueces-tracker.firebasestorage.app",
+  messagingSenderId: "118865121927",
+  appId:             "1:118865121927:web:72f9d7eaceeffff1a69e22"
+};
+const db = getFirestore(initializeApp(firebaseConfig));
+
+const TIL_ZERO=183.10, SIN=2.2, TILG={lat:28.30889,lon:-98.55724};
+let LAT=null, LON=null, ELEV=null, TIL=null;
+
+function riverMi(lat,lon){const dy=(lat-TILG.lat)*69.05, dx=(lon-TILG.lon)*69.05*Math.cos(lat*Math.PI/180); return Math.hypot(dx,dy)*SIN;}
+function box(html){const b=document.getElementById('locBox');b.style.display='block';b.innerHTML=html;}
+
+window.getLoc = function(){
+  box('Locating…');
+  if(!navigator.geolocation){box('<span class="err">No GPS on this device — enter coordinates below.</span>');document.getElementById('manual').style.display='block';return;}
+  navigator.geolocation.getCurrentPosition(
+    async p=>{ await capture(p.coords.latitude, p.coords.longitude); },
+    e=>{ box('<span class="err">GPS blocked ('+e.message+'). Enter coordinates below, or allow location in Settings → Safari.</span>');document.getElementById('manual').style.display='block'; },
+    {enableHighAccuracy:true, timeout:12000}
+  );
+};
+window.useManual = function(){
+  const la=parseFloat(document.getElementById('lat').value), lo=parseFloat(document.getElementById('lon').value);
+  if(isNaN(la)||isNaN(lo)){alert('Enter both latitude and longitude.');return;}
+  capture(la,lo);
+};
+async function capture(lat,lon){
+  LAT=lat;LON=lon;
+  box('📍 <b>'+lat.toFixed(5)+', '+lon.toFixed(5)+'</b><br>fetching ground elevation & river gauge…');
+  try{const r=await fetch(`https://epqs.nationalmap.gov/v1/json?x=${lon}&y=${lat}&units=Feet&wkid=4326`).then(r=>r.json());ELEV=+r.value;}catch(e){ELEV=null;}
+  try{const g=await fetch('https://api.water.noaa.gov/nwps/v1/gauges/TILT2').then(r=>r.json());TIL=+g.status.observed.primary;}catch(e){TIL=null;}
+  box('📍 <b>'+lat.toFixed(5)+', '+lon.toFixed(5)+'</b>'+
+      '<br>ground: <b>'+(ELEV!=null?ELEV.toFixed(1)+' ft':'—')+'</b> · Tilden gauge: <b>'+(TIL!=null?TIL.toFixed(1)+' ft':'—')+'</b>'+
+      (ELEV==null||TIL==null?'<br><span class="err">(some auto-data missing — you can still submit; we\'ll fill it in)</span>':''));
+  const b=document.getElementById('submitBtn');b.disabled=false;b.textContent='✓ Submit this sighting';
+}
+
+window.submit = async function(){
+  if(LAT==null){alert('Tap "Use my GPS location" first.');return;}
+  const who=document.getElementById('who').value.trim()||'—';
+  const dep=parseFloat(document.getElementById('dep').value);
+  if(isNaN(dep)){alert('Enter the water depth (0 if it is just reaching the ground).');return;}
+  const nick=document.getElementById('nick').value.trim() || (LAT.toFixed(4)+', '+LON.toFixed(4));
+  const rm=riverMi(LAT,LON);
+  const msg=document.getElementById('msg');
+  msg.innerHTML='Sending…';
+  try{
+    // shared map pin (shows for everyone right away) — only if we have an elevation
+    if(ELEV!=null){ await addDoc(collection(db,'locations'), {name:nick,lat:LAT,lon:LON,elev:ELEV}); }
+    // sighting (waits for approval to move the model). off needs elev+gauge; if missing, send raw for admin to complete.
+    const off = (ELEV!=null && TIL!=null) ? +(ELEV+dep-TIL_ZERO-TIL).toFixed(1) : null;
+    await addDoc(collection(db,'sightings'), {
+      who, where:nick, rm:+rm.toFixed(1), off,
+      lat:LAT, lon:LON, elev:ELEV, depth:dep, tilden:TIL,
+      obsAt:new Date().toLocaleString()+' (field)', status:'pending', t:serverTimestamp()
+    });
+    msg.innerHTML='<span class="ok">✓ Sent! It will show on the map and — once approved — sharpen the forecast. Thank you.</span>';
+    document.getElementById('dep').value='';document.getElementById('nick').value='';
+  }catch(e){ msg.innerHTML='<span class="err">Could not send: '+(e.code||e.message)+'. Check your signal and try again.</span>'; }
+};
+</script>
+</body>
+</html>
