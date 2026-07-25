@@ -78,6 +78,7 @@ let LAT=null, LON=null, ELEV=null, TIL=null;
 function riverMi(lat,lon){const dy=(lat-TILG.lat)*69.05, dx=(lon-TILG.lon)*69.05*Math.cos(lat*Math.PI/180); return Math.hypot(dx,dy)*SIN;}
 function box(html){const b=document.getElementById('locBox');b.style.display='block';b.innerHTML=html;}
 
+window.logAnother = function(){ document.getElementById('msg').innerHTML=''; getLoc(); window.scrollTo(0,0); };
 window.getLoc = function(){
   box('Locating…');
   if(!navigator.geolocation){box('<span class="err">No GPS on this device — enter coordinates below.</span>');document.getElementById('manual').style.display='block';return;}
@@ -122,8 +123,11 @@ window.submit = async function(){
       lat:LAT, lon:LON, elev:ELEV, depth:dep, tilden:TIL,
       obsAt:new Date().toLocaleString()+' (field)', status:'pending', t:serverTimestamp()
     });
-    msg.innerHTML='<span class="ok">✓ Sent! It will show on the map and — once approved — sharpen the forecast. Thank you.</span>';
+    msg.innerHTML='<span class="ok">✓ Sent! It will show on the map and — once approved — sharpen the forecast. Thank you.</span>'+
+      '<button class="gps" style="margin-top:12px" onclick="logAnother()">＋ Log another spot</button>';
     document.getElementById('dep').value='';document.getElementById('nick').value='';
+    // require a fresh GPS grab before the next submit, so location/gauge/time are current
+    LAT=null;const b=document.getElementById('submitBtn');b.disabled=true;b.textContent='Get location first ↑';
   }catch(e){ msg.innerHTML='<span class="err">Could not send: '+(e.code||e.message)+'. Check your signal and try again.</span>'; }
 };
 </script>
