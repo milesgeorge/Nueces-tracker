@@ -59,7 +59,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getFirestore, collection, addDoc, serverTimestamp }
+import { getFirestore, collection, addDoc, setDoc, doc, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -110,20 +110,16 @@ window.submit = async function(){
   const dep=parseFloat(document.getElementById('dep').value);
   if(isNaN(dep)){alert('Enter the water depth (0 if it is just reaching the ground).');return;}
   const nick=document.getElementById('nick').value.trim() || (LAT.toFixed(4)+', '+LON.toFixed(4));
-  const rm=riverMi(LAT,LON);
   const msg=document.getElementById('msg');
   msg.innerHTML='Sending…';
   try{
-    // shared map pin (shows for everyone right away) — only if we have an elevation
-    if(ELEV!=null){ await addDoc(collection(db,'locations'), {name:nick,lat:LAT,lon:LON,elev:ELEV}); }
-    // sighting (waits for approval to move the model). off needs elev+gauge; if missing, send raw for admin to complete.
-    const off = (ELEV!=null && TIL!=null) ? +(ELEV+dep-TIL_ZERO-TIL).toFixed(1) : null;
-    await addDoc(collection(db,'sightings'), {
-      who, where:nick, rm:+rm.toFixed(1), off,
-      lat:LAT, lon:LON, elev:ELEV, depth:dep, tilden:TIL,
-      obsAt:new Date().toLocaleString()+' (field)', status:'pending', t:serverTimestamp()
+    // A field log is a LIVE REPORT — shows on the shared map immediately.
+    // It does NOT recalibrate the forecast (only high-water marks in the main tool do).
+    await addDoc(collection(db,'reports'), {
+      who, where:nick, lat:LAT, lon:LON, depth:dep, tilden:TIL,
+      t:new Date().toLocaleString()+' (field)', ts:serverTimestamp()
     });
-    msg.innerHTML='<span class="ok">✓ Sent! It will show on the map and — once approved — sharpen the forecast. Thank you.</span>'+
+    msg.innerHTML='<span class="ok">✓ Sent! It will show on the shared map. Thank you.</span>'+
       '<button class="gps" style="margin-top:12px" onclick="logAnother()">＋ Log another spot</button>';
     document.getElementById('dep').value='';document.getElementById('nick').value='';
     // require a fresh GPS grab before the next submit, so location/gauge/time are current

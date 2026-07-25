@@ -197,46 +197,51 @@ window.addEventListener('error',function(e){
     <div id="profileSvg"></div>
   </div>
 
-  <!-- 6 TEACH -->
+  <!-- 6 REPORT + CALIBRATE -->
   <div class="card">
-    <h2>6 · Teach the model — log a real sighting</h2>
-    <p class="sub">Tell it where the water actually is. It converts your report into a measured “water rise above the gauge,” then re-fits its slope so every estimate matches reality. New spots you report here are saved into your Locations list above.</p>
-    <a href="log.html" style="display:block;text-align:center;background:#1a6f8b;color:#fff;font-weight:700;text-decoration:none;padding:12px;border-radius:10px;margin-bottom:12px">📍 In the field on a phone? Use the Quick Field Log — it grabs GPS for you →</a>
-    <div class="row">
-      <div><label>Who is reporting</label><input id="oWho" placeholder="name"></div>
-      <div><label>Where — pick a saved location…</label><select id="oWhere" onchange="onWhere()"></select></div>
-    </div>
-    <div id="newLocFields" style="display:none">
-      <div class="row">
-        <div><label>New location name</label><input id="oName" placeholder="e.g. north crossing"></div>
+    <h2>6 · Report water &amp; teach the model</h2>
+    <p class="sub">Two different jobs. A <b>live report</b> shows where the water is right now on the shared map. A <b>high-water mark</b> — the peak line, after a flood crests — is the only thing that re-calibrates the forecast, because the ranch floods a day <i>ahead</i> of the gauge.</p>
+    <a href="log.html" style="display:block;text-align:center;background:#1a6f8b;color:#fff;font-weight:700;text-decoration:none;padding:12px;border-radius:10px;margin:6px 0 12px">📍 In the field on a phone? Use the Quick Field Log — GPS, one screen →</a>
+
+    <!-- Part A: LIVE REPORT (map only) -->
+    <div style="border:1px solid var(--rule);border-radius:10px;padding:11px">
+      <b style="font-size:13.5px">📍 Report water now</b>
+      <span class="help" style="display:block;margin-top:2px">Shows on the shared map. Does <b>not</b> change the forecast.</span>
+      <div class="row" style="margin-top:6px">
+        <div><label>Who</label><input id="rWho" placeholder="name"></div>
+        <div><label>Where</label><select id="rWhere" onchange="onWhereR()"></select></div>
       </div>
-      <div class="row">
-        <div><label>latitude</label><input id="oLat" type="number" step="0.000001" placeholder="28.2300"></div>
-        <div><label>longitude</label><input id="oLon" type="number" step="0.000001" placeholder="-98.6487"></div>
-        <div><label>ground elev (ft) <span class="help">auto</span></label><input id="oGe" type="number" step="0.1" placeholder="auto"></div>
+      <div class="row" style="margin-top:6px">
+        <div><label>Water depth here (ft · 0 = just reaching ground)</label><input id="rDep" type="number" step="0.1" placeholder="0"></div>
+        <div><label>When <span class="help">blank = now</span></label><input id="rWhen" type="datetime-local"></div>
       </div>
+      <button class="add sm" style="width:100%;margin-top:8px" onclick="addReport()">＋ Add report to the map</button>
+      <div id="reportMsg" style="font-size:12.5px;margin-top:6px"></div>
+      <table id="reportTable"><thead><tr><th>time</th><th>who</th><th>where</th><th>depth</th><th></th></tr></thead><tbody></tbody></table>
     </div>
-    <div style="background:#fff6e6;border:1px solid var(--amb);border-radius:8px;padding:9px 11px;margin-top:8px">
-      <label style="color:#7a5108;font-weight:700;margin-top:0">🕐 When was it seen? — set this to backdate a report</label>
-      <span class="help" style="color:#8a6d3b;display:block;margin-bottom:5px">Leave blank if it's happening <b>right now</b>. Set an earlier time if you saw it earlier today, or someone called it in from before.</span>
-      <input id="oWhen" type="datetime-local">
+
+    <!-- Part B: HIGH-WATER MARK (calibration) -->
+    <div style="border:1px solid var(--grn);border-radius:10px;padding:11px;margin-top:12px;background:#f0f7f2">
+      <b style="font-size:13.5px;color:#0f6b45">🎯 Add a high-water mark — calibrate the model</b>
+      <span class="help" style="display:block;margin-top:3px">Use this <b>after a flood peaks</b> (or for a known past flood): mark the high-water line at a spot and give that flood's <b>peak</b> Tilden crest. This is the only thing that re-fits the forecast — and (in shared mode) only after you approve it.</span>
+      <div class="row" style="margin-top:6px">
+        <div><label>Where — the high-water line</label><select id="hWhere" onchange="onWhereH()"></select></div>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <div><label>Depth at the line (ft · 0 = the debris/mud line at the ground)</label><input id="hDep" type="number" step="0.1" placeholder="0"></div>
+        <div><label>That flood's PEAK Tilden crest (ft)</label><input id="hPeak" type="number" step="0.1" placeholder="e.g. 23.1"></div>
+      </div>
+      <div style="margin-top:6px">
+        <button class="sm" onclick="autoPeak()">⤓ Use this event's forecast crest</button>
+        <span class="sub" id="peakNote" style="margin-left:6px"></span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><button class="add sm" style="width:100%" onclick="addHWM()">＋ Add high-water mark &amp; re-fit</button></div>
+        <div><button class="sm" style="width:100%" onclick="resetHWM()">↺ Reset to seed (2013)</button></div>
+      </div>
+      <div class="learn" id="learnBox"></div>
+      <table id="hwmTable"><thead><tr><th>event</th><th>where</th><th>peak gauge</th><th>rise / river-mi</th><th></th></tr></thead><tbody></tbody></table>
     </div>
-    <div class="row" style="margin-top:6px">
-      <div><label>Water depth at that spot (ft, 0 = just reaching ground)</label><input id="oDep" type="number" step="0.1" placeholder="0"></div>
-      <div><label>Tilden gauge reading at that time (ft)</label><input id="oTil" type="number" step="0.1" placeholder="auto or type"></div>
-    </div>
-    <div style="margin-top:6px">
-      <button class="sm" onclick="autoTilden()">⤓ Auto-fill Tilden gauge from NOAA</button>
-      <span class="sub" id="tilNote" style="margin-left:6px"></span>
-    </div>
-    <div class="row" style="margin-top:8px">
-      <div><button class="add sm" style="width:100%" onclick="addSight()">＋ Add sighting &amp; re-fit</button></div>
-      <div><button class="sm" style="width:100%" onclick="resetSight()">↺ Reset to seed</button></div>
-      <div><button class="sm" style="width:100%" onclick="exportSight()">⬇ Export CSV</button></div>
-    </div>
-    <div class="learn" id="learnBox"></div>
-    <div id="impactBox" style="font-size:12.5px;margin-top:6px"></div>
-    <table id="sightTable"><thead><tr><th>time</th><th>who</th><th>where</th><th>dist. above gauge</th><th>water rise above gauge</th><th></th></tr></thead><tbody></tbody></table>
   </div>
 
   <!-- 7 HISTORICAL -->
@@ -308,8 +313,8 @@ window.addEventListener('error',function(e){
       <h3 id="help-s5">5 · Reach profile</h3>
       <p>A side-view of the water surface down the whole chain. Pills between gauges are travel time; ⚠ marks a gauge above flood stage; kcfs is live flow; 🌊 is the wave’s current position.</p>
 
-      <h3 id="help-s6">6 · Teach the model</h3>
-      <p>This is what makes it smarter over time. When someone sees where the water actually is, log it: who, where, the water depth there, and the current Tilden reading. The tool converts that into a measured “water rise above the gauge” and <b>re-fits its slope</b> so every estimate matches reality. New spots you report are saved into your Locations list. Edit or delete any sighting to recalculate. In shared (Firebase) mode, sightings go to an admin for approval before they move the shared model.</p>
+      <h3 id="help-s6">6 · Report water &amp; teach the model</h3>
+      <p>Two separate things. A <b>live report</b> (“water is here now”) drops a blue pin on the shared map so everyone can see where the water is — it does <b>not</b> change the forecast. A <b>high-water mark</b> is how the model actually learns: after a flood <i>peaks</i>, you mark the high-water line at a known spot and give that flood's <b>peak</b> Tilden crest, and the tool re-fits its water-surface slope. The reason it must be peak-to-peak is that the ranch floods about a day <i>ahead</i> of the gauge, so a live reading compared to the live gauge would over-steepen the model. In shared mode, high-water marks go to an admin for approval before they move the forecast; live reports appear on the map right away.</p>
 
       <h3 id="help-s7">7 · Historical context</h3>
       <p>Every Tilden flood on record since 1935, ranked against your scenario, with a plain-English read of where it sits. <b>★</b> marks the five benchmark floods with full detail. <b>Tap any event</b> for its story and a compare/contrast to what you’re watching. After a flood ends and NOAA logs the official crest, press <b>“Update record from NOAA”</b> to pull it in.</p>
@@ -413,9 +418,12 @@ window.__seedLocs=SEED_LOCS;   // exposed so the shared-locations layer can merg
 /* ================= geometry + adaptive slope ================= */
 function miAB(a,b){const dy=(b.lat-a.lat)*69.05,dx=(b.lon-a.lon)*69.05*Math.cos(a.lat*Math.PI/180);return Math.hypot(dx,dy);}
 function riverMi(pt){return miAB(TILG,pt)*SIN;}
-function sights(){try{return JSON.parse(localStorage.getItem('nueces_v2_s')||'[]')}catch(e){return[]}}
-function saveS(a){localStorage.setItem('nueces_v2_s',JSON.stringify(a));}
-function anchors(){return [RANCH_SEED,...sights().map(s=>({rm:s.rm,off:s.off,w:2.0}))];}
+/* HIGH-WATER MARKS calibrate the model (peak-to-peak). LIVE REPORTS only show on the map. */
+function hwm(){try{return JSON.parse(localStorage.getItem('nueces_v2_hwm')||'[]')}catch(e){return[]}}
+function saveHWM(a){localStorage.setItem('nueces_v2_hwm',JSON.stringify(a));}
+function reports(){try{return JSON.parse(localStorage.getItem('nueces_v2_reports')||'[]')}catch(e){return[]}}
+function saveReports(a){localStorage.setItem('nueces_v2_reports',JSON.stringify(a));}
+function anchors(){return [RANCH_SEED,...hwm().map(s=>({rm:s.rm,off:s.off,w:2.0}))];}
 function slope(){let n=0,d=0;for(const a of anchors()){n+=a.w*a.off*a.rm;d+=a.w*a.rm*a.rm;}return d>0?n/d:1.356;}
 function offsetAt(rm){return slope()*rm;}
 function wseAt(loc,crest){return TIL_ZERO+crest+offsetAt(riverMi(loc));}
@@ -522,7 +530,7 @@ function render(){
   document.getElementById('alertBox').innerHTML=`<div id="alert" style="background:${A.c}">`+
     `<div style="font-size:11px;font-weight:700;opacity:.9;letter-spacing:.3px">PREDICTED IF TILDEN CRESTS AT ${crest.toFixed(1)} FT</div>`+
     `<div class="lvl">${A.lvl}</div><div class="msg">${A.msg}</div></div>`;
-  drawLadder(crest);drawProfile(crest);renderLocs(crest);updateMap(crest);renderHist(crest);renderScen();
+  drawLadder(crest);drawProfile(crest);renderLocs(crest);updateMap(crest);renderHist(crest);renderScen();renderReports();renderHWM();
 }
 
 /* ---- historical ranking (full record, clickable) ---- */
@@ -724,7 +732,7 @@ function openLoc(id){const m=document.getElementById('locModal');document.getEle
   document.getElementById('mLon').value=l?l.lon:'';document.getElementById('mElev').value=l?l.elev:'';
   m.style.display='flex';}
 function closeLoc(){document.getElementById('locModal').style.display='none';
-  const w=document.getElementById('oWhere'); if(w&&w.value==='__new')w.selectedIndex=0;}  // cancelled add → reset the Section-6 picker
+  ['rWhere','hWhere'].forEach(id=>{const w=document.getElementById(id);if(w&&w.value==='__new')w.selectedIndex=0;});}
 function maybeAutoElev(){const lat=parseFloat(document.getElementById('mLat').value),lon=parseFloat(document.getElementById('mLon').value),e=document.getElementById('mElev').value;
   if(!isNaN(lat)&&!isNaN(lon)&&!e)autoElev();}
 async function autoElev(){const lat=parseFloat(document.getElementById('mLat').value),lon=parseFloat(document.getElementById('mLon').value);
@@ -769,103 +777,105 @@ function updateMap(crest){
     mk.bindTooltip(l.name,{permanent:true,direction:'right',offset:[8,0],className:'locLabel'});
     mk.addTo(MAP);MARKERS.push(mk);pts.push([l.lat,l.lon]);
   });
+  // live reports — blue droplets (situational; not part of the forecast)
+  reports().forEach(r=>{ if(r.lat==null||r.lon==null)return;
+    const mk=L.circleMarker([r.lat,r.lon],{radius:6,color:'#fff',weight:1.5,fillColor:'#2f8fd0',fillOpacity:.9});
+    mk.bindPopup(`<b>report:</b> ${r.depth} ft deep<br>${r.where}<br>${r.t} — ${r.who}`);
+    mk.addTo(MAP);MARKERS.push(mk);pts.push([r.lat,r.lon]);
+  });
   if(pts.length&&!MAP._fitOnce){MAP.fitBounds(pts,{padding:[30,30],maxZoom:15});MAP._fitOnce=true;}
 }
 
-/* ================= sightings ================= */
+/* ================= reports + high-water marks ================= */
 async function fetchElev(lat,lon){try{const r=await fetch(`https://epqs.nationalmap.gov/v1/json?x=${lon}&y=${lat}&units=Feet&wkid=4326`).then(r=>r.json());return r.value;}catch(e){return null;}}
-function refreshWhere(){const s=document.getElementById('oWhere');const cur=s.value;s.innerHTML='';
+function fillPicker(id){const s=document.getElementById(id);if(!s)return;const cur=s.value;s.innerHTML='';
   locs().forEach(l=>{const o=document.createElement('option');o.value=l.id;o.textContent=l.name;s.appendChild(o);});
   const o=document.createElement('option');o.value='__new';o.textContent='➕ add a new location (map / coordinates)…';s.appendChild(o);
-  if(window.__selectWhere){s.value=window.__selectWhere;window.__selectWhere=null;}
+  if(window.__selectWhere&&window.__whichPicker===id){s.value=window.__selectWhere;}
   else if(cur)s.value=cur;}
-/* Section 6 "new location" now opens the SAME Add-Location modal as Section 3
-   (coordinates + auto-elevation + tap-the-map), then auto-selects it here. */
-function onWhere(){ if(document.getElementById('oWhere').value==='__new'){ openLoc(); } }
-/* pull the Tilden gauge reading — live if "when" is blank, else the historical
-   value nearest the observed time from the USGS instantaneous record */
-async function autoTilden(){
-  const note=document.getElementById('tilNote'); note.textContent='fetching…';
-  const whenVal=document.getElementById('oWhen').value;
-  try{
-    if(!whenVal){
-      const g=await fetch('https://api.water.noaa.gov/nwps/v1/gauges/TILT2').then(r=>r.json());
-      const v=g.status.observed.primary; document.getElementById('oTil').value=v;
-      note.textContent=`current Tilden ${(+v).toFixed(2)} ft (${new Date(g.status.observed.validTime).toLocaleString()})`;
-      return;
-    }
-    const target=new Date(whenVal).getTime();
-    const d0=whenVal.slice(0,10);
-    const d1=new Date(target+86400000).toISOString().slice(0,10);
-    const url=`https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08194500&parameterCd=00065&startDT=${d0}&endDT=${d1}`;
-    const j=await fetch(url).then(r=>r.json());
-    const arr=j.value.timeSeries[0].values[0].value;
-    let best=null,bd=1e15;
-    arr.forEach(v=>{const t=new Date(v.dateTime).getTime();const dd=Math.abs(t-target);if(dd<bd){bd=dd;best=v;}});
-    if(best){document.getElementById('oTil').value=parseFloat(best.value).toFixed(2);
-      note.textContent=`Tilden was ${parseFloat(best.value).toFixed(2)} ft at ${new Date(best.dateTime).toLocaleString()} (nearest reading)`;}
-    else note.textContent='no gauge data found for that time — enter manually.';
-  }catch(e){note.textContent='could not auto-pull (browser blocked or no data) — read it off water.noaa.gov/gauges/TILT2 and type it.';}
+function refreshWhere(){fillPicker('rWhere');fillPicker('hWhere');
+  if(window.__selectWhere){window.__selectWhere=null;window.__whichPicker=null;}}
+function onWhereR(){ if(document.getElementById('rWhere').value==='__new'){ window.__whichPicker='rWhere'; openLoc(); } }
+function onWhereH(){ if(document.getElementById('hWhere').value==='__new'){ window.__whichPicker='hWhere'; openLoc(); } }
+
+/* ----- LIVE REPORT: map only, does not touch the model ----- */
+async function addReport(){
+  const who=document.getElementById('rWho').value.trim()||'—';
+  const dep=parseFloat(document.getElementById('rDep').value);
+  if(isNaN(dep)){alert('Enter the water depth (0 if just reaching the ground).');return;}
+  const loc=locs().find(x=>x.id===document.getElementById('rWhere').value);
+  if(!loc){alert('Pick or add a location.');return;}
+  const whenVal=document.getElementById('rWhen').value;
+  const t = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : new Date().toLocaleString();
+  const a=reports();
+  a.unshift({id:'r'+Date.now(),t,who,where:loc.name,lat:loc.lat,lon:loc.lon,depth:dep});
+  saveReports(a);
+  document.getElementById('reportMsg').innerHTML='<span style="color:#1a6f8b">✓ Added to the shared map. (Live reports show where water is — they do not change the forecast.)</span>';
+  document.getElementById('rDep').value='';document.getElementById('rWhen').value='';
+  render();
 }
-async function addSight(){
-  const who=document.getElementById('oWho').value.trim()||'—';
-  const til=parseFloat(document.getElementById('oTil').value), dep=parseFloat(document.getElementById('oDep').value);
-  if(isNaN(til)){alert('Enter the current Tilden gauge reading.');return;}
-  if(isNaN(dep)){alert('Enter the water depth at the spot (0 if just reaching the ground).');return;}
-  let loc, where=document.getElementById('oWhere').value;
-  if(where==='__new'){
-    const name=document.getElementById('oName').value.trim()||'sighting';
-    const lat=parseFloat(document.getElementById('oLat').value),lon=parseFloat(document.getElementById('oLon').value);
-    if(isNaN(lat)||isNaN(lon)){alert('Enter coordinates for the new location.');return;}
-    let ge=parseFloat(document.getElementById('oGe').value);
-    if(isNaN(ge)){const v=await fetchElev(lat,lon);if(v!=null)ge=+v.toFixed(1);else{alert('Enter a ground elevation for the new spot.');return;}}
-    loc={id:'u'+Date.now(),name,lat,lon,elev:ge,seed:false};
-    const L=locs();L.push(loc);saveLocs(L);          // <-- new sighting spot saved into Locations (Section 3)
-  } else {
-    loc=locs().find(x=>x.id===where);
-    if(!loc){alert('Pick a location.');return;}
-  }
-  const rm=riverMi(loc);
-  const off=loc.elev+dep-TIL_ZERO-til;                 // implied "water rise above gauge"
-  const crest=parseFloat(document.getElementById('crest').value);
-  const before=TIL_ZERO+crest+offsetAt(18.0);          // ranch WSE before this sighting
-  const whenVal=document.getElementById('oWhen').value;
-  const tstamp = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : new Date().toLocaleString();
-  const a=sights();
-  a.unshift({id:'s'+Date.now(),t:tstamp,who,where:loc.name,rm:+rm.toFixed(1),off:+off.toFixed(1)});
-  saveS(a);
-  const after=TIL_ZERO+crest+offsetAt(18.0);           // ranch WSE after
-  const dw=after-before;
-  document.getElementById('impactBox').innerHTML=
-    `<span style="color:${Math.abs(dw)<0.05?'#6b7684':'#0f8a5f'}">✓ Sighting added. It moved the predicted ranch water surface by <b>${dw>=0?'+':''}${dw.toFixed(2)} ft</b> `+
-    (Math.abs(dw)<0.05?'(this sighting agrees with the current model — no change needed, which is itself confirmation).':'(watch Section 3 update).')+`</span>`;
-  renderSights();render();
-  document.getElementById('oDep').value='';document.getElementById('oWhen').value='';
-}
-function resetSight(){if(confirm('Clear all sightings and return the model to its seed slope?')){localStorage.removeItem('nueces_v2_s');document.getElementById('impactBox').innerHTML='';renderSights();render();}}
-function editSight(id){const s=sights().find(x=>x.id===id);if(!s)return;
-  document.getElementById('oWho').value=s.who;
-  // load into form as a new-location edit (keeps coords implicit; user re-enters depth/gauge)
-  alert('Loaded "'+s.where+'" into the form. Adjust the depth or gauge reading and press Add to re-record; the old entry has been removed so the model recalculates.');
-  saveS(sights().filter(x=>x.id!==id));renderSights();render();
-}
-function delSight(id){saveS(sights().filter(x=>x.id!==id));document.getElementById('impactBox').innerHTML='<span style="color:#6b7684">Sighting deleted — model recalculated.</span>';renderSights();render();}
-function renderSights(){
-  const b=document.querySelector('#sightTable tbody');b.innerHTML='';
-  sights().forEach(s=>{const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${s.t}</td><td>${s.who}</td><td>${s.where}</td><td>${s.rm} mi</td><td>${s.off} ft</td>`+
-      `<td style="white-space:nowrap"><button class="sm" style="padding:3px 7px" onclick="editSight('${s.id}')">edit</button> <button class="sm" style="padding:3px 7px;background:#8a1f1f" onclick="delSight('${s.id}')">✕</button></td>`;
+function delReport(id){saveReports(reports().filter(x=>x.id!==id));render();}
+function renderReports(){
+  const b=document.querySelector('#reportTable tbody');if(!b)return;b.innerHTML='';
+  reports().slice(0,25).forEach(r=>{const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${r.t}</td><td>${r.who}</td><td>${r.where}</td><td>${r.depth} ft</td>`+
+      `<td><button class="sm" style="padding:3px 7px;background:#8a1f1f" onclick="delReport('${r.id}')">✕</button></td>`;
     b.appendChild(tr);});
-  const sl=slope(),n=sights().length,moved=((sl-1.356)/1.356*100);
-  document.getElementById('learnBox').innerHTML= n===0?
-    `<b>Model state:</b> slope <b>1.356 ft per river-mile</b> (seed, from the 2013 ranch marks). Log a sighting and it re-fits. <span style="color:#6b7684">“Dist. above gauge” = how far upstream of Tilden the spot is; “water rise above gauge” = how high the water sits above the gauge reading there — the number the model learns.</span>`:
-    `<b>Learned from ${n} sighting(s):</b> slope now <b>${sl.toFixed(3)} ft/river-mile</b> (${moved>=0?'+':''}${moved.toFixed(0)}% vs seed). Every estimate above now uses this. `+
-    (Math.abs(moved)>12?'<span style="color:#c1272d">Large shift — reach behaving unlike the seed; likely a different mechanism than picked.</span>':'');
 }
-function exportSight(){const a=sights();if(!a.length){alert('No sightings yet.');return;}
-  const rows=[['time','who','where','river_mi_above_tilden','water_rise_above_gauge_ft'],...a.map(s=>[s.t,s.who,s.where,s.rm,s.off])];
-  const csv=rows.map(r=>r.map(x=>`"${x}"`).join(',')).join('\n');
-  const u=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));const el=document.createElement('a');el.href=u;el.download='nueces_sightings.csv';el.click();}
+
+/* ----- HIGH-WATER MARK: peak-to-peak, the only thing that calibrates ----- */
+function validCalib(off,rm,peak){
+  if(rm<3){ alert("That spot is basically at the gauge — too close to calibrate a slope. Pick a location farther up the reach."); return false; }
+  if(peak<14){
+    alert("That flood's peak Tilden crest ("+peak.toFixed(1)+" ft) is below flood stage — a high-water mark only makes sense for an actual flood (peak ~14 ft or higher).");
+    return false;
+  }
+  const sl=off/rm;
+  if(sl<0.6||sl>2.0){
+    alert("This mark implies the flood surface rises "+sl.toFixed(2)+" ft per river-mile, outside the realistic range (~0.8–1.8).\n\nDouble-check the depth at the high-water line and the flood's PEAK crest value. Not applied.");
+    return false;
+  }
+  return true;
+}
+async function autoPeak(){
+  const note=document.getElementById('peakNote');note.textContent='fetching forecast crest…';
+  try{
+    const f=await fetch('https://api.water.noaa.gov/nwps/v1/gauges/TILT2/stageflow/forecast').then(r=>r.json());
+    const mx=Math.max.apply(null, f.data.map(d=>d.primary));
+    document.getElementById('hPeak').value=mx.toFixed(1);
+    note.textContent='forecast crest '+mx.toFixed(1)+' ft';
+  }catch(e){note.textContent='could not fetch — enter the crest manually from water.noaa.gov/gauges/TILT2.';}
+}
+async function addHWM(){
+  const loc=locs().find(x=>x.id===document.getElementById('hWhere').value);
+  if(!loc){alert('Pick or add a location for the high-water line.');return;}
+  const dep=parseFloat(document.getElementById('hDep').value);
+  const peak=parseFloat(document.getElementById('hPeak').value);
+  if(isNaN(dep)){alert('Enter the water depth at the high-water line (0 if the debris/mud line at ground).');return;}
+  if(isNaN(peak)){alert("Enter that flood's PEAK Tilden crest (ft).");return;}
+  const rm=riverMi(loc);
+  const off=loc.elev+dep-TIL_ZERO-peak;                 // water rise above the gauge, at the PEAK
+  if(!validCalib(off,rm,peak)) return;
+  const a=hwm();
+  a.unshift({id:'h'+Date.now(),t:new Date().toLocaleString(),event:'peak '+peak.toFixed(1)+' ft',where:loc.name,rm:+rm.toFixed(1),off:+off.toFixed(1),peak:+peak.toFixed(1)});
+  saveHWM(a);
+  document.getElementById('hDep').value='';
+  render();
+}
+function delHWM(id){saveHWM(hwm().filter(x=>x.id!==id));render();}
+function resetHWM(){if(confirm('Clear all high-water marks and return to the seed (2013) calibration?')){localStorage.removeItem('nueces_v2_hwm');render();}}
+function renderHWM(){
+  const b=document.querySelector('#hwmTable tbody');if(!b)return;b.innerHTML='';
+  hwm().forEach(s=>{const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${s.event||''}</td><td>${s.where}</td><td>${s.peak?s.peak.toFixed(1)+' ft':'—'}</td><td>${(s.off/s.rm).toFixed(2)}</td>`+
+      `<td><button class="sm" style="padding:3px 7px;background:#8a1f1f" onclick="delHWM('${s.id}')">✕</button></td>`;
+    b.appendChild(tr);});
+  const sl=slope(),n=hwm().length,moved=((sl-1.356)/1.356*100);
+  document.getElementById('learnBox').innerHTML= n===0?
+    `<b>Model:</b> water-surface slope <b>1.356 ft/river-mile</b> — the seed, from the confirmed 2013 high-water line (peak Tilden 23.5 ft). Add a high-water mark to refine it.`:
+    `<b>Calibrated from ${n} high-water mark(s):</b> slope now <b>${sl.toFixed(3)} ft/river-mile</b> (${moved>=0?'+':''}${moved.toFixed(0)}% vs seed).`+
+    (Math.abs(moved)>12?' <span style="color:#c1272d">Large shift — double-check the marks and their peak crest values.</span>':'');
+}
 
 /* ================= help ================= */
 function openHelp(anchor){const m=document.getElementById('helpModal');m.style.display='flex';
@@ -874,7 +884,7 @@ function openHelp(anchor){const m=document.getElementById('helpModal');m.style.d
   else b.scrollTop=0;}
 function closeHelp(){document.getElementById('helpModal').style.display='none';}
 function resetAll(){if(confirm('Clear ALL your saved locations, sightings and scenarios on this device? This cannot be undone.')){
-  ['nueces_v2_loc','nueces_v2_s','nueces_v2_scen','nueces_v2_hist'].forEach(k=>localStorage.removeItem(k));
+  ['nueces_v2_loc','nueces_v2_hwm','nueces_v2_reports','nueces_v2_scen','nueces_v2_hist'].forEach(k=>localStorage.removeItem(k));
   location.reload();}}
 function printHelp(){const w=window.open('','_blank');
   w.document.write('<html><head><title>Nueces Reach Model — How to use</title><style>body{font-family:Georgia,serif;max-width:640px;margin:24px auto;padding:0 16px;line-height:1.5}h3{color:#12202e;margin-top:18px}p{font-size:14px;color:#222}</style></head><body><h1>Nueces Reach Model — Miles Ranch · How to use</h1>'+document.getElementById('helpBody').innerHTML+'</body></html>');
@@ -898,7 +908,7 @@ function boot(){
   step(initDefaults);
   step(addHelpIcons);
   step(function(){ if(AUTO){applyAuto();} });
-  step(renderSights);
+  step(refreshWhere);
   step(render);
   // map last, and only if Leaflet actually loaded — never let it block the rest
   if(window.L && L.map){ step(initMap); step(function(){render();}); }
@@ -911,7 +921,8 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
 </script>
 
 <!-- ============================================================= -->
-<!--  FIREBASE SHARED + MODERATED LAYER (config already pasted)     -->
+<!--  FIREBASE SHARED LAYER (config already pasted)                 -->
+<!--  reports = open live map pins · hwm = moderated calibration    -->
 <!-- ============================================================= -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -934,61 +945,67 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   badge.style.cssText='position:fixed;bottom:8px;right:8px;background:#0f8a5f;color:#fff;font:600 11px sans-serif;padding:4px 9px;border-radius:20px;z-index:9998;opacity:.9';
   badge.textContent='\u{1F517} shared mode'; document.body.appendChild(badge);
 
-  /* ---------- SIGHTINGS: submit as pending, stream approved into the model ---------- */
-  window.addSight = async function () {
-    const who = document.getElementById('oWho').value.trim() || '\u2014';
-    const til = parseFloat(document.getElementById('oTil').value);
-    const dep = parseFloat(document.getElementById('oDep').value);
-    if (isNaN(til)) { alert('Enter the current Tilden gauge reading.'); return; }
-    if (isNaN(dep)) { alert('Enter the water depth at the spot (0 if just reaching ground).'); return; }
-    let loc, where = document.getElementById('oWhere').value;
-    if (where === '__new') {
-      const name = document.getElementById('oName').value.trim() || 'sighting';
-      const lat = parseFloat(document.getElementById('oLat').value), lon = parseFloat(document.getElementById('oLon').value);
-      if (isNaN(lat) || isNaN(lon)) { alert('Enter coordinates for the new location.'); return; }
-      let ge = parseFloat(document.getElementById('oGe').value);
-      if (isNaN(ge)) { const v = await window.fetchElev(lat, lon); if (v != null) ge = +v.toFixed(1); else { alert('Enter a ground elevation.'); return; } }
-      loc = { id:'u'+Date.now(), name, lat, lon, elev: ge, seed:false };
-      const L = window.locs(); L.push(loc); localStorage.setItem('nueces_v2_loc', JSON.stringify(L));
-      pushLoc(loc);   // share the new pin
-    } else {
-      loc = window.locs().find(x => x.id === where);
-      if (!loc) { alert('Pick a location.'); return; }
-    }
-    const rm = window.riverMi(loc);
-    const off = loc.elev + dep - TILZ - til;
-    if (off < -20 || off > 80) { alert('That reading looks out of range \u2014 double-check the depth and gauge value.'); return; }
-    const whenVal = document.getElementById('oWhen').value;
-    const obsAt = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : null;
+  /* ---------- LIVE REPORTS: open, appear on everyone's map instantly ---------- */
+  window.addReport = async function () {
+    const who = document.getElementById('rWho').value.trim() || '\u2014';
+    const dep = parseFloat(document.getElementById('rDep').value);
+    if (isNaN(dep)) { alert('Enter the water depth (0 if just reaching the ground).'); return; }
+    const loc = window.locs().find(x => x.id === document.getElementById('rWhere').value);
+    if (!loc) { alert('Pick or add a location.'); return; }
+    const whenVal = document.getElementById('rWhen').value;
+    const t = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : new Date().toLocaleString();
     try {
-      await addDoc(collection(db, 'sightings'),
-        { who, where: loc.name, rm:+rm.toFixed(1), off:+off.toFixed(1), obsAt, status:'pending', t: serverTimestamp() });
-      document.getElementById('impactBox').innerHTML =
-        '<span style="color:#1a6f8b">\u2713 Sent for approval. It will move the shared model once an admin approves it.</span>';
-      document.getElementById('oDep').value = ''; document.getElementById('oWhen').value = '';
-    } catch (e) { alert('Could not submit: ' + (e.code||e.message) + '. Check your internet.'); }
+      await addDoc(collection(db,'reports'), { who, where:loc.name, lat:loc.lat, lon:loc.lon, depth:dep, t, ts: serverTimestamp() });
+      document.getElementById('reportMsg').innerHTML = '<span style="color:#1a6f8b">\u2713 Added to the shared map.</span>';
+      document.getElementById('rDep').value=''; document.getElementById('rWhen').value='';
+    } catch(e){ alert('Could not send: '+(e.code||e.message)); }
   };
-  onSnapshot(query(collection(db, 'sightings'), where('status','==','approved')), snap => {
-    const arr = snap.docs.map(d => { const s = d.data();
-      return { id:d.id, t:(s.obsAt||'(shared)'), who:s.who, where:s.where, rm:s.rm, off:s.off }; })
-      .filter(s => typeof s.off === 'number');   // skip field logs that lacked gauge/elevation
-    localStorage.setItem('nueces_v2_s', JSON.stringify(arr));
+  onSnapshot(collection(db,'reports'), snap => {
+    const arr = snap.docs.map(d => ({ id:d.id, ...d.data() }))
+      .sort((a,b)=> (b.ts?.seconds||0)-(a.ts?.seconds||0));
+    localStorage.setItem('nueces_v2_reports', JSON.stringify(arr));
     if (window.render) window.render();
   });
+  window.delReport = function(id){ try{ deleteDoc(doc(db,'reports',id)); }catch(e){} };
 
-  /* ---------- LOCATIONS: open shared map (everyone sees the same pins) ---------- */
+  /* ---------- HIGH-WATER MARKS: moderated; only approved ones re-fit the model ---------- */
+  window.addHWM = async function () {
+    const loc = window.locs().find(x => x.id === document.getElementById('hWhere').value);
+    if (!loc) { alert('Pick or add a location for the high-water line.'); return; }
+    const dep = parseFloat(document.getElementById('hDep').value);
+    const peak = parseFloat(document.getElementById('hPeak').value);
+    if (isNaN(dep)) { alert('Enter the water depth at the high-water line (0 = debris/mud line at ground).'); return; }
+    if (isNaN(peak)) { alert("Enter that flood's PEAK Tilden crest (ft)."); return; }
+    const rm = window.riverMi(loc);
+    const off = loc.elev + dep - TILZ - peak;
+    if (!window.validCalib(off, rm, peak)) return;
+    try {
+      await addDoc(collection(db,'hwm'),
+        { event:'peak '+peak.toFixed(1)+' ft', where:loc.name, rm:+rm.toFixed(1), off:+off.toFixed(1), peak:+peak.toFixed(1), status:'pending', t: serverTimestamp() });
+      document.getElementById('hDep').value='';
+      alert('High-water mark sent for approval. It will re-fit the shared forecast once an admin approves it.');
+    } catch(e){ alert('Could not send: '+(e.code||e.message)); }
+  };
+  onSnapshot(query(collection(db,'hwm'), where('status','==','approved')), snap => {
+    const arr = snap.docs.map(d => { const s=d.data();
+      return { id:d.id, t:'(shared)', event:s.event, where:s.where, rm:s.rm, off:s.off, peak:s.peak }; })
+      .filter(s => typeof s.off==='number' && typeof s.rm==='number');
+    localStorage.setItem('nueces_v2_hwm', JSON.stringify(arr));
+    if (window.render) window.render();
+  });
+  window.delHWM = function(id){ try{ deleteDoc(doc(db,'hwm',id)); }catch(e){} };
+
+  /* ---------- LOCATIONS: open shared map pins ---------- */
   async function pushLoc(l){ try{ await setDoc(doc(db,'locations',l.id), {name:l.name,lat:l.lat,lon:l.lon,elev:l.elev}); }catch(e){} }
-  async function pushAllUserLocs(){ for(const l of window.locs()){ if(!l.seed) await pushLoc(l); } }
   const _saveLoc = window.saveLoc;
-  window.saveLoc = async function(){ await _saveLoc(); pushAllUserLocs(); };
+  window.saveLoc = async function(){ await _saveLoc(); for(const l of window.locs()){ if(!l.seed) await pushLoc(l); } };
   const _delLoc = window.delLoc;
   window.delLoc = function(id){ _delLoc(id); try{ deleteDoc(doc(db,'locations',id)); }catch(e){} };
   onSnapshot(collection(db,'locations'), snap => {
     const remote = snap.docs.map(d => { const x=d.data(); return {id:d.id,name:x.name,lat:x.lat,lon:x.lon,elev:x.elev,seed:false}; });
-    const remoteIds = new Set(remote.map(r=>r.id));
-    const localExtra = window.locs().filter(l => !l.seed && !remoteIds.has(l.id));  // not yet synced up
-    const merged = (window.__seedLocs||[]).concat(remote, localExtra);
-    localStorage.setItem('nueces_v2_loc', JSON.stringify(merged));
+    const ids = new Set(remote.map(r=>r.id));
+    const localExtra = window.locs().filter(l => !l.seed && !ids.has(l.id));
+    localStorage.setItem('nueces_v2_loc', JSON.stringify((window.__seedLocs||[]).concat(remote, localExtra)));
     if (window.render) window.render();
   });
 }

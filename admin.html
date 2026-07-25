@@ -21,7 +21,7 @@
 <body>
 <div class="wrap">
   <h1>Nueces Tracker — Moderation</h1>
-  <p class="muted">Approve or reject incoming sightings. Only approved ones move the shared model.</p>
+  <p class="muted">Approve or reject incoming <b>high-water marks</b>. Only approved ones re-calibrate the shared forecast. (Live map reports don't need approval.)</p>
 
   <div class="card" id="loginCard">
     <b>Admin sign-in</b>
@@ -40,7 +40,7 @@
     <div class="muted" id="empty" style="margin-top:8px">Nothing pending. 👍</div>
   </div>
 
-  <p class="muted">Config below must match the one in your tracker. Sanity range: a sighting whose “water rise above gauge” is outside −20…+80 ft is auto-flagged <span class="flag">⚠ check</span>.</p>
+  <p class="muted">Config below must match the one in your tracker. A mark whose implied water-surface slope is outside ~0.6–2.0 ft/river-mile is auto-flagged <span class="flag">⚠ check</span> — that usually means the depth or the peak crest value is off.</p>
 </div>
 
 <script type="module">
@@ -81,17 +81,18 @@ onAuthStateChanged(auth, user => {
 });
 
 function watchPending(){
-  const q = query(collection(db,'sightings'), where('status','==','pending'));
+  const q = query(collection(db,'hwm'), where('status','==','pending'));
   unsub = onSnapshot(q, snap => {
     const list = document.getElementById('list'); list.innerHTML = '';
     document.getElementById('cnt').textContent = snap.size;
     document.getElementById('empty').style.display = snap.size ? 'none' : 'block';
     snap.forEach(d => {
       const s = d.data();
-      const bad = (s.off < -20 || s.off > 80);
+      const sl = s.off / s.rm;
+      const bad = (sl < 0.6 || sl > 2.0);
       const el = document.createElement('div'); el.className = 'row';
-      el.innerHTML = `<div><b>${esc(s.where)}</b> — ${esc(s.who)}<br>
-        <span class="muted">rise above gauge ${(+s.off).toFixed(1)} ft · ${(+s.rm).toFixed(1)} river-mi ${bad?'<span class="flag">⚠ check</span>':''}${s.obsAt?' · observed '+esc(s.obsAt):''}</span></div>
+      el.innerHTML = `<div><b>${esc(s.where)}</b> — ${esc(s.event||'high-water mark')}<br>
+        <span class="muted">rise ${(+s.off).toFixed(1)} ft over ${(+s.rm).toFixed(1)} river-mi = ${sl.toFixed(2)} ft/mi · peak ${(+s.peak).toFixed(1)} ft ${bad?'<span class="flag">⚠ check</span>':''}</span></div>
         <div style="white-space:nowrap">
           <button class="sm ok" data-a="ok" data-id="${d.id}">Approve</button>
           <button class="sm no" data-a="no" data-id="${d.id}">Reject</button></div>`;
@@ -101,7 +102,7 @@ function watchPending(){
   });
 }
 async function act(a, id){
-  const ref = doc(db,'sightings',id);
+  const ref = doc(db,'hwm',id);
   if (a === 'ok') await updateDoc(ref, { status:'approved' });
   else await deleteDoc(ref);
 }
