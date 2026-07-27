@@ -62,6 +62,9 @@ window.addEventListener('error',function(e){
   body.mapbig #map{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:5000;border-radius:0;margin:0}
   body.mapbig #mapNote{font-size:12px}
   #mapExitBtn{position:fixed;top:12px;right:12px;z-index:5001;display:none;background:#12202e;color:#fff}
+  body.mapbig #mapControls{position:fixed;left:0;right:0;bottom:0;z-index:5001;background:rgba(15,28,40,.94);padding:8px 14px 12px;border-top:1px solid #2c4b68;max-height:42vh;overflow:auto}
+  body.mapbig #mapControls label,body.mapbig #mapControls .sub,body.mapbig #mapControls b{color:#dce8f2 !important}
+  body.mapbig #mapControls input[type=range]{width:100%}
   body.mapbig #mapExitBtn{display:inline-block}
   .modal{position:fixed;inset:0;background:rgba(10,15,22,.55);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px}
   .modal .box{background:#fff;border-radius:14px;max-width:420px;width:100%;padding:18px}
@@ -101,7 +104,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-28 · v26 — Expand map now true full-screen (fixed viewport, full width + height); flood fills on Play; wider desktop layout</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-28 · v28 — timeline scrubber + real clock/Tilden-crest times (ranch floods before crest); Play speed button (0.5–4×); gauge labels TILT2/COTT2</div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -230,9 +233,11 @@ window.addEventListener('error',function(e){
     <div id="map"></div>
     <button id="mapExitBtn" class="sm" onclick="toggleMapSize()">✕ Close map</button>
     <div class="sub" id="mapNote" style="margin-top:6px"><b>Live reach map.</b> Channel: <span style="color:#1668e3;font-weight:700">blue</span> = at/above flood stage, <span style="color:#7a8794;font-weight:700">grey</span> = not yet · <span style="color:#00b3a4;font-weight:700">– – teal</span> Old Nueces oxbow · <span style="color:#6fbf2f;font-weight:700">– – green</span> Elm Creek · <span style="color:#b47fe0;font-weight:700">– – purple</span> Elm Slue · gauge dots turn <span style="color:#e01b1b;font-weight:700">red</span> above flood stage · 🌊 = flood front · translucent <span style="color:#2f7ff0;font-weight:700">blue fill</span> = predicted LiDAR inundation that fills continuously as you change the crest (toggle button). Esri imagery; tiles need internet.</div>
+    <div id="mapControls">
     <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
       <button class="sm" onclick="playFlood()">▶ Play flood advance</button>
       <button class="sm" id="pauseBtn" onclick="pauseFlood()" style="display:none">⏸ Pause</button>
+      <button class="sm" id="speedBtn" onclick="cycleSpeed()">⏩ 1×</button>
       <button class="sm" onclick="toggleMapSize()">⤢ Expand map</button>
       <button class="sm" id="floodBtn" onclick="toggleFlood()">🌊 Flood extent</button>
       <span class="sub" id="animClock"></span>
@@ -241,6 +246,12 @@ window.addEventListener('error',function(e){
       <label style="font-size:12px;color:var(--mut)">Map crest at Tilden: <b style="color:var(--ink)"><span id="mapCrestVal">–</span> ft</b> <button class="sm" style="padding:3px 8px" onclick="resetCrestNOAA()">↺ NOAA</button></label>
       <input id="mapCrest" type="range" min="14" max="28" step="0.1" value="22" oninput="onMapCrest(this.value)">
       <div class="sub" style="margin-top:2px">Drag to <b>simulate the flood at any Tilden crest</b> — turn on 🌊 Flood extent and the blue inundation + markers update as you slide. ↺ NOAA snaps back to the official forecast.</div>
+    </div>
+    <div style="margin-top:8px">
+      <label style="font-size:12px;color:var(--mut)">⏱ Timeline — scrub the wave down the reach: <span id="simClock" style="font-weight:600"></span></label>
+      <input id="timeScrub" type="range" min="0" max="100" step="1" value="0" oninput="scrubTo(this.value)">
+      <div class="sub" style="margin-top:2px">Left = wave still up near Cotulla; right = crest at Tilden. The <b style="color:#c1272d">ranch floods a few hours BEFORE</b> the Tilden crest time (it is upstream). ▶ Play auto-runs this; ⏩ changes speed.</div>
+    </div>
     </div>
   </div>
 
@@ -515,7 +526,8 @@ function drawReachGeo(){ if(!MAP)return; try{
   if(typeof ELMCREEK!=='undefined'&&ELMCREEK.length) L.polyline(ELMCREEK,{color:'#9be15d',weight:3,opacity:.95,dashArray:'4 3'}).addTo(MAP).bindTooltip('Elm Creek (tributary)',{sticky:true});
   if(typeof ELMSLUE!=='undefined'&&ELMSLUE.length) L.polyline(ELMSLUE,{color:'#e0a3ff',weight:3,opacity:.95,dashArray:'3 4'}).addTo(MAP).bindTooltip('Elm Slue',{sticky:true});
 }catch(e){} }
-let CHANLAY=[], ANIM=null, ANIMt=null, ANIMf=0, ANIMN=110, ANIMstart=0, ANIMvT=null, ANIMt0=0, ANIMpaused=false;
+let CHANLAY=[], ANIM=null, ANIMt=null, ANIMf=0, ANIMN=110, ANIMstart=0, ANIMvT=null, ANIMt0=0, ANIMpaused=false, ANIMspeed=150, ANIMspeedI=1;
+const SPEEDS=[{ms:300,l:"0.5×"},{ms:150,l:"1×"},{ms:75,l:"2×"},{ms:40,l:"4×"}];
 function reachFrontRm(){ const cS=gval('nCot'),tS=gval('nTil'), top=CHANNEL_RM[0][2];
   if(tS!=null&&tS>=14) return 0;
   if(cS!=null&&cS>=15){ const q=Math.max(0,Math.min(1,((tS!=null?tS:2)-2)/(14-2))); return (1-q)*top; }
@@ -533,17 +545,32 @@ function drawChannelState(frontRm){
 }
 function _animStep(){ const crest=parseFloat(document.getElementById('crest').value); ANIMf++; const prog=ANIMf/ANIMN; ANIM=ANIMstart*Math.pow(1-prog,1.8); updateMap(crest);
   if(FLOOD_ON && ANIMf%3===0) drawFloodAt(14+(crest-14)*prog);
-  const lab=document.getElementById('animClock'); if(lab){ let tt=ANIMvT?new Date(ANIMt0+prog*(ANIMvT-ANIMt0)):null; lab.textContent='🌊 front '+ANIM.toFixed(0)+' river-mi above Tilden · filling'+(tt?' · ~'+tt.toLocaleString([], {weekday:'short',hour:'numeric'}):''); }
-  if(ANIMf>=ANIMN){ clearInterval(ANIMt);ANIMt=null;ANIM=null; updateMap(crest); if(FLOOD_ON)drawFloodAt(crest); if(lab)lab.textContent='wave reached Tilden (crest '+crest.toFixed(1)+' ft). ▶ replay'; const pb=document.getElementById('pauseBtn'); if(pb)pb.style.display='none'; } }
+  const ts=document.getElementById('timeScrub'); if(ts)ts.value=Math.round(prog*100);
+  updateSimClock(prog,crest);
+  if(ANIMf>=ANIMN){ clearInterval(ANIMt);ANIMt=null;ANIM=null; updateMap(crest); if(FLOOD_ON)drawFloodAt(crest); updateSimClock(1,crest); const pb=document.getElementById('pauseBtn'); if(pb)pb.style.display='none'; } }
+function updateSimClock(prog,crest){ const lab=document.getElementById('simClock'); if(!lab)return;
+  const vT=(typeof OFFICIAL!=='undefined'&&OFFICIAL.til&&OFFICIAL.til.valid)?new Date(OFFICIAL.til.valid):null; const now=Date.now();
+  const t=vT?new Date(now+prog*(vT.getTime()-now)):null;
+  const effC=14+(crest-14)*prog; const rmFront=(ANIM!=null?ANIM:0);
+  let s=(t?'⏱ '+t.toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'}):'⏱ '+Math.round(prog*100)+'% through the wave');
+  s+=' · front '+rmFront.toFixed(0)+' mi above Tilden · Tilden rising ~'+effC.toFixed(1)+' ft';
+  if(vT) s+=' · <b>Tilden crest '+vT.toLocaleString([], {weekday:'short',hour:'numeric'})+'</b>';
+  if(rmFront>=8&&rmFront<=15){ const hb=vT?Math.max(0,Math.round((1-prog)*(vT.getTime()-now)/3600000)):null; s+=' · <span style="color:#ff9b9b;font-weight:700">wave at the RANCH'+(hb!=null?' — floods here ~'+hb+' h BEFORE Tilden crests':'')+'</span>'; }
+  lab.innerHTML=s; }
+function scrubTo(pct){ if(ANIMt){clearInterval(ANIMt);ANIMt=null;const pb=document.getElementById('pauseBtn');if(pb)pb.textContent='▶ Resume';ANIMpaused=true;}
+  ANIMstart=CHANNEL_RM[0][2]; const prog=Math.max(0,Math.min(1,(+pct)/100)); const crest=parseFloat(document.getElementById('crest').value); FLOOD_ON=true;
+  if(prog>=1){ ANIM=null; updateMap(crest); drawFloodAt(crest); } else { ANIM=ANIMstart*Math.pow(1-prog,1.8); updateMap(crest); drawFloodAt(14+(crest-14)*prog); }
+  updateSimClock(prog,crest); }
+function cycleSpeed(){ ANIMspeedI=(ANIMspeedI+1)%SPEEDS.length; ANIMspeed=SPEEDS[ANIMspeedI].ms; const b=document.getElementById('speedBtn'); if(b)b.textContent='⏩ '+SPEEDS[ANIMspeedI].l; if(ANIMt){clearInterval(ANIMt);ANIMt=setInterval(_animStep,ANIMspeed);} }
 function playFlood(){ if(!MAP)return; if(ANIMt){clearInterval(ANIMt);ANIMt=null;}
   ANIMstart=CHANNEL_RM[0][2]; ANIMf=0; ANIMpaused=false; ANIMvT=(typeof OFFICIAL!=='undefined'&&OFFICIAL.til&&OFFICIAL.til.valid)?new Date(OFFICIAL.til.valid):null; ANIMt0=Date.now();
   const pb=document.getElementById('pauseBtn'); if(pb){pb.style.display='inline-block';pb.textContent='⏸ Pause';}
-  FLOOD_ON=true; try{MAP.setView([28.235,-98.655],13);}catch(e){} drawFloodAt(14);
+  FLOOD_ON=true; try{MAP.setView([28.235,-98.655],13);}catch(e){} drawFloodAt(14); {const ts=document.getElementById("timeScrub"); if(ts)ts.value=0;}
   const lab=document.getElementById('animClock'); if(lab)lab.textContent='🌊 wave entering the reach at Cotulla…';
-  ANIMt=setInterval(_animStep,150); }
+  ANIMt=setInterval(_animStep,ANIMspeed); }
 function pauseFlood(){ const pb=document.getElementById('pauseBtn');
   if(ANIMt){ clearInterval(ANIMt);ANIMt=null;ANIMpaused=true; if(pb)pb.textContent='▶ Resume'; }
-  else if(ANIMpaused&&ANIM!=null){ ANIMpaused=false; if(pb)pb.textContent='⏸ Pause'; ANIMt=setInterval(_animStep,150); } }
+  else if(ANIMpaused&&ANIM!=null){ ANIMpaused=false; if(pb)pb.textContent='⏸ Pause'; ANIMt=setInterval(_animStep,ANIMspeed); } }
 function onMapCrest(v){ const cr=document.getElementById('crest'); if(cr){ cr.value=(+v).toFixed(1); crestUserSet=true; render(); } }
 function resetCrestNOAA(){ if(typeof OFFICIAL!=='undefined'&&OFFICIAL.til&&OFFICIAL.til.stage>0){ const cr=document.getElementById('crest'); cr.value=Math.max(14,Math.min(28,OFFICIAL.til.stage)).toFixed(1); crestUserSet=false; crestAutoPulled=true; render(); } else { alert('No NOAA forecast crest available yet — try Refresh gauges.'); } }
 function refreshAll(){ if(window.fetchChain)fetchChain(); if(window.fetchOfficial)fetchOfficial().then(()=>{if(window.fetchForecastSeries)fetchForecastSeries();}); if(window.fetchNWM)fetchNWM(); if(window.fetchTrends)fetchTrends(); if(window.fetchAlerts)fetchAlerts(); }   // sideways miles off the main channel (slue/floodplain)
@@ -1055,7 +1082,7 @@ function updateMap(crest){
     mk.addTo(MAP);MARKERS.push(mk);
   });
   const cS=gval('nCot'), tS=gval('nTil');
-  [['Cotulla',28.42611,-99.23972,cS,15],['Tilden',28.30889,-98.55724,tS,14]].forEach(g=>{
+  [['Cotulla (COTT2)',28.42611,-99.23972,cS,15],['Tilden (TILT2)',28.30889,-98.55724,tS,14]].forEach(g=>{
     const fl=g[4],st=g[3], col=st==null?'#8aa0b4':(st>=fl?'#e01b1b':(st>=fl-3?'#e08a00':'#11b866'));
     const mk=L.circleMarker([g[1],g[2]],{radius:7,color:'#12202e',weight:2,fillColor:col,fillOpacity:1});
     mk.bindTooltip(`${g[0]}${st!=null?' '+st.toFixed(1)+'ft':''}`,{permanent:true,direction:'top',className:'locLabel'});
