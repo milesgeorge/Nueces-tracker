@@ -182,6 +182,37 @@ window.addEventListener('error',function(e){
     <table id="locTable"><thead><tr><th>name</th><th>ground</th><th>status now</th><th></th></tr></thead><tbody></tbody></table>
   </div>
 
+  <!-- 3B OFFICIAL FORECAST + FUSION + SATELLITE -->
+  <div class="card" id="fuseCard">
+    <h2>3B · NOAA forecast, satellite &amp; one fused forecast</h2>
+    <p class="sub">Three independent reads of the same flood — NOAA's official forecast, the National Water Model at the ranch reach, and your own high-water calibration — blended into one number. Needs internet; if any source is down, the others still work.</p>
+    <div style="display:grid;grid-template-columns:1fr;gap:10px">
+      <div style="border:1px solid var(--rule);border-radius:10px;padding:11px 12px">
+        <div style="font-size:12px;color:var(--mut);font-weight:700">① NOAA OFFICIAL FORECAST — Tilden gauge</div>
+        <div id="offBox" style="font-size:14px;margin-top:3px">Fetching NOAA forecast…</div>
+        <button class="sm" style="margin-top:6px" onclick="useOfficial()">⤓ Use NOAA's forecast crest as the scenario</button>
+      </div>
+      <div style="border:1px solid var(--rule);border-radius:10px;padding:11px 12px">
+        <div style="font-size:12px;color:var(--mut);font-weight:700">② NATIONAL WATER MODEL — modeled flow at the ranch's own reach</div>
+        <div id="nwmBox" style="font-size:14px;margin-top:3px">Looking up the ranch river reach…</div>
+      </div>
+      <div style="border:1px solid var(--rule);border-radius:10px;padding:11px 12px">
+        <div style="font-size:12px;color:var(--mut);font-weight:700">③ YOUR CALIBRATION — high-water marks</div>
+        <div id="calBox" style="font-size:14px;margin-top:3px">—</div>
+      </div>
+    </div>
+    <div style="background:#eef4fb;border:1px solid #9cc0e6;border-radius:10px;padding:12px;margin-top:12px">
+      <div style="font-size:12px;color:#33506e;font-weight:700">FUSED FORECAST — best single estimate at the ranch</div>
+      <div id="fuseOut" style="font-size:15px;margin-top:4px;line-height:1.5">—</div>
+    </div>
+    <div style="margin-top:12px">
+      <b style="font-size:13px">🛰️ Satellite &amp; official maps <span class="sub" style="font-weight:400">— passive; no one in the field needed</span></b>
+      <div id="hgImgs" style="display:grid;grid-template-columns:1fr;gap:10px;margin-top:8px"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px" id="satLinks"></div>
+      <div class="sub" id="satNote" style="margin-top:8px"></div>
+    </div>
+  </div>
+
   <!-- 4 SATELLITE MAP -->
   <div class="card">
     <h2>4 · Satellite map</h2>
@@ -555,6 +586,7 @@ function render(){
     `<div style="font-size:11px;font-weight:700;opacity:.9;letter-spacing:.3px">PREDICTED IF TILDEN CRESTS AT ${crest.toFixed(1)} FT</div>`+
     `<div class="lvl">${A.lvl}</div><div class="msg">${A.msg}</div></div>`;
   drawLadder(crest);drawProfile(crest);renderLocs(crest);updateMap(crest);renderHist(crest);renderScen();renderReports();renderHWM();
+  if(window.renderFusion)step(renderFusion);
 }
 
 /* ---- historical ranking (full record, clickable) ---- */
@@ -971,6 +1003,142 @@ function addHelpIcons(){document.querySelectorAll('.card h2').forEach((h,i)=>{
   s.onclick=()=>openHelp('s'+(i+1));h.appendChild(s);});}
 
 /* ================= init ================= */
+/* =================================================================
+   MULTI-SOURCE FUSION: NOAA official forecast + National Water Model
+   + your calibration, blended into one ranch forecast. All best-effort;
+   each wrapped so a failure never breaks the rest of the tool.
+   ================================================================= */
+const RANCHPT={lat:28.2300,lon:-98.6487};
+const TIL_REACH='10631613';            // NHDPlus COMID for the Tilden reach (verified via NWPS)
+let RANCH_REACH=null;                  // resolved at runtime via USGS NLDI
+let OFFICIAL={til:null,cot:null};      // {stage,flow,cat,valid}
+let NWM=null;                          // {flow,unit,peakTime,impliedStage,reach,source}
+
+/* Tilden stage↔flow rating, fit from the NWPS historic crest pairs (backwater-loopy,
+   so this is an APPROXIMATE cross-check only): stage ≈ 3.50·ln(Q_cfs) − 13.24 */
+function stageFromFlow(qcfs){ if(!(qcfs>0))return null; let s=3.50*Math.log(qcfs)-13.24; return Math.max(4,Math.min(30,s)); }
+function fmtWhen(iso){ try{ if(!iso)return''; const d=new Date(iso); if(isNaN(d))return''; return d.toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'}); }catch(e){return'';} }
+
+async function fetchOfficial(){
+  const box=document.getElementById('offBox'); if(!box)return;
+  try{
+    const [t,c]=await Promise.all([
+      fetch('https://api.water.noaa.gov/nwps/v1/gauges/TILT2').then(r=>r.json()).catch(()=>null),
+      fetch('https://api.water.noaa.gov/nwps/v1/gauges/COTT2').then(r=>r.json()).catch(()=>null)
+    ]);
+    if(t&&t.status&&t.status.forecast){const f=t.status.forecast;OFFICIAL.til={stage:+f.primary,flow:(+f.secondary||0)*1000,cat:f.floodCategory,valid:f.validTime};}
+    if(c&&c.status&&c.status.forecast){const f=c.status.forecast;OFFICIAL.cot={stage:+f.primary,flow:(+f.secondary||0)*1000,cat:f.floodCategory,valid:f.validTime};}
+    if(OFFICIAL.til){
+      const o=OFFICIAL.til, catTxt=(o.cat||'').replace('_',' ');
+      box.innerHTML=`Forecast crest <b>${o.stage.toFixed(1)} ft</b>`+(o.flow?` (${Math.round(o.flow).toLocaleString()} cfs)`:'')+
+        ` · <b style="color:${o.cat==='major'?'#c1272d':o.cat==='moderate'?'#b9770a':'#1a6f8b'}">${catTxt||'—'}</b>`+
+        `<br><span class="sub">valid ${fmtWhen(o.valid)} · issued by NWS West Gulf RFC</span>`+
+        (OFFICIAL.cot?`<br><span class="sub">Upstream Cotulla forecast: ${OFFICIAL.cot.stage.toFixed(1)} ft (${(OFFICIAL.cot.cat||'').replace('_',' ')})</span>`:'');
+    } else box.innerHTML='<span class="sub">No active NOAA forecast right now (forecasts are issued only during high water). The scenario slider is yours to set.</span>';
+  }catch(e){ box.innerHTML='<span class="sub">NOAA forecast fetch blocked — open water.noaa.gov/gauges/TILT2 to read it.</span>'; }
+  step(renderFusion);
+}
+
+async function resolveRanchReach(){
+  try{
+    const j=await fetch(`https://api.water.usgs.gov/nldi/linked-data/comid/position?coords=POINT(${RANCHPT.lon} ${RANCHPT.lat})`).then(r=>r.json());
+    const f=(j.features&&j.features[0])||null; const p=f&&f.properties||{};
+    const id=p.comid||p.identifier||p.featureid||p.nhdplus_comid;
+    if(id)return String(id).replace(/[^0-9]/g,'');
+  }catch(e){}
+  return TIL_REACH;   // fallback: use the Tilden reach if lookup fails
+}
+function extractSeries(obj){   // defensively pull [{t,flow}] out of an NWPS reaches/streamflow payload of unknown shape
+  let best=[];
+  (function walk(o){ if(!o||typeof o!=='object')return;
+    if(Array.isArray(o)){ if(o.length&&o[0]&&typeof o[0]==='object'){
+        const pts=o.map(e=>({t:e.validTime||e.time||e.forecastTime||e.t, flow:+(e.flow!=null?e.flow:e.value!=null?e.value:e.streamflow)})).filter(x=>!isNaN(x.flow));
+        if(pts.length>best.length)best=pts;
+      } o.forEach(walk); return; }
+    Object.values(o).forEach(walk);
+  })(obj);
+  return best;
+}
+async function fetchNWM(){
+  const box=document.getElementById('nwmBox'); if(!box)return;
+  try{
+    RANCH_REACH=RANCH_REACH||await resolveRanchReach();
+    let pts=[];
+    for(const s of ['short_range','medium_range']){
+      try{ const j=await fetch(`https://api.water.noaa.gov/nwps/v1/reaches/${RANCH_REACH}/streamflow?series=${s}`).then(r=>r.json());
+        const p=extractSeries(j); if(p.length>pts.length)pts=p; }catch(e){}
+    }
+    if(!pts.length){ box.innerHTML='<span class="sub">National Water Model reach forecast not reachable right now (or none active). Cross-check unavailable — official + calibration still drive the forecast.</span>'; NWM=null; return; }
+    let peak=pts[0]; for(const x of pts) if(x.flow>peak.flow)peak=x;
+    // NWPS reaches streamflow is in cfs; if values look like kcfs (tiny), scale up.
+    let qcfs=peak.flow; if(qcfs>0&&qcfs<300)qcfs*=1000;
+    NWM={flow:qcfs,peakTime:peak.t,impliedStage:stageFromFlow(qcfs),reach:RANCH_REACH,source:(RANCH_REACH===TIL_REACH?'Tilden reach (ranch lookup unavailable)':'ranch reach')};
+    box.innerHTML=`Modeled peak flow <b>${Math.round(qcfs).toLocaleString()} cfs</b> on the <b>${NWM.source}</b>`+
+      (peak.t?` around <b>${fmtWhen(peak.t)}</b>`:'')+
+      (NWM.impliedStage?`<br><span class="sub">≈ ${NWM.impliedStage.toFixed(1)} ft Tilden-equivalent (approx. cross-check via rating curve)</span>`:'')+
+      `<br><span class="sub">The ranch reach is upstream of Tilden, so this peaks <i>before</i> the gauge — an early read on arrival timing.</span>`;
+  }catch(e){ box.innerHTML='<span class="sub">National Water Model fetch blocked by the browser.</span>'; NWM=null; }
+  step(renderFusion);
+}
+
+window.useOfficial=function(){
+  if(!(OFFICIAL.til&&OFFICIAL.til.stage>0)){alert('No NOAA forecast crest is available to use right now.');return;}
+  const cr=document.getElementById('crest'); cr.value=Math.max(14,Math.min(28,OFFICIAL.til.stage)).toFixed(1);
+  AUTO=false; render();
+  document.getElementById('fuseCard').scrollIntoView({behavior:'smooth',block:'start'});
+};
+
+function ranchDepthAt(crest){ const w=TIL_ZERO+crest+offsetAt(18.0); const key=['camp','house','pens','pad'].map(id=>locs().find(l=>l.id===id)).filter(Boolean);
+  return {wse:w, spots:key.map(l=>({name:l.name,d:+(w-l.elev).toFixed(1)}))}; }
+
+function renderFusion(){
+  const cal=document.getElementById('calBox'); if(cal){ const n=hwm().length; cal.innerHTML=`Slope <b>${slope().toFixed(3)} ft/river-mi</b> from <b>${n}</b> high-water mark${n===1?'':'s'}${n?'':' (using 2013 seed until you add one)'}. This shapes how any crest maps to the ranch.`; }
+  const out=document.getElementById('fuseOut'); if(!out)return;
+  const slider=parseFloat(document.getElementById('crest').value);
+  const off=OFFICIAL.til?OFFICIAL.til.stage:null, nwm=NWM?NWM.impliedStage:null;
+  const cands=[off,nwm].filter(x=>x!=null&&!isNaN(x));
+  const fused = off!=null?off : (cands.length?cands.reduce((a,b)=>a+b,0)/cands.length : slider);
+  const lo=Math.min(...(cands.length?cands:[fused])), hi=Math.max(...(cands.length?cands:[fused]));
+  const r=ranchDepthAt(fused);
+  const oc=ranchOutcome(fused);
+  const spotTxt=r.spots.map(s=>`${s.name}: <b>${s.d>0?s.d.toFixed(1)+' ft over':(Math.abs(s.d)).toFixed(1)+' ft to spare'}</b>`).join(' · ');
+  let src = off!=null?`NOAA official (${off.toFixed(1)} ft)`:(nwm!=null?`NWM cross-check (${nwm.toFixed(1)} ft)`:`your scenario slider (${slider.toFixed(1)} ft)`);
+  let band = (cands.length>1&&hi-lo>0.2)?` <span class="sub">(sources span ${lo.toFixed(1)}–${hi.toFixed(1)} ft)</span>`:'';
+  let timing = NWM&&NWM.peakTime?` Arrival read from NWM: peak near <b>${fmtWhen(NWM.peakTime)}</b> at the ranch reach (leads the gauge).`:(OFFICIAL.til&&OFFICIAL.til.valid?` NOAA crest valid <b>${fmtWhen(OFFICIAL.til.valid)}</b>.`:'');
+  out.innerHTML=`Fused Tilden crest <b>${fused.toFixed(1)} ft</b>${band} — anchored on ${src}.`+
+    `<br>Ranch water surface ≈ <b>${r.wse.toFixed(0)} ft NAVD88</b> → <b style="color:${oc[1]}">${oc[0]}</b>.`+
+    `<br>${spotTxt}.`+timing+
+    `<br><span class="sub">Slider is at ${slider.toFixed(1)} ft; press “Use NOAA's forecast crest” to align them.</span>`;
+}
+
+function buildSatPanel(){
+  const imgs=document.getElementById('hgImgs'); if(imgs){
+    const cards=[
+      ['Tilden — live hydrograph','https://water.noaa.gov/resources/hydrographs/tilt2_hg.png','https://water.noaa.gov/gauges/TILT2'],
+      ['Cotulla — live hydrograph (upstream)','https://water.noaa.gov/resources/hydrographs/cott2_hg.png','https://water.noaa.gov/gauges/COTT2'],
+      ['Tilden — probabilistic (HEFS) short-range','https://water.noaa.gov/resources/probabilistic/short_term/TILT2.shortrange.hefs.png','https://water.noaa.gov/gauges/TILT2']
+    ];
+    imgs.innerHTML=cards.map(c=>`<a href="${c[2]}" target="_blank" rel="noopener" style="text-decoration:none">
+      <div style="font-size:12px;color:var(--mut);font-weight:600;margin-bottom:2px">${c[0]}</div>
+      <img src="${c[1]}" loading="lazy" style="width:100%;border:1px solid var(--rule);border-radius:8px;background:#fff" onerror="this.parentNode.style.display='none'"></a>`).join('');
+  }
+  const links=document.getElementById('satLinks'); if(links){
+    const L=[
+      ['🛰 Sentinel-1 radar (sees through storm clouds)','https://browser.dataspace.copernicus.eu/?zoom=12&lat=28.2300&lng=-98.6487'],
+      ['🗺 NOAA gauge & flood-inundation page','https://water.noaa.gov/gauges/TILT2'],
+      ['📈 USGS live data (Tilden)','https://waterdata.usgs.gov/monitoring-location/08194500'],
+      ['🌎 Optical (Sentinel-2, clear-sky only)','https://browser.dataspace.copernicus.eu/?zoom=12&lat=28.2300&lng=-98.6487']
+    ];
+    links.innerHTML=L.map(x=>`<a class="sm" style="text-decoration:none;padding:7px 11px;border:1px solid var(--rule);border-radius:8px;color:#1d2430;background:#f6f8fa" href="${x[1]}" target="_blank" rel="noopener">${x[0]}</a>`).join('');
+  }
+  const note=document.getElementById('satNote'); if(note){
+    note.innerHTML='NOAA Flood-Inundation Mapping is <b>not yet enabled</b> for this reach (checked live) — expected as NOAA reaches ~100% U.S. coverage in late 2026; the link above will show it once live. '+
+      'Sentinel-1 radar revisits every ~6 days and works through cloud — the objective replacement for walking to the water\'s edge. '+
+      'SWOT measures water-surface height directly but only every ~21 days and is marginal on a river this narrow. '+
+      'A cellular trail-camera aimed at a painted staff gauge beats every satellite on <i>timing</i> if you want a passive on-site reading.';
+  }
+}
+
 function initDefaults(){
   // last-known values so the profile populates before/without a live fetch (overwritten on fetch)
   document.getElementById('nAsh').textContent='25.2';
@@ -991,7 +1159,11 @@ function boot(){
   else { var mn=document.getElementById('mapNote'); if(mn)mn.textContent='Map library did not load (offline or blocked) — every other section still works.'; }
   // auto-pull live gauges on open, then keep them fresh every 15 min while the tab is visible
   step(function(){ if(window.fetchChain) fetchChain(); });
-  try{ setInterval(function(){ if(document.visibilityState!=='hidden' && window.fetchChain) fetchChain(); }, 900000); }catch(e){}
+  // new multi-source backbones — official NOAA forecast, National Water Model, satellite panel
+  step(buildSatPanel);
+  step(function(){ if(window.fetchOfficial) fetchOfficial(); });
+  step(function(){ if(window.fetchNWM) fetchNWM(); });
+  try{ setInterval(function(){ if(document.visibilityState!=='hidden'){ if(window.fetchChain)fetchChain(); if(window.fetchOfficial)fetchOfficial(); if(window.fetchNWM)fetchNWM(); } }, 900000); }catch(e){}
 }
 if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',boot); else boot();
 </script>
