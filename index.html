@@ -109,6 +109,28 @@ window.addEventListener('error',function(e){
   body.histmode .card{border-color:#e0c39a;box-shadow:0 0 0 1px #ecd3ac inset}
   body.histmode .card > h2::after{content:' · 📜 HISTORICAL VIEW';color:#b9770a;font-weight:800}
   #histBar{display:none}
+  /* ===== v35 dashboard restyle ===== */
+  body{background:linear-gradient(180deg,#e9eef3,#f6f8fa 260px) fixed}
+  header{padding:18px 18px 15px;box-shadow:0 2px 12px rgba(12,32,46,.18)}
+  header h1{font-size:22px;font-weight:800;letter-spacing:-.3px}
+  .tracksites{color:#9fc0dc;font-size:12px;margin-top:3px;font-weight:600;letter-spacing:.2px}
+  .tagline{color:#c7d5e1 !important}
+  .help-btn{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer}
+  .help-btn:hover{background:rgba(255,255,255,.26)}
+  #topnav{position:sticky;top:0;z-index:60;background:#12202e;border-bottom:1px solid #24405a;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #topnav .navinner{display:flex;gap:2px;max-width:1200px;margin:0 auto;padding:0 8px}
+  #topnav a{color:#cfe0ee;text-decoration:none;font-size:12.5px;font-weight:700;padding:10px 12px;white-space:nowrap;border-bottom:2px solid transparent}
+  #topnav a:hover{color:#fff;border-bottom-color:#2f8fd0}
+  body.mapbig #topnav{display:none}
+  .card{border-radius:14px;box-shadow:0 2px 10px rgba(20,40,60,.06);border-color:#e3e8ee;padding:15px 16px}
+  .card>h2{font-size:15.5px;text-transform:none;letter-spacing:0;color:#12202e;font-weight:800;margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid #eef1f5}
+  .card .sub{color:#586977}
+  button.sm{transition:filter .12s,transform .02s;border-radius:9px}
+  button.sm:hover{filter:brightness(1.08)}
+  button.sm:active{transform:translateY(1px)}
+  input,select,textarea{border-radius:9px;border-color:#d7dee6}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:#2f8fd0;box-shadow:0 0 0 3px rgba(47,143,208,.15)}
+  label{font-weight:600}
 </style>
 </head>
 <body>
@@ -117,19 +139,20 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-28 · v34 — Historical Review Mode: page banner + “HISTORICAL VIEW” badge on every section, named flood/date bar + map corner label, and a Reset-to-current-conditions button (keeps archive clearly separate from live)</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v36 — cloud media sharing: saved events + photos/videos sync to the whole family via Firebase (Storage + events); offline Download still works</div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
   </div>
 </header>
+<nav id="topnav"><div class="navinner"><a href="#sec1">Gauges</a><a href="#sec3">Forecast</a><a href="#fuseCard">Fused</a><a href="#wxCard">Weather</a><a href="#secmap">Map</a><a href="#sec6">Report</a><a href="#archiveCard">Archive</a><a href="#sec7">History</a></div></nav>
 <div class="wrap">
 
   <div id="alertBanner" style="margin-bottom:4px"></div>
   <div id="histBanner"></div>
 
   <!-- 1 CHAIN -->
-  <div class="card">
+  <div class="card" id="sec1">
     <h2>1 · The gauge chain — your early-warning ladder</h2>
     <p class="sub">Each gauge upstream buys lead time. In 2026 Asherton crested 7/19, Cotulla 7/22 — ranch ~7/27–29. Watching Asherton = 8–10 days notice.</p>
     <div class="chain">
@@ -171,7 +194,7 @@ window.addEventListener('error',function(e){
   </div>
 
   <!-- 3 FORECAST + LOCATIONS -->
-  <div class="card">
+  <div class="card" id="sec3">
     <h2>3 · Forecast &amp; your locations</h2>
     <p class="sub">Set a predicted <b>Cotulla</b> crest and the mechanism translates it to a <b>Tilden</b> crest — or drag the Tilden slider directly for what-ifs.</p>
 
@@ -281,7 +304,7 @@ window.addEventListener('error',function(e){
   </div>
 
   <!-- 4 SATELLITE MAP -->
-  <div class="card">
+  <div class="card" id="secmap">
     <h2>4 · Satellite map</h2>
     <p class="sub">Markers turn <span style="color:var(--red)"><b>red</b></span> when the current scenario floods them, <span style="color:var(--grn)"><b>green</b></span> when dry. <b>Tap the map</b> to drop a new location (fills the Add form for you).</p>
     <div id="map"></div>
@@ -321,7 +344,7 @@ window.addEventListener('error',function(e){
   </div>
 
   <!-- 6 REPORT + CALIBRATE -->
-  <div class="card">
+  <div class="card" id="sec6">
     <h2>6 · Report water &amp; teach the model</h2>
     <p class="sub">Two different jobs. A <b>live report</b> shows where the water is right now on the shared map. A <b>high-water mark</b> — the peak line, after a flood crests — is the only thing that re-calibrates the forecast, because the ranch floods a day <i>ahead</i> of the gauge.</p>
     <a href="log.html" style="display:block;text-align:center;background:#1a6f8b;color:#fff;font-weight:700;text-decoration:none;padding:12px;border-radius:10px;margin:6px 0 12px">📍 In the field on a phone? Use the Quick Field Log — GPS, one screen →</a>
@@ -404,7 +427,7 @@ window.addEventListener('error',function(e){
   </div>
 
   <!-- 7 HISTORICAL -->
-  <div class="card">
+  <div class="card" id="sec7">
     <h2>7 · Historical context — every flood on record</h2>
     <p class="sub">The full Tilden flood record (crests ≥ flood stage, 1935–2026). Your scenario is ranked against all of them. Tap any event for its story and a compare/contrast to what you're watching now. <b>★</b> = benchmark flood with full detail.</p>
     <button class="sm" style="margin-bottom:8px" onclick="fetchCrests()">↻ Update record from NOAA</button>
@@ -1578,20 +1601,20 @@ function saveEventsArr(a){localStorage.setItem('nueces_v2_events',JSON.stringify
 let STAGED=[];
 function compressImg(file){return new Promise(res=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height,M=1280;if(w>M||h>M){if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;}}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);c.toBlob(b=>res({blob:b||file,thumb:c.toDataURL('image/jpeg',0.45)}),'image/jpeg',0.75);};img.onerror=()=>res({blob:file,thumb:''});img.src=URL.createObjectURL(file);});}
 async function stageMedia(files){ for(const f of files){ const key='m'+Date.now()+Math.random().toString(36).slice(2,7); let blob=f,thumb='',type=(f.type||'').startsWith('video')?'video':'image'; try{ if(type==='image'){const c=await compressImg(f);blob=c.blob;thumb=c.thumb;} await idbPut(key,blob); STAGED.push({key,type,thumb,name:f.name||type}); }catch(e){} } renderStaged(); }
-function thumbHTML(m,onx){ const inner=m.type==='image'?(m.thumb?'<img src="'+m.thumb+'">':'🖼'):'<video muted playsinline></video><span class="pv">▶</span>'; return '<div class="th" data-k="'+m.key+'">'+inner+(onx?'<button class="x" onclick="'+onx+'(\''+m.key+'\')">✕</button>':'')+'</div>'; }
-async function paintVideoThumbs(container){ if(!container)return; const vids=container.querySelectorAll('video'); for(const v of vids){ const th=v.closest('.th'); if(!th)continue; const b=await idbGet(th.dataset.k); if(b){try{v.src=URL.createObjectURL(b);}catch(e){}} } }
+function thumbHTML(m,onx){ const u=m.url||''; const inner=m.type==='image'?((u||m.thumb)?'<img src="'+(u||m.thumb)+'">':'🖼'):('<video muted playsinline'+(u?' src="'+u+'"':'')+'></video><span class="pv">▶</span>'); return '<div class="th" data-k="'+m.key+'" data-type="'+m.type+'"'+(m.url?' data-url="'+m.url+'"':'')+'>'+inner+(onx?'<button class="x" onclick="'+onx+'(\''+m.key+'\')">✕</button>':'')+'</div>'; }
+async function paintVideoThumbs(container){ if(!container)return; const vids=container.querySelectorAll('video'); for(const v of vids){ if(v.getAttribute('src'))continue; const th=v.closest('.th'); if(!th)continue; const b=await idbGet(th.dataset.k); if(b){try{v.src=URL.createObjectURL(b);}catch(e){}} } }
 function renderStaged(){ const el=document.getElementById('evMediaPreview'); if(!el)return; el.innerHTML=STAGED.map(m=>thumbHTML(m,'unstage')).join(''); paintVideoThumbs(el); }
 function unstage(k){ STAGED=STAGED.filter(m=>m.key!==k); idbDel(k); renderStaged(); }
-function saveEvent(){ const nm=(document.getElementById('evName').value||'').trim()||('Event '+new Date().toLocaleDateString()); const notes=(document.getElementById('evNotes').value||'').trim(); const hs=document.getElementById('histStart'),he=document.getElementById('histEnd');
+async function saveEvent(){ const nm=(document.getElementById('evName').value||'').trim()||('Event '+new Date().toLocaleDateString()); const notes=(document.getElementById('evNotes').value||'').trim(); const hs=document.getElementById('histStart'),he=document.getElementById('histEnd');
   const ev={id:'e'+Date.now(),name:nm,notes:notes,when:Date.now(),crest:parseFloat(document.getElementById('crest').value)||null,histStart:hs?hs.value:'',histEnd:he?he.value:'',media:STAGED.slice(),reports:reports(),hwm:hwm(),weather:currentWxSnapshot()};
-  const a=events();a.unshift(ev);saveEventsArr(a);STAGED=[];document.getElementById('evName').value='';document.getElementById('evNotes').value='';renderStaged();renderEvents(); }
-function delEvent(id){ if(!confirm('Delete this saved event? (kept in any downloaded backup)'))return; const a=events();const ev=a.find(e=>e.id===id); if(ev&&ev.media)ev.media.forEach(m=>idbDel(m.key)); saveEventsArr(a.filter(e=>e.id!==id)); renderEvents(); }
+  const a=events();a.unshift(ev);saveEventsArr(a); if(window.__cloudSaveEvent){ try{ const blobs={}; for(const m of ev.media){ const b=await idbGet(m.key); if(b)blobs[m.key]=b; } window.__cloudSaveEvent(ev,blobs); }catch(e){} } STAGED=[];document.getElementById('evName').value='';document.getElementById('evNotes').value='';renderStaged();renderEvents(); }
+function delEvent(id){ if(!confirm('Delete this saved event? (kept in any downloaded backup)'))return; const a=events();const ev=a.find(e=>e.id===id); if(ev&&ev.media)ev.media.forEach(m=>idbDel(m.key)); saveEventsArr(a.filter(e=>e.id!==id)); if(window.__cloudDelEvent)window.__cloudDelEvent(id); renderEvents(); }
 function loadEvent(id){ const ev=events().find(e=>e.id===id); if(!ev)return; enterHistReview(ev.name+' · '+new Date(ev.when).toLocaleDateString(), ev.crest||null, {histStart:ev.histStart,histEnd:ev.histEnd}); }
 function renderEvents(){ const el=document.getElementById('eventList'); if(!el)return; const a=events(); if(!a.length){el.innerHTML='<div class="sub">No saved events yet — set a crest or load a replay, add notes/photos, then “Save current as event”.</div>';return;}
   const esc=(x)=>String(x==null?'':x).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
   el.innerHTML=a.map(ev=>'<div class="evcard"><div class="evh"><b>'+esc(ev.name)+'</b><span class="sub">'+new Date(ev.when).toLocaleDateString()+(ev.crest?' · crest '+ev.crest.toFixed(1)+' ft':'')+' · '+(ev.media?ev.media.length:0)+' media · '+((ev.reports||[]).length)+' logs</span></div>'+(ev.notes?'<div class="sub" style="margin-top:3px">'+esc(ev.notes)+'</div>':'')+((ev.weather&&wxSummary(ev.weather))?'<div class="sub" style="margin-top:3px">🌦 '+esc(wxSummary(ev.weather))+'</div>':'')+'<div class="mediaGrid" data-ev="'+ev.id+'">'+(ev.media||[]).map(m=>thumbHTML(m,'')).join('')+'</div><div style="margin-top:6px;display:flex;gap:6px"><button class="sm" onclick="loadEvent(\''+ev.id+'\')">↺ Load / replay</button><button class="sm" style="background:#8a1f1f" onclick="delEvent(\''+ev.id+'\')">✕ Delete</button></div></div>').join('');
-  el.querySelectorAll('.mediaGrid').forEach(g=>{paintVideoThumbs(g); g.querySelectorAll('.th').forEach(t=>{t.onclick=()=>openMedia(t.dataset.k);});}); }
-async function openMedia(k){ const b=await idbGet(k); if(!b)return; const url=URL.createObjectURL(b); const w=window.open('','_blank'); if(w){ w.document.write((b.type||'').startsWith('video')?'<body style="margin:0;background:#000"><video src="'+url+'" controls autoplay playsinline style="width:100%;height:100vh;object-fit:contain"></video>':'<body style="margin:0;background:#000"><img src="'+url+'" style="width:100%;height:100vh;object-fit:contain">'); } }
+  el.querySelectorAll('.mediaGrid').forEach(g=>{paintVideoThumbs(g); g.querySelectorAll('.th').forEach(t=>{t.onclick=()=>openMedia(t.dataset.k,t.dataset.url,t.dataset.type);});}); }
+async function openMedia(k,url,type){ let src=url; if(!src){ const b=await idbGet(k); if(!b)return; src=URL.createObjectURL(b); type=(b.type||''); } const isVid=(type||'').indexOf('video')>=0; const w=window.open('','_blank'); if(w){ w.document.write(isVid?'<body style="margin:0;background:#000"><video src="'+src+'" controls autoplay playsinline style="width:100%;height:100vh;object-fit:contain"></video>':'<body style="margin:0;background:#000"><img src="'+src+'" style="width:100%;height:100vh;object-fit:contain">'); } }
 function blobToB64(b){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b);});}
 function b64ToBlob(d){const p=d.split(',');const mime=(p[0].match(/:(.*?);/)||[])[1]||'application/octet-stream';const bin=atob(p[1]);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
 async function exportAll(){ const ls=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}}; const data={app:'NuecesReachModel',version:30,exported:new Date().toISOString(),events:events(),reports:reports(),hwm:hwm(),locations:ls('nueces_v2_loc'),scen:ls('nueces_v2_scen'),hist:ls('nueces_v2_hist'),rain:rainReports(),media:{}};
@@ -1713,6 +1736,8 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getFirestore, collection, addDoc, setDoc, deleteDoc, doc, onSnapshot, query, where, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
 
 const firebaseConfig = {
   apiKey:            "AIzaSyBsXL_nH9YB0gfQV8XYkw_JcnZEL_0b_E8",
@@ -1725,7 +1750,9 @@ const firebaseConfig = {
 
 const TILZ = 183.10;
 if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
-  const db = getFirestore(initializeApp(firebaseConfig));
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
   const badge = document.createElement('div');
   badge.style.cssText='position:fixed;bottom:8px;right:8px;background:#0f8a5f;color:#fff;font:600 11px sans-serif;padding:4px 9px;border-radius:20px;z-index:9998;opacity:.9';
   badge.textContent='\u{1F517} shared mode'; document.body.appendChild(badge);
@@ -1792,6 +1819,30 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
     const localExtra = window.locs().filter(l => !l.seed && !ids.has(l.id));
     localStorage.setItem('nueces_v2_loc', JSON.stringify((window.__seedLocs||[]).concat(remote, localExtra)));
     if (window.render) window.render();
+  });
+
+  /* ---------- EVENT ARCHIVE: shared, with photos/videos in Storage ---------- */
+  window.__cloudSaveEvent = async function (ev, blobs) {
+    try {
+      const media = [];
+      for (const m of (ev.media || [])) {
+        const b = blobs[m.key];
+        if (b) { const r = ref(storage, 'events/' + ev.id + '/' + m.key); await uploadBytes(r, b); media.push({ key:m.key, type:m.type, url: await getDownloadURL(r), name:m.name||'' }); }
+        else if (m.url) { media.push(m); }
+      }
+      await setDoc(doc(db,'events',ev.id), { id:ev.id, name:ev.name, notes:ev.notes||'', when:ev.when, crest:ev.crest||null, histStart:ev.histStart||'', histEnd:ev.histEnd||'', weather:ev.weather||null, media:media, reports:ev.reports||[], hwm:ev.hwm||[] });
+    } catch(e){ console.warn('cloud event', e); alert('Could not upload the event to the cloud ('+(e.code||e.message)+') — it is still saved on this device and in your backup.'); }
+  };
+  window.__cloudDelEvent = function (id) { try{ deleteDoc(doc(db,'events',id)); }catch(e){} };
+  window.__cloudReady = true;
+  const _sb = document.createElement('span'); _sb.textContent=' · archive synced'; badge.appendChild(_sb);
+  onSnapshot(collection(db,'events'), snap => {
+    const cloud = snap.docs.map(d => d.data());
+    let local = []; try { local = JSON.parse(localStorage.getItem('nueces_v2_events')||'[]'); } catch(e){}
+    const ids = new Set(cloud.map(e=>e.id));
+    const merged = cloud.concat(local.filter(e=>!ids.has(e.id))).sort((a,b)=>(b.when||0)-(a.when||0));
+    localStorage.setItem('nueces_v2_events', JSON.stringify(merged));
+    if (window.renderEvents) window.renderEvents();
   });
 }
 </script>
