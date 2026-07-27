@@ -96,7 +96,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-27 · v11 — “now” = sightings (with time-ago) › NWM nowcast › gauge; crest auto-pulls NOAA forecast; Section 5 overhaul; fused NOAA+NWM+satellite, impacts, duration, warnings</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-27 · v15 — animated flood-front sweep + wet/dry channel shading + Elm Slue; live reach map (real Nueces channel + Old Nueces oxbow + Elm Creek, gauge dots); authentic NHD centerline (sinuosity 1.91); along-channel river-miles</div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -184,7 +184,7 @@ window.addEventListener('error',function(e){
       <button class="add sm" onclick="openLoc()">＋ Add location</button>
     </div>
     <table id="locTable"><thead><tr><th>name</th><th>ground</th><th>now <span style="font-weight:400;color:var(--mut)">(observed, else est.)</span></th><th>at crest <span style="font-weight:400;color:var(--mut)">(forecast)</span></th><th></th></tr></thead><tbody></tbody></table>
-    <div class="sub" style="margin-top:6px;line-height:1.45"><b>“now” priority (best first):</b> ① <span style="color:#1a6f8b;font-weight:700">💧 blue observed</span> = someone logged water there, with how long ago — ground truth. ② <b>“NWM est.”</b> = modeled at the ranch's <i>own</i> reach (lag-free). ③ plain <b>“est.”</b> = only the Tilden gauge, which sits ~a day <i>downstream</i>, so on a rising river an “est. dry” spot may already be wet. Trust eyes first — and log it so it turns blue.</div>
+    <div class="sub" style="margin-top:6px;line-height:1.45"><b>“now” priority (best first):</b> ① <span style="color:#1a6f8b;font-weight:700">💧 blue observed</span> = someone logged water there, with how long ago — ground truth. ② <b>“NWM est.”</b> = modeled at the ranch's <i>own</i> reach (lag-free). ③ plain <b>“est.”</b> = only the Tilden gauge, which sits ~a day <i>downstream</i>, so on a rising river an “est. dry” spot may already be wet. Trust eyes first — and log it so it turns blue.<br><b>Geometry:</b> each spot's <b>river-mile</b> is measured along the <i>authentic USGS Nueces channel trace</i> (NHD, HUC 1211 — reach sinuosity 1.91), and its sideways distance out to a slue/floodplain (shown as “off-channel”) is projected onto the channel rather than inflating its depth.</div>
   </div>
 
   <!-- 3B OFFICIAL FORECAST + FUSION + SATELLITE -->
@@ -223,7 +223,8 @@ window.addEventListener('error',function(e){
     <h2>4 · Satellite map</h2>
     <p class="sub">Markers turn <span style="color:var(--red)"><b>red</b></span> when the current scenario floods them, <span style="color:var(--grn)"><b>green</b></span> when dry. <b>Tap the map</b> to drop a new location (fills the Add form for you).</p>
     <div id="map"></div>
-    <div class="sub" id="mapNote" style="margin-top:6px">Esri satellite imagery. Needs internet for tiles; everything else works offline.</div>
+    <div class="sub" id="mapNote" style="margin-top:6px"><b>Live reach map.</b> <span style="color:#2f6fd0">\u2014 blue</span> = Nueces channel (USGS NHD) \u00b7 <span style="color:#1fbfae">- - teal</span> = Old Nueces oxbow \u00b7 <span style="color:#7bc043">- - green</span> = Elm Creek \u00b7 gauge dots turn <span style="color:#e01b1b">red</span> above flood stage \u00b7 \uD83C\uDF0A marks the flood front \u00b7 <span style="color:#c39bd3">- - purple</span> = Elm Slue \u00b7 wet channel shown <span style="color:#1b6fe0">blue</span>, not-yet-flooded <span style="color:#8794a3">grey</span>. Esri imagery; tiles need internet.</div>
+    <div style="margin-top:6px"><button class="sm" onclick="playFlood()">\u25B6 Play flood advance</button> <span class="sub" id="animClock" style="margin-left:6px"></span></div>
   </div>
 
   <!-- 5 REACH PROFILE -->
@@ -466,7 +467,62 @@ window.__seedLocs=SEED_LOCS;   // exposed so the shared-locations layer can merg
 
 /* ================= geometry + adaptive slope ================= */
 function miAB(a,b){const dy=(b.lat-a.lat)*69.05,dx=(b.lon-a.lon)*69.05*Math.cos(a.lat*Math.PI/180);return Math.hypot(dx,dy);}
-function riverMi(pt){return miAB(TILG,pt)*SIN;}
+/* AUTHENTIC USGS NHD channel centerline (NHDPlus HR, HUC 1211), downsampled to 207 pts.
+   Each entry is [lat, lon, river-mi UPSTREAM of the Tilden gauge]. River-mile is read by projecting
+   a point onto this line (true along-channel distance, sinuosity 1.91 baked in); a point's sideways
+   distance out to a slue/floodplain is measured separately and never inflates its river-mile. */
+const CHANNEL_RM=[[28.43252,-99.30071,87.098],[28.43388,-99.29697,86.836],[28.43451,-99.294,86.607],[28.43565,-99.29154,86.359],[28.43816,-99.28879,86.089],[28.43957,-99.28729,85.913],[28.44125,-99.28738,85.7],[28.44277,-99.28429,85.441],[28.44171,-99.28091,85.187],[28.44081,-99.27898,84.971],[28.44198,-99.27608,84.731],[28.4413,-99.27321,84.473],[28.44077,-99.27056,84.226],[28.43949,-99.26902,83.991],[28.43729,-99.26846,83.768],[28.4338,-99.26729,83.486],[28.42964,-99.26675,83.154],[28.42519,-99.26601,82.831],[28.42637,-99.26264,82.584],[28.4252,-99.25906,82.327],[28.42537,-99.25515,82.08],[28.42666,-99.25044,81.769],[28.42884,-99.24836,81.529],[28.42928,-99.24495,81.286],[28.42733,-99.24256,81.027],[28.41894,-99.23902,80.347],[28.41181,-99.22863,79.505],[28.41026,-99.22169,78.983],[28.41291,-99.21696,78.56],[28.40896,-99.21475,78.21],[28.40261,-99.21366,77.717],[28.39997,-99.21043,77.395],[28.39959,-99.2084,77.031],[28.39781,-99.20507,76.678],[28.39539,-99.20249,76.36],[28.38899,-99.20481,75.864],[28.38515,-99.20602,75.491],[28.38199,-99.20325,75.118],[28.37607,-99.20003,74.555],[28.37459,-99.19821,74.244],[28.37324,-99.196,73.917],[28.37235,-99.19319,73.632],[28.3721,-99.18876,73.137],[28.37131,-99.18384,72.621],[28.36675,-99.18362,72.108],[28.36403,-99.17777,71.581],[28.35966,-99.17343,70.948],[28.35302,-99.16851,70.182],[28.34609,-99.16063,69.425],[28.34406,-99.15602,68.964],[28.33561,-99.15242,68.016],[28.32698,-99.15053,67.279],[28.32084,-99.14486,66.632],[28.31721,-99.14251,66.184],[28.31157,-99.14176,65.61],[28.30002,-99.13629,64.456],[28.30197,-99.13085,63.893],[28.30497,-99.12574,63.341],[28.30265,-99.11994,62.77],[28.29792,-99.11814,62.279],[28.29526,-99.11566,61.885],[28.29464,-99.11177,61.314],[28.29333,-99.10777,60.786],[28.29205,-99.10226,60.251],[28.28461,-99.09811,59.555],[28.27917,-99.09909,59.131],[28.27611,-99.09443,58.716],[28.27287,-99.09283,58.333],[28.27068,-99.09078,58.007],[28.26755,-99.09213,57.701],[28.26361,-99.09157,57.32],[28.26145,-99.09008,56.961],[28.26021,-99.08944,56.604],[28.25807,-99.0885,56.268],[28.25611,-99.08427,55.883],[28.25558,-99.08072,55.551],[28.25413,-99.07911,55.207],[28.25269,-99.07767,54.911],[28.25033,-99.07614,54.605],[28.24865,-99.07324,54.339],[28.24341,-99.0725,53.882],[28.24096,-99.07085,53.57],[28.24037,-99.06944,53.307],[28.23646,-99.06927,52.95],[28.23278,-99.06976,52.568],[28.23204,-99.07164,52.264],[28.22956,-99.07176,51.988],[28.22645,-99.07007,51.676],[28.2243,-99.06975,51.368],[28.2223,-99.06771,51.002],[28.2196,-99.06714,50.724],[28.21842,-99.064,50.45],[28.21638,-99.06462,50.195],[28.21277,-99.06303,49.88],[28.21034,-99.06238,49.584],[28.20637,-99.0608,49.163],[28.20154,-99.05799,48.707],[28.20014,-99.05665,48.354],[28.1985,-99.05415,48.036],[28.1975,-99.05054,47.647],[28.19381,-99.04916,47.246],[28.18954,-99.04848,46.846],[28.18586,-99.04705,46.514],[28.18472,-99.04418,46.223],[28.18263,-99.04148,45.898],[28.18065,-99.04207,45.633],[28.179,-99.04259,45.35],[28.17731,-99.04024,45.05],[28.17585,-99.0388,44.796],[28.17341,-99.04115,44.521],[28.17004,-99.04062,44.188],[28.16659,-99.04026,43.852],[28.1637,-99.03807,43.547],[28.16231,-99.03633,43.279],[28.15892,-99.03532,42.989],[28.15886,-99.03689,42.743],[28.15553,-99.03664,42.445],[28.15305,-99.03547,42.142],[28.14934,-99.03325,41.807],[28.13594,-98.74502,23.999],[28.13616,-98.74189,23.723],[28.14088,-98.73913,23.32],[28.14274,-98.73777,22.995],[28.14494,-98.73812,22.765],[28.14884,-98.73567,22.422],[28.15103,-98.73438,22.184],[28.15334,-98.73227,21.883],[28.15577,-98.72987,21.604],[28.15584,-98.72703,21.302],[28.15804,-98.72544,21.032],[28.16219,-98.72559,20.709],[28.16489,-98.72245,20.379],[28.16758,-98.72049,20.104],[28.17177,-98.71673,19.619],[28.17526,-98.71416,19.242],[28.17819,-98.71545,18.912],[28.17981,-98.71363,18.672],[28.18166,-98.71116,18.42],[28.18366,-98.70955,18.12],[28.18476,-98.70651,17.83],[28.18582,-98.70464,17.535],[28.18888,-98.70223,17.207],[28.19278,-98.70003,16.829],[28.19782,-98.69729,16.402],[28.20575,-98.69288,15.716],[28.21169,-98.68641,15.113],[28.21533,-98.68498,14.78],[28.21827,-98.67859,14.284],[28.22077,-98.67298,13.813],[28.22476,-98.6733,13.447],[28.2275,-98.67115,13.049],[28.23245,-98.66608,12.53],[28.2354,-98.66363,12.09],[28.23799,-98.6591,11.701],[28.24337,-98.65393,11.162],[28.24729,-98.65021,10.726],[28.25151,-98.64975,10.34],[28.25321,-98.64625,10.029],[28.25322,-98.64353,9.786],[28.25165,-98.641,9.497],[28.25377,-98.64057,9.24],[28.25473,-98.6379,9.001],[28.25727,-98.63711,8.784],[28.25951,-98.63562,8.51],[28.26075,-98.63297,8.258],[28.26175,-98.63074,7.94],[28.26448,-98.626,7.566],[28.2683,-98.62247,7.146],[28.26942,-98.61928,6.826],[28.27475,-98.61344,6.246],[28.27871,-98.60865,5.727],[28.28154,-98.60657,5.206],[28.28412,-98.60149,4.755],[28.28496,-98.59814,4.435],[28.2863,-98.59735,4.217],[28.2906,-98.5948,3.822],[28.29135,-98.59041,3.475],[28.29236,-98.58752,3.15],[28.29358,-98.58478,2.881],[28.29649,-98.58172,2.459],[28.2946,-98.57874,2.114],[28.29564,-98.57608,1.722],[28.29841,-98.56778,1.118],[28.30259,-98.56592,0.761],[28.30739,-98.56165,0.294],[28.3126,-98.55329,-0.366],[28.31568,-98.55103,-0.801],[28.31747,-98.54897,-1.069],[28.31967,-98.54702,-1.31],[28.32169,-98.54428,-1.56],[28.32285,-98.54041,-1.874],[28.3231,-98.53802,-2.115],[28.3216,-98.53307,-2.46],[28.32238,-98.5281,-2.792],[28.32292,-98.52376,-3.11],[28.32193,-98.52059,-3.379],[28.31897,-98.51759,-3.706],[28.31658,-98.51172,-4.173],[28.3161,-98.50899,-4.441],[28.31635,-98.50538,-4.725],[28.31847,-98.50095,-5.09],[28.31831,-98.49868,-5.363],[28.31863,-98.49405,-5.699],[28.31896,-98.48892,-6.094],[28.32013,-98.48485,-6.473],[28.32106,-98.48137,-6.822],[28.32355,-98.4767,-7.175]];
+const LONMI=69.05*Math.cos(28.28*Math.PI/180);
+function projectChannel(pt){
+  let best=null;
+  for(let i=0;i<CHANNEL_RM.length-1;i++){
+    const A=CHANNEL_RM[i],B=CHANNEL_RM[i+1];
+    const vx=(B[1]-A[1])*LONMI, vy=(B[0]-A[0])*69.05;
+    const wx=(pt.lon-A[1])*LONMI, wy=(pt.lat-A[0])*69.05;
+    const L2=vx*vx+vy*vy, t=L2?Math.max(0,Math.min(1,(wx*vx+wy*vy)/L2)):0;
+    const off=Math.hypot(wx-vx*t,wy-vy*t), rm=A[2]+t*(B[2]-A[2]);
+    if(!best||off<best.lat) best={rm,lat:off};
+  }
+  return best||{rm:0,lat:0};
+}
+function riverMi(pt){return Math.max(0,projectChannel(pt).rm);}   // along-channel river-miles upstream of Tilden (clamp downstream to 0)
+function latOff(pt){return projectChannel(pt).lat;}               // sideways miles off the main channel
+const OLDCHANNEL=[[28.15995, -98.71711], [28.16032, -98.71684], [28.16093, -98.71657], [28.16143, -98.71645], [28.16131, -98.71552], [28.16175, -98.71509], [28.16205, -98.71457], [28.16252, -98.71396], [28.16271, -98.71304], [28.16228, -98.71262], [28.16244, -98.71229], [28.16343, -98.71169], [28.16426, -98.71098], [28.16561, -98.71041], [28.16639, -98.71004], [28.16703, -98.71019], [28.16735, -98.70995], [28.16743, -98.70961], [28.1673, -98.7091], [28.16753, -98.70898], [28.16777, -98.70844], [28.16788, -98.70828], [28.16838, -98.70844], [28.1687, -98.70795], [28.16928, -98.70728], [28.16969, -98.70697], [28.17026, -98.70631], [28.17157, -98.70521], [28.17189, -98.70561], [28.14793, -98.72132], [28.14833, -98.72083], [28.14858, -98.72067], [28.15013, -98.72014], [28.15047, -98.71999], [28.15153, -98.72001], [28.15172, -98.71965], [28.15196, -98.7193], [28.15289, -98.71959], [28.15427, -98.71969], [28.15485, -98.71944], [28.15524, -98.71921], [28.15557, -98.71969], [28.15573, -98.71926], [28.15617, -98.719], [28.1575, -98.71843], [28.15774, -98.71808], [28.15835, -98.71804], [28.15872, -98.71784], [28.15934, -98.71743], [28.15982, -98.71714], [28.17181, -98.70584], [28.17159, -98.70637], [28.172, -98.70686], [28.17219, -98.70648], [28.17241, -98.70612], [28.17297, -98.70655], [28.17316, -98.7064], [28.17348, -98.7062], [28.17434, -98.70652], [28.17454, -98.70607], [28.17501, -98.70589], [28.1751, -98.70553], [28.1752, -98.7049], [28.17573, -98.7048], [28.17663, -98.70507], [28.17611, -98.70618], [28.17643, -98.70649], [28.17705, -98.70654], [28.17702, -98.70571], [28.17768, -98.70586], [28.17819, -98.70568], [28.17843, -98.70464], [28.17918, -98.70426], [28.17962, -98.70491], [28.18008, -98.7046], [28.18095, -98.70429], [28.18131, -98.70401], [28.1817, -98.70413], [28.18163, -98.70496], [28.18213, -98.70507], [28.18259, -98.70456], [28.18327, -98.70452], [28.18398, -98.70457], [28.18483, -98.70394], [28.18526, -98.70324], [28.18631, -98.70329], [28.18643, -98.70459]];
+const ELMCREEK=[[28.16562, -98.59215], [28.1646, -98.5964], [28.15787, -98.57526], [28.15941, -98.57657], [28.21557, -98.64062], [28.21639, -98.6405], [28.21778, -98.64012], [28.219, -98.64083], [28.19795, -98.63156], [28.19958, -98.63232], [28.20139, -98.63373], [28.20198, -98.63412], [28.20416, -98.63453], [28.20503, -98.63551], [28.20637, -98.63584], [28.20747, -98.63649], [28.2092, -98.63651], [28.21047, -98.63598], [28.21132, -98.63625], [28.21298, -98.63759], [28.21412, -98.63982], [28.21527, -98.64044], [28.15476, -98.57495], [28.18629, -98.60979], [28.18742, -98.61087], [28.18835, -98.61204], [28.18776, -98.61448], [28.18818, -98.61678], [28.18904, -98.61861], [28.18973, -98.62078], [28.19082, -98.62176], [28.19158, -98.62253], [28.19272, -98.62393], [28.19262, -98.6254], [28.19332, -98.62689], [28.19429, -98.62787], [28.16433, -98.58691], [28.16532, -98.58911], [28.16641, -98.59989], [28.1691, -98.6012], [28.1704, -98.60294], [28.17226, -98.60409], [28.17415, -98.6047], [28.17524, -98.60619], [28.22096, -98.64222], [28.22244, -98.64336], [28.22253, -98.64412], [28.22366, -98.6445], [28.22335, -98.64604], [28.22586, -98.64687], [28.17568, -98.60728], [28.17804, -98.60804], [28.17994, -98.60731], [28.18337, -98.60833], [28.1954, -98.62797], [28.19697, -98.62902], [28.19659, -98.63003], [28.19751, -98.63074], [28.22909, -98.64679], [28.23167, -98.64473], [28.23276, -98.64381]];
+const ELMSLUE=[[28.23963, -98.63978], [28.24009, -98.63939], [28.2405, -98.63871], [28.24088, -98.63877], [28.24162, -98.63817], [28.24229, -98.63824], [28.24259, -98.63764], [28.24287, -98.63741], [28.24349, -98.6372], [28.24423, -98.63579], [28.2449, -98.63485], [28.23322, -98.64286], [28.23355, -98.6426], [28.23358, -98.64227], [28.23336, -98.64214], [28.23371, -98.64181], [28.23375, -98.64134], [28.23416, -98.64124], [28.23474, -98.64122], [28.23542, -98.64094], [28.23639, -98.64084], [28.23694, -98.641], [28.23815, -98.64095], [28.24559, -98.6342], [28.24615, -98.63404], [28.2467, -98.63415], [28.24713, -98.63423], [28.24771, -98.63433], [28.24829, -98.6343], [28.24921, -98.63399], [28.24982, -98.63362], [28.25065, -98.63344], [28.25114, -98.63328], [28.25099, -98.63291], [28.25123, -98.63253], [28.25133, -98.63237], [28.25171, -98.63217], [28.25203, -98.63178], [28.25237, -98.63132], [28.25272, -98.63089], [28.25335, -98.63099], [28.25376, -98.63113], [28.25424, -98.63156], [28.25472, -98.63206], [28.25551, -98.63178], [28.25651, -98.63172], [28.25732, -98.63168], [28.25766, -98.63174], [28.25839, -98.63158], [28.25876, -98.63144], [28.25932, -98.63147], [28.25971, -98.63099], [28.26049, -98.63091], [28.26097, -98.63061], [28.26118, -98.63012], [28.26149, -98.63007], [28.2622, -98.62955], [28.23947, -98.64048], [28.23949, -98.63994]];
+function pointAtRm(rm){ const C=CHANNEL_RM; for(let i=0;i<C.length-1;i++){ const a=C[i][2],b=C[i+1][2]; if((rm<=a&&rm>=b)||(rm>=a&&rm<=b)){ const t=(a-b)?(a-rm)/(a-b):0; return [C[i][0]+t*(C[i+1][0]-C[i][0]), C[i][1]+t*(C[i+1][1]-C[i][1])]; } } return [C[0][0],C[0][1]]; }
+function drawReachGeo(){ if(!MAP)return; try{
+  if(typeof OLDCHANNEL!=='undefined'&&OLDCHANNEL.length) L.polyline(OLDCHANNEL,{color:'#1fbfae',weight:2,opacity:.85,dashArray:'5 4'}).addTo(MAP).bindTooltip('Old Nueces River Channel (oxbow)',{sticky:true});
+  if(typeof ELMCREEK!=='undefined'&&ELMCREEK.length) L.polyline(ELMCREEK,{color:'#7bc043',weight:2,opacity:.85,dashArray:'3 3'}).addTo(MAP).bindTooltip('Elm Creek (tributary)',{sticky:true});
+  if(typeof ELMSLUE!=='undefined'&&ELMSLUE.length) L.polyline(ELMSLUE,{color:'#c39bd3',weight:2,opacity:.85,dashArray:'2 4'}).addTo(MAP).bindTooltip('Elm Slue',{sticky:true});
+}catch(e){} }
+let CHANLAY=[], ANIM=null, ANIMt=null;
+function reachFrontRm(){ const cS=gval('nCot'),tS=gval('nTil'), top=CHANNEL_RM[0][2];
+  if(tS!=null&&tS>=14) return 0;
+  if(cS!=null&&cS>=15){ const q=Math.max(0,Math.min(1,((tS!=null?tS:2)-2)/(14-2))); return (1-q)*top; }
+  return top+5; }
+function drawChannelState(frontRm){
+  CHANLAY.forEach(l=>MAP.removeLayer(l)); CHANLAY=[];
+  const wet=[],dry=[];
+  for(const p of CHANNEL_RM){ (p[2]>=frontRm?wet:dry).push([p[0],p[1]]); }
+  if(wet.length&&dry.length) dry.unshift(wet[wet.length-1]);
+  if(dry.length>1) CHANLAY.push(L.polyline(dry,{color:'#8794a3',weight:2,opacity:.7}).addTo(MAP).bindTooltip('Nueces channel — not yet at flood stage',{sticky:true}));
+  if(wet.length>1) CHANLAY.push(L.polyline(wet,{color:'#1b6fe0',weight:5,opacity:.92}).addTo(MAP).bindTooltip('Nueces channel — at/above flood stage',{sticky:true}));
+  if(frontRm>=0&&frontRm<=CHANNEL_RM[0][2]){ const fp=pointAtRm(frontRm);
+    CHANLAY.push(L.marker(fp,{icon:L.divIcon({html:'<div style=\'font-size:22px;filter:drop-shadow(0 0 2px #fff)\'>\uD83C\uDF0A</div>',className:'',iconSize:[22,22]})}).addTo(MAP).bindTooltip('flood-stage front',{permanent:true,direction:'top',className:'locLabel'})); }
+}
+function playFlood(){ if(!MAP)return; if(ANIMt){clearInterval(ANIMt);ANIMt=null;}
+  const start=CHANNEL_RM[0][2], crest=parseFloat(document.getElementById('crest').value);
+  const vT=(typeof OFFICIAL!=='undefined'&&OFFICIAL.til&&OFFICIAL.til.valid)?new Date(OFFICIAL.til.valid):null;
+  const lab=document.getElementById('animClock'); let f=0; const N=60; const t0=Date.now();
+  ANIMt=setInterval(()=>{ f++; const prog=f/N; ANIM=start*(1-prog); updateMap(crest);
+    if(lab){ let tt=vT?new Date(t0+prog*(vT-t0)):null; lab.textContent='\uD83C\uDF0A front '+ANIM.toFixed(0)+' river-mi above Tilden'+(tt?' \u00b7 ~'+tt.toLocaleString([], {weekday:'short',hour:'numeric'}):''); }
+    if(f>=N){ clearInterval(ANIMt);ANIMt=null;ANIM=null; updateMap(crest); if(lab)lab.textContent='wave reached Tilden (crest). \u25B6 replay'; }
+  }, 95);
+}   // sideways miles off the main channel (slue/floodplain)
+const RANCH_HOUSE={lat:28.22999,lon:-98.64866};       // the nominal "ranch" reference point
+const RANCH_RM=riverMi(RANCH_HOUSE);                  // its along-channel river-mile (replaces the old fixed 18)
+RANCH_SEED.rm=RANCH_RM;                               // keep the 2013 rise (off) as the physical anchor; slope = off / RANCH_RM
 /* HIGH-WATER MARKS calibrate the model (peak-to-peak). LIVE REPORTS only show on the map. */
 function hwm(){try{return JSON.parse(localStorage.getItem('nueces_v2_hwm')||'[]')}catch(e){return[]}}
 function saveHWM(a){localStorage.setItem('nueces_v2_hwm',JSON.stringify(a));}
@@ -590,13 +646,13 @@ function render(){
   const crest=parseFloat(document.getElementById('crest').value);
   document.getElementById('crestVal').textContent=crest.toFixed(1);
   const v=REG[REGSEL];const srcTxt=crestUserSet?' · manual':(crestAutoPulled?' · auto from NOAA':'');document.getElementById('crestBand').textContent=`(band ${v[3]}–${v[4]})${srcTxt}`;
-  const wseR=TIL_ZERO+crest+offsetAt(18.0);
+  const wseR=TIL_ZERO+crest+offsetAt(RANCH_RM);
   document.getElementById('ranchWSE').textContent=wseR.toFixed(1)+' ft';
   // Section 1 RANCH node = CURRENT conditions from the live Tilden gauge (not the forecast crest)
   const nowStage=gval('nTil');
   const rn=document.getElementById('nRanch'), rx=document.getElementById('nRanchEx');
   if(nowStage!=null){
-    const nowWSE=TIL_ZERO+nowStage+offsetAt(18.0);
+    const nowWSE=TIL_ZERO+nowStage+offsetAt(RANCH_RM);
     const lowest=Math.min.apply(null, locs().map(l=>l.elev));   // water well = first to flood
     const margin=lowest-nowWSE;                                 // + = dry headroom, − = depth over low ground
     const ns = nowStage<2.5?['DRY','#cfe0ee']:nowStage<5?['RISING','#8fd0f0']:nowStage<10?['HIGH','#ffcf8a']:nowStage<15?['FLOODING','#ff9b9b']:['FLOODED','#ff8080'];
@@ -604,7 +660,7 @@ function render(){
     rx.textContent = margin>0 ? 'now · dry, '+margin.toFixed(1)+' ft to flood' : 'now · '+(-margin).toFixed(1)+' ft on low ground';
     rn.title='modeled water surface ≈'+nowWSE.toFixed(0)+' ft NAVD88 (elevation, not depth)';
     const rNow=document.getElementById('ranchNow');
-    if(rNow){ const nt=nowTilEq(); const rWSEnow=nt?TIL_ZERO+nt.stage+offsetAt(18.0):nowWSE, mNow=lowest-rWSEnow, isNWM=nt&&nt.src==='NWM';
+    if(rNow){ const nt=nowTilEq(); const rWSEnow=nt?TIL_ZERO+nt.stage+offsetAt(RANCH_RM):nowWSE, mNow=lowest-rWSEnow, isNWM=nt&&nt.src==='NWM';
       rNow.innerHTML=`NOW ${isNWM?'(NWM nowcast — modeled at the ranch reach)':`est. (from Tilden ${nowStage.toFixed(1)} ft)`}: ranch surface ≈ ${rWSEnow.toFixed(1)} ft NAVD88 — `+
       (mNow>0?`<span style="color:#0f8a5f">${mNow.toFixed(1)} ft below the lowest spot</span>`:`<span style="color:#c1272d">${(-mNow).toFixed(1)} ft over the lowest spot</span>`)+
       `<br><span style="color:#98a2ad">`+(isNWM?'Lag-free — modeled at the ranch itself. ':'Estimate only — the gauge is ~a day downstream, so on a rising river the ranch is already higher than this. ')+`Field sightings always override it.</span>`; }
@@ -622,7 +678,7 @@ function render(){
 /* ---- historical ranking (full record, clickable) ---- */
 function ranchOutcome(crest){
   const camp=locs().find(l=>l.id==='camp'),pens=locs().find(l=>l.id==='pens'),house=locs().find(l=>l.id==='house'),pad=locs().find(l=>l.id==='pad');
-  const w=TIL_ZERO+crest+offsetAt(18.0);
+  const w=TIL_ZERO+crest+offsetAt(RANCH_RM);
   if(house&&w>house.elev)return['HOUSE flooded','#7a1220'];
   if(camp&&w>camp.elev)return['over hunting camp','#c1272d'];
   if(pens&&w>pens.elev)return['over back pens','#c1272d'];
@@ -729,7 +785,7 @@ function renderScen(){const el=document.getElementById('scenList');const a=scens
         the last-dry and first-wet rows with a centered label. Scales & scrolls. ---- */
 function drawLadder(crest){
   const L=locs().slice().sort((a,b)=>b.elev-a.elev);   // highest at top
-  const wseR=TIL_ZERO+crest+offsetAt(18.0);
+  const wseR=TIL_ZERO+crest+offsetAt(RANCH_RM);
   let html='';
   let lineDrawn=false;
   L.forEach((l,i)=>{
@@ -759,7 +815,7 @@ function gval(id){const t=document.getElementById(id).textContent;return t==='�
 let CHAINFLOW={};   // filled by fetchChain: {ASRT2:kcfs,...}
 function drawProfile(crest){
   const W=820,H=384,padT=68,padB=126,ML=52,MR=30;
-  const wseR=TIL_ZERO+crest+offsetAt(18.0);
+  const wseR=TIL_ZERO+crest+offsetAt(RANCH_RM);
   const nodes=[
    {n:'Uvalde',x:0.00,e:520,g:gval('nUvl'),f:CHAINFLOW.UVLT2},
    {n:'Asherton',x:0.20,e:470,g:gval('nAsh'),f:CHAINFLOW.ASRT2},
@@ -793,7 +849,7 @@ function drawProfile(crest){
     if(p.f!=null)labs+=`<text x="${x}" y="${kcfsY}" font-size="11" fill="#6b7684" text-anchor="middle">${(+p.f).toFixed(0)} kcfs</text>`;
     // NOW water-surface marker (blue open ring) at the water nodes, from the live Tilden gauge
     if(isWater && nowStage!=null){
-      const nowE=TIL_ZERO+nowStage+(p.n==='RANCH'?offsetAt(18.0):0), ny=ys(nowE);
+      const nowE=TIL_ZERO+nowStage+(p.n==='RANCH'?offsetAt(RANCH_RM):0), ny=ys(nowE);
       nowMarks+=`<circle cx="${x}" cy="${ny}" r="5.5" fill="#fff" stroke="#1a6f8b" stroke-width="2.5"/>`+
         `<text x="${x}" y="${ny+18}" font-size="11" font-weight="700" fill="#1a6f8b" text-anchor="middle">now ${nowE.toFixed(0)}</text>`;
     }
@@ -870,8 +926,10 @@ function renderLocs(crest){
       nowTag=`<span class="tag" style="background:#1a6f8b">💧 ${od>0?od.toFixed(1)+'′ deep':'water here'}</span>${ag?` <span class="sub">${ag}</span>`:''}`; }
     else if(nt){ nowTag=depthTag((TIL_ZERO+nt.stage+offsetAt(riverMi(l)))-l.elev, nt.src==='NWM'?'NWM est':'est'); }
     else nowTag='<span class="sub">—</span>';
+    const off=(l.lat!=null&&l.lon!=null)?latOff(l):0, rmL=(l.lat!=null&&l.lon!=null)?riverMi(l):null;
+    const geo=rmL!=null?`<br><span class="sub">rm ${rmL.toFixed(1)}${off>0.3?` · ${off.toFixed(1)} mi off-channel`:''}</span>`:'';
     const tr=document.createElement('tr');tr.className='locrow';
-    tr.innerHTML=`<td>${l.name}</td><td>${l.elev.toFixed(1)}</td><td>${nowTag}</td><td>${tag}</td>`+
+    tr.innerHTML=`<td>${l.name}${geo}</td><td>${l.elev.toFixed(1)}</td><td>${nowTag}</td><td>${tag}</td>`+
       `<td style="white-space:nowrap"><button class="sm" style="padding:4px 8px" onclick="openLoc('${l.id}')">edit</button> ${l.seed?'':`<button class="sm" style="padding:4px 8px;background:#8a1f1f" onclick="delLoc('${l.id}')">✕</button>`}</td>`;
     b.appendChild(tr);
   });
@@ -908,7 +966,7 @@ async function saveLoc(){
 function delLoc(id){if(confirm('Delete this location?')){saveLocs(locs().filter(x=>x.id!==id));render();}}
 
 /* ================= satellite map ================= */
-let MAP=null, MARKERS=[];
+let MAP=null, MARKERS=[], FRONTLAYER=[];
 function initMap(){
   try{
     MAP=L.map('map',{zoomControl:true});
@@ -918,26 +976,40 @@ function initMap(){
       openLoc();document.getElementById('mLat').value=e.latlng.lat.toFixed(6);
       document.getElementById('mLon').value=e.latlng.lng.toFixed(6);autoElev();
     });
-    const L0=locs();MAP.setView([L0[0].lat,L0[0].lon],14);
+    drawReachGeo();
+    try{ MAP.fitBounds(CHANNEL_RM.map(p=>[p[0],p[1]]),{padding:[15,15]}); MAP._fitOnce=true; }catch(e){ const L0=locs();MAP.setView([L0[0].lat,L0[0].lon],12); }
   }catch(e){document.getElementById('mapNote').textContent='Map library unavailable (offline). The rest of the tool works.';}
 }
 function updateMap(crest){
   if(!MAP)return;
   MARKERS.forEach(m=>MAP.removeLayer(m));MARKERS=[];
-  const pts=[];
+  FRONTLAYER.forEach(m=>MAP.removeLayer(m));FRONTLAYER=[];
+  const front = (ANIM!=null)?ANIM:reachFrontRm();
+  drawChannelState(front);
+  const R=reports();
   locs().forEach(l=>{const wse=wseAt(l,crest),d=wse-l.elev,under=d>0;
-    const mk=L.circleMarker([l.lat,l.lon],{radius:9,color:'#fff',weight:2,fillColor:under?'#e01b1b':'#11b866',fillOpacity:.95});
-    mk.bindPopup(`<b>${l.name}</b><br>${l.elev.toFixed(1)} ft ground<br>${under?'<span style="color:#c1272d">'+d.toFixed(1)+' ft UNDER</span>':'<span style="color:#0f8a5f">'+(-d).toFixed(1)+' ft dry</span>'}`);
+    const rmL=riverMi(l),off=latOff(l);
+    const reached=(ANIM==null)||(front<=rmL);
+    const fill=!reached?'#9aa7b2':(under?'#e01b1b':'#11b866');
+    let obTxt='';
+    for(const r of R){ const mm=(r.where&&r.where===l.name)||(r.lat!=null&&r.lon!=null&&miAB({lat:l.lat,lon:l.lon},{lat:r.lat,lon:r.lon})<0.1); if(mm){obTxt=`<br><span style="color:#1a6f8b">\uD83D\uDCA7 water logged here${(+r.depth)>0?' ('+(+r.depth).toFixed(1)+'\u2032)':''}</span>`;break;} }
+    const mk=L.circleMarker([l.lat,l.lon],{radius:9,color:'#fff',weight:2,fillColor:fill,fillOpacity:.95});
+    mk.bindPopup(`<b>${l.name}</b><br>${l.elev.toFixed(1)} ft ground \u00b7 rm ${rmL.toFixed(1)}${off>0.3?' \u00b7 '+off.toFixed(1)+' mi off-channel':''}<br>at crest ${crest.toFixed(1)}: ${under?'<span style="color:#c1272d">'+d.toFixed(1)+' ft UNDER</span>':'<span style="color:#0f8a5f">'+(-d).toFixed(1)+' ft dry</span>'}`+obTxt);
     mk.bindTooltip(l.name,{permanent:true,direction:'right',offset:[8,0],className:'locLabel'});
-    mk.addTo(MAP);MARKERS.push(mk);pts.push([l.lat,l.lon]);
+    mk.addTo(MAP);MARKERS.push(mk);
   });
-  // live reports — blue droplets (situational; not part of the forecast)
   reports().forEach(r=>{ if(r.lat==null||r.lon==null)return;
     const mk=L.circleMarker([r.lat,r.lon],{radius:6,color:'#fff',weight:1.5,fillColor:'#2f8fd0',fillOpacity:.9});
-    mk.bindPopup(`<b>report:</b> ${r.depth} ft deep<br>${r.where}<br>${r.t} — ${r.who}`);
-    mk.addTo(MAP);MARKERS.push(mk);pts.push([r.lat,r.lon]);
+    mk.bindPopup(`<b>report:</b> ${r.depth} ft<br>${r.where}<br>${r.t} \u2014 ${r.who}`);
+    mk.addTo(MAP);MARKERS.push(mk);
   });
-  if(pts.length&&!MAP._fitOnce){MAP.fitBounds(pts,{padding:[30,30],maxZoom:15});MAP._fitOnce=true;}
+  const cS=gval('nCot'), tS=gval('nTil');
+  [['Cotulla',28.42611,-99.23972,cS,15],['Tilden',28.30889,-98.55724,tS,14]].forEach(g=>{
+    const fl=g[4],st=g[3], col=st==null?'#8aa0b4':(st>=fl?'#e01b1b':(st>=fl-3?'#e08a00':'#11b866'));
+    const mk=L.circleMarker([g[1],g[2]],{radius:7,color:'#12202e',weight:2,fillColor:col,fillOpacity:1});
+    mk.bindTooltip(`${g[0]}${st!=null?' '+st.toFixed(1)+'ft':''}`,{permanent:true,direction:'top',className:'locLabel'});
+    mk.addTo(MAP);FRONTLAYER.push(mk);
+  });
 }
 
 /* ================= reports + high-water marks ================= */
@@ -1246,7 +1318,7 @@ window.useOfficial=function(){
   document.getElementById('fuseCard').scrollIntoView({behavior:'smooth',block:'start'});
 };
 
-function ranchDepthAt(crest){ const w=TIL_ZERO+crest+offsetAt(18.0); const key=['camp','house','pens','pad'].map(id=>locs().find(l=>l.id===id)).filter(Boolean);
+function ranchDepthAt(crest){ const w=TIL_ZERO+crest+offsetAt(RANCH_RM); const key=['camp','house','pens','pad'].map(id=>locs().find(l=>l.id===id)).filter(Boolean);
   return {wse:w, spots:key.map(l=>({name:l.name,d:+(w-l.elev).toFixed(1)}))}; }
 
 function renderFusion(){
