@@ -8,11 +8,14 @@
 /* early error reporter — shows any script error on-screen (helps debug phones) */
 window.addEventListener('error',function(e){
   try{
+    // Ignore harmless resource-load errors (a map tile, image, or decode) — only report REAL script errors.
+    if(e && e.target && e.target!==window && (e.target.tagName||e.target.src||e.target.href)) return;
+    if(!e.message && !(e.error)) return;
     var d=document.getElementById('errbar');
     if(!d){d=document.createElement('div');d.id='errbar';
       d.style.cssText='position:fixed;top:0;left:0;right:0;background:#7a1220;color:#fff;font:12px/1.4 monospace;padding:7px 11px;z-index:99999;white-space:pre-wrap';
       (document.body||document.documentElement).appendChild(d);}
-    var msg=(e.message||'error')+'  ['+((e.filename||'').split('/').pop())+':'+(e.lineno||'?')+']';
+    var msg=(e.message||(e.error&&e.error.message)||'error')+'  ['+((e.filename||'').split('/').pop())+':'+(e.lineno||'?')+']'+((e.error&&e.error.stack)?'\n'+String(e.error.stack).split('\n').slice(0,3).join('\n'):'');
     d.textContent='⚠ Startup error — send George this line:\n'+msg;
   }catch(_){}
 },true);
@@ -139,7 +142,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v40 — leaner build: LiDAR rasters PNG-compressed (~408KB→~87KB embedded), still one self-contained offline file; all layers intact</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v41 — startup error-bar now ignores harmless resource/tile load errors (only real script errors); PNG-compressed rasters</div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
