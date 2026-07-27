@@ -59,9 +59,9 @@ window.addEventListener('error',function(e){
   svg:not(.leaflet-zoom-animated){width:100%;height:auto;display:block}
   .leaflet-pane svg,.leaflet-container svg{width:auto;height:auto;max-width:none;display:block}
   #map{height:340px;border-radius:10px;border:1px solid var(--rule);margin-top:4px}
-  body.mapbig #map{width:100vw;max-width:100vw;margin-left:calc(50% - 50vw);height:86vh;height:86dvh;border-radius:0}
+  body.mapbig #map{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:5000;border-radius:0;margin:0}
   body.mapbig #mapNote{font-size:12px}
-  #mapExitBtn{position:fixed;top:12px;right:12px;z-index:4001;display:none;background:#12202e;color:#fff}
+  #mapExitBtn{position:fixed;top:12px;right:12px;z-index:5001;display:none;background:#12202e;color:#fff}
   body.mapbig #mapExitBtn{display:inline-block}
   .modal{position:fixed;inset:0;background:rgba(10,15,22,.55);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px}
   .modal .box{background:#fff;border-radius:14px;max-width:420px;width:100%;padding:18px}
@@ -101,7 +101,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-28 · v24 — wider desktop layout; Expand map now fills full browser width; Play flood advance now fills the inundation as the wave arrives</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-28 · v26 — Expand map now true full-screen (fixed viewport, full width + height); flood fills on Play; wider desktop layout</div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -532,13 +532,13 @@ function drawChannelState(frontRm){
     CHANLAY.push(L.marker(fp,{icon:L.divIcon({html:'<div style=\'font-size:22px;filter:drop-shadow(0 0 2px #fff)\'>🌊</div>',className:'',iconSize:[22,22]})}).addTo(MAP).bindTooltip('flood-stage front',{permanent:true,direction:'top',className:'locLabel'})); }
 }
 function _animStep(){ const crest=parseFloat(document.getElementById('crest').value); ANIMf++; const prog=ANIMf/ANIMN; ANIM=ANIMstart*Math.pow(1-prog,1.8); updateMap(crest);
-  if(FLOOD_ON) drawFloodAt(14+(crest-14)*prog);
+  if(FLOOD_ON && ANIMf%3===0) drawFloodAt(14+(crest-14)*prog);
   const lab=document.getElementById('animClock'); if(lab){ let tt=ANIMvT?new Date(ANIMt0+prog*(ANIMvT-ANIMt0)):null; lab.textContent='🌊 front '+ANIM.toFixed(0)+' river-mi above Tilden · filling'+(tt?' · ~'+tt.toLocaleString([], {weekday:'short',hour:'numeric'}):''); }
   if(ANIMf>=ANIMN){ clearInterval(ANIMt);ANIMt=null;ANIM=null; updateMap(crest); if(FLOOD_ON)drawFloodAt(crest); if(lab)lab.textContent='wave reached Tilden (crest '+crest.toFixed(1)+' ft). ▶ replay'; const pb=document.getElementById('pauseBtn'); if(pb)pb.style.display='none'; } }
 function playFlood(){ if(!MAP)return; if(ANIMt){clearInterval(ANIMt);ANIMt=null;}
   ANIMstart=CHANNEL_RM[0][2]; ANIMf=0; ANIMpaused=false; ANIMvT=(typeof OFFICIAL!=='undefined'&&OFFICIAL.til&&OFFICIAL.til.valid)?new Date(OFFICIAL.til.valid):null; ANIMt0=Date.now();
   const pb=document.getElementById('pauseBtn'); if(pb){pb.style.display='inline-block';pb.textContent='⏸ Pause';}
-  if(!FLOOD_ON){ FLOOD_ON=true; } try{MAP.setView([28.235,-98.655],13);}catch(e){}
+  FLOOD_ON=true; try{MAP.setView([28.235,-98.655],13);}catch(e){} drawFloodAt(14);
   const lab=document.getElementById('animClock'); if(lab)lab.textContent='🌊 wave entering the reach at Cotulla…';
   ANIMt=setInterval(_animStep,150); }
 function pauseFlood(){ const pb=document.getElementById('pauseBtn');
@@ -997,13 +997,14 @@ function delLoc(id){if(confirm('Delete this location?')){saveLocs(locs().filter(
 /* ================= satellite map ================= */
 let MAP=null, MARKERS=[], FRONTLAYER=[];
 function floodBytes(){ if(FLOODBYTES)return FLOODBYTES; const bin=atob(FLOOD_RASTER.data); const a=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i); FLOODBYTES=a; return a; }
-function drawFloodAt(crest){ if(!MAP)return; if(FLOODIMG){MAP.removeLayer(FLOODIMG);FLOODIMG=null;}
+function drawFloodAt(crest){ if(!MAP)return;
   const thr=Math.round((crest-FLOOD_RASTER.base0)/FLOOD_RASTER.step);
   const w=FLOOD_RASTER.w,hh=FLOOD_RASTER.h,on=floodBytes();
   const cv=document.createElement('canvas');cv.width=w;cv.height=hh;const ctx=cv.getContext('2d');const im=ctx.createImageData(w,hh);const d=im.data;
-  for(let i=0;i<w*hh;i++){ const o=on[i]; if(o!==255&&o<=thr){ const j=i*4; d[j]=31;d[j+1]=111;d[j+2]=235;d[j+3]=160; } }
-  ctx.putImageData(im,0,0);
-  FLOODIMG=L.imageOverlay(cv.toDataURL(),[[FLOOD_RASTER.south,FLOOD_RASTER.west],[FLOOD_RASTER.north,FLOOD_RASTER.east]],{opacity:0.82,interactive:false}).addTo(MAP);
+  for(let i=0;i<w*hh;i++){ const o=on[i]; if(o!==255&&o<=thr){ const j=i*4; d[j]=31;d[j+1]=111;d[j+2]=235;d[j+3]=165; } }
+  ctx.putImageData(im,0,0); const url=cv.toDataURL();
+  const bounds=[[FLOOD_RASTER.south,FLOOD_RASTER.west],[FLOOD_RASTER.north,FLOOD_RASTER.east]];
+  if(FLOODIMG){ FLOODIMG.setUrl(url); } else { FLOODIMG=L.imageOverlay(url,bounds,{opacity:0.82,interactive:false}).addTo(MAP); }
   const b=document.getElementById('floodBtn'); if(b)b.textContent='🌊 Flood extent: '+crest.toFixed(1)+' ft'; }
 function drawFlood(){ if(!MAP||!FLOOD_ON)return; drawFloodAt(parseFloat(document.getElementById('crest').value)); }
 function toggleFlood(){ if(!MAP)return; FLOOD_ON=!FLOOD_ON;
