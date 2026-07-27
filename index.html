@@ -56,9 +56,10 @@ window.addEventListener('error',function(e){
   .tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;color:#fff}
   .learn{background:#f0f7f2;border:1px solid #bfe0cc;border-radius:8px;padding:9px 11px;font-size:12.5px;margin-top:8px}
   .foot{font-size:11px;color:var(--mut);margin:16px 4px 40px}
-  svg{width:100%;height:auto;display:block}
+  svg:not(.leaflet-zoom-animated){width:100%;height:auto;display:block}
+  .leaflet-pane svg,.leaflet-container svg{width:auto;height:auto;max-width:none;display:block}
   #map{height:340px;border-radius:10px;border:1px solid var(--rule);margin-top:4px}
-  body.mapbig #map{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;z-index:4000;border-radius:0;margin:0}
+  body.mapbig #map{position:fixed;inset:0;z-index:4000;border-radius:0;margin:0;width:auto;height:auto}
   body.mapbig{overflow:hidden}
   #mapExitBtn{position:fixed;top:12px;right:12px;z-index:4001;display:none;background:#12202e;color:#fff}
   body.mapbig #mapExitBtn{display:inline-block}
@@ -100,7 +101,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-28 · v19 — LiDAR flood-extent overlay now tracks the crest slider (16–28 ft levels); expand/collapse map; legible reach map; authentic NHD centerline</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-28 · v20 — FIX: global svg CSS was hiding all Leaflet vectors (channel shading, dots, flood polygons now render); fullscreen map sizing; gauge-refresh no longer resets the crest</div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -601,7 +602,8 @@ Object.entries(REG).forEach(([k,v])=>{const b=document.createElement('button');b
 function selectReg(k){REGSEL=k;document.querySelectorAll('.regbtn').forEach(x=>x.classList.remove('on'));document.getElementById('rb_'+k).classList.add('on');
   const v=REG[k];
   document.getElementById('regNote').innerHTML=`<b>${v[0]}.</b> Historic crest band for a big Cotulla: <b>${v[3]}–${v[4]} ft</b> at Tilden, reaches the ranch in ~${v[5]} day(s). `+((k==='rain'||k==='tropic')?'<span style="color:#c1272d">Amplifying regime — the danger case; the ranch can flood even when the gauge looks modest.</span>':'');
-  onCotulla();}
+  // only seed the crest from the mechanism on first load; never clobber a NOAA-pulled or user-set crest on gauge refresh
+  if(!crestUserSet && !crestAutoPulled) onCotulla(); else if(window.render) render();}
 function pickReg(k){AUTO=false;selectReg(k);paintAuto();}       // user override
 function suggestRegime(){AUTO=false;selectReg({dry:'dry',wet:'wet',raining:'rain',tropic:'tropic'}[document.getElementById('antec').value]);paintAuto();}
 function backToAuto(){AUTO=true;applyAuto();}
@@ -994,7 +996,7 @@ function toggleFlood(){ if(!MAP)return; FLOOD_ON=!FLOOD_ON;
 }
 function toggleMapSize(){
   document.body.classList.toggle('mapbig');
-  setTimeout(()=>{ try{ if(MAP){ const c=MAP.getCenter(),z=MAP.getZoom(); MAP.invalidateSize(); MAP.setView(c,z); } }catch(e){} }, 220);
+  setTimeout(()=>{ try{ if(MAP){ MAP.invalidateSize(); MAP.setView([28.245,-98.632],12); } }catch(e){} }, 250);
 }
 function initMap(){
   try{
