@@ -104,6 +104,11 @@ window.addEventListener('error',function(e){
   .evcard{border:1px solid var(--rule);border-radius:10px;padding:10px 11px;margin-top:8px;background:#fbfdff}
   .evcard .evh{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
   textarea{width:100%;padding:8px 10px;border:1px solid var(--rule);border-radius:8px;font:inherit;resize:vertical;background:#fff}
+  #histBanner{display:none;background:linear-gradient(180deg,#5a3210,#7a4a18);color:#fff;padding:10px 14px;border-radius:10px;margin-bottom:8px;font-weight:600}
+  body.histmode #histBanner{display:block}
+  body.histmode .card{border-color:#e0c39a;box-shadow:0 0 0 1px #ecd3ac inset}
+  body.histmode .card > h2::after{content:' · 📜 HISTORICAL VIEW';color:#b9770a;font-weight:800}
+  #histBar{display:none}
 </style>
 </head>
 <body>
@@ -112,7 +117,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-28 · v32 — Weather Keeper: live NWS conditions incl. pressure, forecast, NHC/radar links, tropical-storm watch, manual rainfall/pressure/storm logging, weather saved into each event</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-28 · v34 — Historical Review Mode: page banner + “HISTORICAL VIEW” badge on every section, named flood/date bar + map corner label, and a Reset-to-current-conditions button (keeps archive clearly separate from live)</div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -121,6 +126,7 @@ window.addEventListener('error',function(e){
 <div class="wrap">
 
   <div id="alertBanner" style="margin-bottom:4px"></div>
+  <div id="histBanner"></div>
 
   <!-- 1 CHAIN -->
   <div class="card">
@@ -251,6 +257,27 @@ window.addEventListener('error',function(e){
       </div>
       <div class="sub" style="margin-top:4px">Rainfall/pressure can be typed by hand or read from the AHPS/NHC links; current NWS temp, wind and pressure are captured automatically when you save an event.</div>
     </div>
+    <div style="margin-top:10px;background:#eef4fb;border:1px solid #9cc0e6;border-radius:8px;padding:9px 11px">
+      <b style="font-size:13px">🌧 Log rainfall</b> <span class="sub">— like a water report: quick on a phone (GPS), or add on desktop; import/export CSV.</span>
+      <div class="row" style="margin-top:6px">
+        <div><label>Rain amount (in)</label><input id="rnAmt" type="number" step="0.1" placeholder="e.g., 4.2"></div>
+        <div><label>Storm (optional)</label><input id="rnStorm" placeholder="e.g., Beulah / blank"></div>
+        <div><label>Your name</label><input id="rnWho" placeholder="who measured"></div>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <div><label>When</label><input id="rnWhen" type="datetime-local"></div>
+        <div><label>Latitude</label><input id="rnLat" type="number" step="0.000001" placeholder="auto GPS"></div>
+        <div><label>Longitude</label><input id="rnLon" type="number" step="0.000001"></div>
+      </div>
+      <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="sm" onclick="useRainGPS()">📍 Use my GPS</button>
+        <button class="add sm" onclick="logRain()">➕ Add rainfall</button>
+        <button class="sm" onclick="exportRainCSV()">⬇ Export CSV</button>
+        <label class="sm" style="cursor:pointer;padding:9px 13px;border:1px solid var(--rule);border-radius:8px;background:#f6f8fa">⬆ Import CSV<input type="file" accept=".csv,text/csv" style="display:none" onchange="importRainCSV(this.files&&this.files[0])"></label>
+      </div>
+      <div id="rnMsg" class="sub" style="margin-top:4px"></div>
+      <div id="rnList" style="margin-top:6px"></div>
+    </div>
   </div>
 
   <!-- 4 SATELLITE MAP -->
@@ -260,6 +287,7 @@ window.addEventListener('error',function(e){
     <div id="map"></div>
     <button id="mapExitBtn" class="sm" onclick="toggleMapSize()">✕ Close map</button>
     <div class="sub" id="mapNote" style="margin-top:6px"><b>Live reach map.</b> Channel: <span style="color:#1668e3;font-weight:700">blue</span> = at/above flood stage, <span style="color:#7a8794;font-weight:700">grey</span> = not yet · <span style="color:#00b3a4;font-weight:700">– – teal</span> Old Nueces oxbow · <span style="color:#6fbf2f;font-weight:700">– – green</span> Elm Creek · <span style="color:#b47fe0;font-weight:700">– – purple</span> Elm Slue · gauge dots turn <span style="color:#e01b1b;font-weight:700">red</span> above flood stage · 🌊 = flood front · translucent <span style="color:#2f7ff0;font-weight:700">blue fill</span> = predicted LiDAR inundation that fills continuously as you change the crest (toggle button). Esri imagery; tiles need internet.</div>
+    <div id="histBar" style="margin:6px 0;padding:8px 11px;background:#7a1220;color:#fff;border-radius:8px;font-weight:700">📜 Reviewing historic flood: <span id="histBarName">—</span> <button class="sm" style="background:#12202e;margin-left:8px" onclick="resetLive()">↩ Reset to current conditions</button></div>
     <div id="mapControls">
     <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
       <button class="sm" onclick="playFlood()">▶ Play flood advance</button>
@@ -267,6 +295,7 @@ window.addEventListener('error',function(e){
       <button class="sm" id="speedBtn" onclick="cycleSpeed()">⏩ 1×</button>
       <button class="sm" onclick="toggleMapSize()">⤢ Expand map</button>
       <button class="sm" id="floodBtn" onclick="toggleFlood()">🌊 Flood extent</button>
+      <button class="sm" id="rainBtn" onclick="toggleRain()">🌧 Rain layer</button>
       <span class="sub" id="animClock"></span>
     </div>
     <div style="margin-top:8px">
@@ -627,7 +656,7 @@ async function loadHistory(){
     HIST_ON=true; FLOOD_ON=true;
     const pk=HIST_SERIES.reduce((a,b)=>b.stage>a.stage?b:a);
     if(note)note.innerHTML='▶ Loaded '+HIST_SERIES.length+' readings · peak <b>'+pk.stage.toFixed(1)+' ft</b> on '+new Date(pk.t).toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric'})+'. Scrub or Play to watch it unfold. (↺ NOAA returns to live.)';
-    const ts=document.getElementById('timeScrub'); if(ts)ts.value=0; try{MAP.setView([28.235,-98.655],13);}catch(e2){} applyHist(0);
+    const ts=document.getElementById('timeScrub'); if(ts)ts.value=0; try{MAP.setView([28.235,-98.655],13);}catch(e2){} applyHist(0); enterHistReview('Observed replay · '+s+' → '+e, null, {histStart:s,histEnd:e});
   }catch(err){ if(note)note.textContent='Fetch failed (offline or blocked).'; }
 }
 function applyHist(prog){ if(!HIST_SERIES.length)return; const idx=Math.max(0,Math.min(HIST_SERIES.length-1,Math.round(prog*(HIST_SERIES.length-1)))); const ev=HIST_SERIES[idx];
@@ -1557,7 +1586,7 @@ function saveEvent(){ const nm=(document.getElementById('evName').value||'').tri
   const ev={id:'e'+Date.now(),name:nm,notes:notes,when:Date.now(),crest:parseFloat(document.getElementById('crest').value)||null,histStart:hs?hs.value:'',histEnd:he?he.value:'',media:STAGED.slice(),reports:reports(),hwm:hwm(),weather:currentWxSnapshot()};
   const a=events();a.unshift(ev);saveEventsArr(a);STAGED=[];document.getElementById('evName').value='';document.getElementById('evNotes').value='';renderStaged();renderEvents(); }
 function delEvent(id){ if(!confirm('Delete this saved event? (kept in any downloaded backup)'))return; const a=events();const ev=a.find(e=>e.id===id); if(ev&&ev.media)ev.media.forEach(m=>idbDel(m.key)); saveEventsArr(a.filter(e=>e.id!==id)); renderEvents(); }
-function loadEvent(id){ const ev=events().find(e=>e.id===id); if(!ev)return; if(ev.crest){document.getElementById('crest').value=ev.crest;crestUserSet=true;} if(ev.histStart&&document.getElementById('histStart'))document.getElementById('histStart').value=ev.histStart; if(ev.histEnd&&document.getElementById('histEnd'))document.getElementById('histEnd').value=ev.histEnd; if(window.render)render(); const m=document.getElementById('map'); if(m)m.scrollIntoView({behavior:'smooth'}); }
+function loadEvent(id){ const ev=events().find(e=>e.id===id); if(!ev)return; enterHistReview(ev.name+' · '+new Date(ev.when).toLocaleDateString(), ev.crest||null, {histStart:ev.histStart,histEnd:ev.histEnd}); }
 function renderEvents(){ const el=document.getElementById('eventList'); if(!el)return; const a=events(); if(!a.length){el.innerHTML='<div class="sub">No saved events yet — set a crest or load a replay, add notes/photos, then “Save current as event”.</div>';return;}
   const esc=(x)=>String(x==null?'':x).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
   el.innerHTML=a.map(ev=>'<div class="evcard"><div class="evh"><b>'+esc(ev.name)+'</b><span class="sub">'+new Date(ev.when).toLocaleDateString()+(ev.crest?' · crest '+ev.crest.toFixed(1)+' ft':'')+' · '+(ev.media?ev.media.length:0)+' media · '+((ev.reports||[]).length)+' logs</span></div>'+(ev.notes?'<div class="sub" style="margin-top:3px">'+esc(ev.notes)+'</div>':'')+((ev.weather&&wxSummary(ev.weather))?'<div class="sub" style="margin-top:3px">🌦 '+esc(wxSummary(ev.weather))+'</div>':'')+'<div class="mediaGrid" data-ev="'+ev.id+'">'+(ev.media||[]).map(m=>thumbHTML(m,'')).join('')+'</div><div style="margin-top:6px;display:flex;gap:6px"><button class="sm" onclick="loadEvent(\''+ev.id+'\')">↺ Load / replay</button><button class="sm" style="background:#8a1f1f" onclick="delEvent(\''+ev.id+'\')">✕ Delete</button></div></div>').join('');
@@ -1565,18 +1594,18 @@ function renderEvents(){ const el=document.getElementById('eventList'); if(!el)r
 async function openMedia(k){ const b=await idbGet(k); if(!b)return; const url=URL.createObjectURL(b); const w=window.open('','_blank'); if(w){ w.document.write((b.type||'').startsWith('video')?'<body style="margin:0;background:#000"><video src="'+url+'" controls autoplay playsinline style="width:100%;height:100vh;object-fit:contain"></video>':'<body style="margin:0;background:#000"><img src="'+url+'" style="width:100%;height:100vh;object-fit:contain">'); } }
 function blobToB64(b){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b);});}
 function b64ToBlob(d){const p=d.split(',');const mime=(p[0].match(/:(.*?);/)||[])[1]||'application/octet-stream';const bin=atob(p[1]);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
-async function exportAll(){ const ls=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}}; const data={app:'NuecesReachModel',version:30,exported:new Date().toISOString(),events:events(),reports:reports(),hwm:hwm(),locations:ls('nueces_v2_loc'),scen:ls('nueces_v2_scen'),hist:ls('nueces_v2_hist'),media:{}};
+async function exportAll(){ const ls=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}}; const data={app:'NuecesReachModel',version:30,exported:new Date().toISOString(),events:events(),reports:reports(),hwm:hwm(),locations:ls('nueces_v2_loc'),scen:ls('nueces_v2_scen'),hist:ls('nueces_v2_hist'),rain:rainReports(),media:{}};
   const keys=[]; data.events.forEach(ev=>(ev.media||[]).forEach(m=>keys.push(m.key)));
   for(const k of keys){ const b=await idbGet(k); if(b) data.media[k]=await blobToB64(b); }
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='NuecesRanch_archive_'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); }
 async function importAll(file){ if(!file)return; try{ const d=JSON.parse(await file.text());
-  if(d.events)saveEventsArr(d.events); if(d.reports)localStorage.setItem('nueces_v2_reports',JSON.stringify(d.reports)); if(d.hwm)localStorage.setItem('nueces_v2_hwm',JSON.stringify(d.hwm)); if(d.locations)localStorage.setItem('nueces_v2_loc',JSON.stringify(d.locations)); if(d.scen)localStorage.setItem('nueces_v2_scen',JSON.stringify(d.scen)); if(d.hist)localStorage.setItem('nueces_v2_hist',JSON.stringify(d.hist));
+  if(d.events)saveEventsArr(d.events); if(d.reports)localStorage.setItem('nueces_v2_reports',JSON.stringify(d.reports)); if(d.hwm)localStorage.setItem('nueces_v2_hwm',JSON.stringify(d.hwm)); if(d.locations)localStorage.setItem('nueces_v2_loc',JSON.stringify(d.locations)); if(d.scen)localStorage.setItem('nueces_v2_scen',JSON.stringify(d.scen)); if(d.hist)localStorage.setItem('nueces_v2_hist',JSON.stringify(d.hist)); if(d.rain)localStorage.setItem('nueces_v2_rain',JSON.stringify(d.rain));
   if(d.media){ for(const k in d.media){ try{await idbPut(k,b64ToBlob(d.media[k]));}catch(e){} } }
   alert('Backup imported — reloading.'); location.reload();
 }catch(e){ alert('Could not import that file: '+e.message); } }
 function renderPresets(){ const el=document.getElementById('presetList'); if(!el)return; const rows=(typeof HISTX!=='undefined'?HISTX:HIST).slice().sort((a,b)=>b[0]-a[0]);
-  el.innerHTML='<div class="sub" style="margin:4px 0">Click a flood to load its recorded crest as the scenario (turn on 🌊 Flood extent to see its peak inundation). Events from ~2007 on can also be Played as a full time-lapse via 📼 Replay.</div>'+rows.map(r=>'<button class="sm" style="margin:2px" onclick="loadPreset('+r[0]+")\">"+(r[2]||r[1])+' · '+(+r[0]).toFixed(1)+' ft</button>').join(''); }
-function loadPreset(stage){ const cr=document.getElementById('crest'); cr.value=Math.max(14,Math.min(28,stage)).toFixed(1); crestUserSet=true; if(!FLOOD_ON&&typeof toggleFlood==='function'){/* leave to user */} if(window.render)render(); const m=document.getElementById('map'); if(m)m.scrollIntoView({behavior:'smooth'}); }
+  el.innerHTML='<div class="sub" style="margin:4px 0">Click a flood to <b>review it in Historical mode</b> (loads its recorded crest + peak inundation; every section is marked HISTORICAL). Events from ~2007 on can also be Played as a full time-lapse via 📼 Replay.</div>'+rows.map(function(r){var lab=(r[2]||r[1]).replace(/'/g,'');return '<button class="sm" style="margin:2px" onclick="loadPreset('+r[0]+",'"+lab+"')\">"+(r[2]||r[1])+' · '+(+r[0]).toFixed(1)+' ft</button>';}).join(''); }
+function loadPreset(stage,label){ enterHistReview((label||'Historic flood')+' · '+(+stage).toFixed(1)+' ft (peak inundation)', +stage); }
 
 /* ============ WEATHER KEEPER (NWS live + tropical + event logging) ============ */
 let WEATHER=null;
@@ -1617,6 +1646,38 @@ function currentWxSnapshot(){ const num=function(id){var v=document.getElementBy
   return Object.assign({}, WEATHER||{}, {rainIn:num('wxRain'), minPresMb:num('wxPres'), storm:str('wxStorm')}); }
 function wxSummary(w){ if(!w)return''; var p=[]; if(w.storm)p.push('🌀 '+w.storm); if(w.minPresMb!=null)p.push('min '+w.minPresMb+' mb'); else if(w.mb!=null)p.push(w.mb+' mb'); if(w.rainIn!=null)p.push(w.rainIn+' in rain'); if(w.tF!=null)p.push(w.tF+'°F'); if(w.wmph!=null)p.push(w.wmph+' mph'); return p.join(' · '); }
 
+/* ============ RAINFALL LOG + MAP LAYER ============ */
+function rainReports(){try{return JSON.parse(localStorage.getItem('nueces_v2_rain')||'[]')}catch(e){return[]}}
+function saveRainArr(a){localStorage.setItem('nueces_v2_rain',JSON.stringify(a));}
+function useRainGPS(){ const m=document.getElementById('rnMsg'); if(!navigator.geolocation){if(m)m.textContent='No GPS here — type coordinates.';return;} if(m)m.textContent='locating…'; navigator.geolocation.getCurrentPosition(function(p){document.getElementById('rnLat').value=p.coords.latitude.toFixed(6);document.getElementById('rnLon').value=p.coords.longitude.toFixed(6);if(m)m.textContent='📍 got your location';},function(e){if(m)m.textContent='GPS blocked ('+e.message+') — type coordinates.';},{enableHighAccuracy:true,timeout:12000}); }
+function logRain(){ const amt=parseFloat(document.getElementById('rnAmt').value); if(isNaN(amt)){alert('Enter a rain amount in inches.');return;} const lat=parseFloat(document.getElementById('rnLat').value),lon=parseFloat(document.getElementById('rnLon').value); const wv=document.getElementById('rnWhen').value; const t=wv?new Date(wv).getTime():Date.now();
+  const r={id:'rn'+Date.now(),t:t,amount:amt,storm:(document.getElementById('rnStorm').value||'').trim(),who:(document.getElementById('rnWho').value||'').trim()||'—',lat:isNaN(lat)?null:lat,lon:isNaN(lon)?null:lon};
+  const a=rainReports();a.unshift(r);saveRainArr(a); document.getElementById('rnAmt').value=''; const m=document.getElementById('rnMsg'); if(m)m.innerHTML='<span style="color:#1a6f8b">✓ Rainfall logged'+(r.lat==null?' (no location — add coords to map it)':'')+'.</span>'; renderRain(); if(RAIN_ON)drawRainLayer(); }
+function renderRain(){ const el=document.getElementById('rnList'); if(!el)return; const a=rainReports(); if(!a.length){el.innerHTML='<span class="sub">No rainfall logged yet.</span>';return;} const mx=a.reduce(function(m,r){return r.amount>m.amount?r:m;}); el.innerHTML='<div class="sub"><b>'+a.length+'</b> readings · max <b>'+mx.amount.toFixed(1)+' in</b>'+(mx.storm?' ('+mx.storm+')':'')+' · latest: '+a.slice(0,5).map(function(r){return r.amount.toFixed(1)+'in '+new Date(r.t).toLocaleDateString();}).join(', ')+(a.length>5?' …':'')+'</div>'; }
+function exportRainCSV(){ const a=rainReports(); const q=function(s){return '"'+String(s==null?'':s).replace(/"/g,'""')+'"';}; const rows=[['datetime','lat','lon','amount_in','storm','who']]; a.forEach(function(r){rows.push([new Date(r.t).toISOString(),(r.lat==null?'':r.lat),(r.lon==null?'':r.lon),r.amount,q(r.storm),q(r.who)]);}); const csv=rows.map(function(x){return x.join(',');}).join('\n'); const b=new Blob([csv],{type:'text/csv'}); const el=document.createElement('a');el.href=URL.createObjectURL(b);el.download='Nueces_rainfall.csv';document.body.appendChild(el);el.click();el.remove(); }
+function splitCSV(line){ const out=[];let cur='',q=false; for(let i=0;i<line.length;i++){const ch=line[i]; if(ch=='"'){ if(q&&line[i+1]=='"'){cur+='"';i++;} else q=!q; } else if(ch==','&&!q){out.push(cur);cur='';} else cur+=ch;} out.push(cur); return out; }
+async function importRainCSV(file){ if(!file)return; try{ const txt=await file.text(); const lines=txt.split(/\r?\n/).filter(function(x){return x.trim();}); if(!lines.length)return; const hdr=splitCSV(lines[0]).map(function(x){return x.toLowerCase().replace(/["']/g,'').trim();}); const find=function(n){return hdr.findIndex(function(x){return x.indexOf(n)>=0;});}; const di=find('date'),la=find('lat'),lo=find('lon'),am=(find('amount')>=0?find('amount'):find('rain')),so=find('storm'),wh=find('who'); if(am<0){alert('CSV needs an amount/rain column.');return;} const a=rainReports(); let n=0; for(let i=1;i<lines.length;i++){ const c=splitCSV(lines[i]); const amt=parseFloat(c[am]); if(isNaN(amt))continue; const dt=(di>=0&&c[di])?new Date(c[di]).getTime():Date.now(); a.push({id:'rn'+Date.now()+'_'+i,t:isNaN(dt)?Date.now():dt,amount:amt,lat:(la>=0&&c[la]!=='')?parseFloat(c[la]):null,lon:(lo>=0&&c[lo]!=='')?parseFloat(c[lo]):null,storm:so>=0?(c[so]||''):'',who:wh>=0?(c[wh]||'imported'):'imported'}); n++; } saveRainArr(a); renderRain(); if(RAIN_ON)drawRainLayer(); const m=document.getElementById('rnMsg'); if(m)m.textContent='Imported '+n+' rainfall rows.'; }catch(e){ alert('Could not import CSV: '+e.message); } }
+let RAINLAYER=null, RAIN_ON=false;
+function rainColor(a){ return a>=8?'#08306b':a>=6?'#08519c':a>=4?'#2171b5':a>=2?'#4292c6':a>=1?'#6baed6':'#9ecae1'; }
+function drawRainLayer(){ if(!MAP)return; if(RAINLAYER){MAP.removeLayer(RAINLAYER);} RAINLAYER=L.layerGroup(); rainReports().forEach(function(r){ if(r.lat==null||r.lon==null)return; const mk=L.circleMarker([r.lat,r.lon],{radius:Math.min(18,6+r.amount*1.3),color:'#fff',weight:1.5,fillColor:rainColor(r.amount),fillOpacity:.9}); mk.bindPopup('<b>🌧 '+r.amount.toFixed(1)+' in</b>'+(r.storm?' · '+r.storm:'')+'<br>'+new Date(r.t).toLocaleString()+' — '+(r.who||'')); mk.bindTooltip(r.amount.toFixed(1)+'"',{permanent:true,direction:'top',className:'locLabel'}); RAINLAYER.addLayer(mk); }); RAINLAYER.addTo(MAP); }
+function toggleRain(){ if(!MAP)return; RAIN_ON=!RAIN_ON; const b=document.getElementById('rainBtn'); if(RAIN_ON){ drawRainLayer(); if(b)b.textContent='🌧 Rain layer: ON'; } else { if(RAINLAYER){MAP.removeLayer(RAINLAYER);RAINLAYER=null;} if(b)b.textContent='🌧 Rain layer'; } }
+
+/* ============ HISTORICAL REVIEW MODE ============ */
+let HIST_REVIEW=null, HISTCTL=null;
+function setMapHistLabel(txt){ if(!MAP)return; if(HISTCTL){try{MAP.removeControl(HISTCTL);}catch(e){}HISTCTL=null;} if(!txt)return; try{ HISTCTL=L.control({position:'bottomright'}); HISTCTL.onAdd=function(){var d=L.DomUtil.create('div');d.style.cssText='background:rgba(122,18,32,.92);color:#fff;padding:6px 10px;border-radius:8px;font:700 12px sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.4);max-width:60vw';d.innerHTML='📜 '+txt;return d;}; HISTCTL.addTo(MAP);}catch(e){} }
+function enterHistReview(name,crest,opts){ HIST_REVIEW={name:name}; document.body.classList.add('histmode');
+  const bn=document.getElementById('histBanner'); if(bn)bn.innerHTML='📜 <b>Reviewing historic flood:</b> '+name+' — this is an <b>ARCHIVE</b> view, not current conditions. <button class="sm" style="background:#12202e;margin-left:8px" onclick="resetLive()">↩ Return to LIVE</button>';
+  const hb=document.getElementById('histBar'); if(hb){hb.style.display='block'; const nm=document.getElementById('histBarName'); if(nm)nm.textContent=name;}
+  setMapHistLabel(name);
+  if(crest){document.getElementById('crest').value=Math.max(14,Math.min(28,crest)).toFixed(1);crestUserSet=true;}
+  if(opts){ if(opts.histStart&&document.getElementById('histStart'))document.getElementById('histStart').value=opts.histStart; if(opts.histEnd&&document.getElementById('histEnd'))document.getElementById('histEnd').value=opts.histEnd; }
+  if(window.render)render();
+  const m=document.getElementById('map'); if(m)m.scrollIntoView({behavior:'smooth',block:'start'}); }
+function resetLive(){ HIST_REVIEW=null; HIST_ON=false; document.body.classList.remove('histmode');
+  const hb=document.getElementById('histBar'); if(hb)hb.style.display='none'; const hn=document.getElementById('histNote'); if(hn)hn.textContent=''; setMapHistLabel('');
+  if(typeof OFFICIAL!=='undefined'&&OFFICIAL.til&&OFFICIAL.til.stage>0){document.getElementById('crest').value=Math.max(14,Math.min(28,OFFICIAL.til.stage)).toFixed(1);crestUserSet=false;crestAutoPulled=true;}
+  if(window.render)render(); if(window.fetchWeather)fetchWeather(); }
+
 function boot(){
   step(initDefaults);
   step(addHelpIcons);
@@ -1624,6 +1685,7 @@ function boot(){
   step(refreshWhere);
   step(render);
   step(renderEvents);
+  step(renderRain);
   step(buildWxLinks);
   step(function(){if(window.fetchWeather)fetchWeather();});
   step(function(){if(window.fetchTropical)fetchTropical();});
