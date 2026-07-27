@@ -120,10 +120,12 @@ window.addEventListener('error',function(e){
   .tagline{color:#c7d5e1 !important}
   .help-btn{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer}
   .help-btn:hover{background:rgba(255,255,255,.26)}
-  #topnav{position:sticky;top:0;z-index:60;background:#12202e;border-bottom:1px solid #24405a;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  #topnav .navinner{display:flex;gap:2px;max-width:1200px;margin:0 auto;padding:0 8px}
-  #topnav a{color:#cfe0ee;text-decoration:none;font-size:12.5px;font-weight:700;padding:10px 12px;white-space:nowrap;border-bottom:2px solid transparent}
-  #topnav a:hover{color:#fff;border-bottom-color:#2f8fd0}
+  #topnav{position:sticky;top:0;z-index:60;background:linear-gradient(180deg,#eef4fa,#dde8f3);border-top:3px solid #2f8fd0;border-bottom:1px solid #b9cad9;box-shadow:0 3px 8px rgba(20,40,60,.14);overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #topnav .navinner{display:flex;gap:4px;align-items:center;max-width:1200px;margin:0 auto;padding:6px 10px}
+  #topnav .navlbl{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:#5a7183;padding-right:6px;white-space:nowrap;flex:none}
+  #topnav a{color:#16466e;text-decoration:none;font-size:12.5px;font-weight:700;padding:8px 13px;white-space:nowrap;border-radius:9px;border-bottom:none;transition:background .12s,color .12s}
+  #topnav a:hover{color:#fff;background:#2f8fd0}
+  #topnav a:active{transform:translateY(1px)}
   body.mapbig #topnav{display:none}
   .card{border-radius:14px;box-shadow:0 2px 10px rgba(20,40,60,.06);border-color:#e3e8ee;padding:15px 16px}
   .card>h2{font-size:15.5px;text-transform:none;letter-spacing:0;color:#12202e;font-weight:800;margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid #eef1f5}
@@ -142,17 +144,28 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v41 — startup error-bar now ignores harmless resource/tile load errors (only real script errors); PNG-compressed rasters</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v42 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
   </div>
 </header>
-<nav id="topnav"><div class="navinner"><a href="#sec1">Gauges</a><a href="#sec3">Forecast</a><a href="#fuseCard">Fused</a><a href="#wxCard">Weather</a><a href="#secmap">Map</a><a href="#sec6">Report</a><a href="#archiveCard">Archive</a><a href="#sec7">History</a></div></nav>
+<nav id="topnav"><div class="navinner"><span class="navlbl">☰ Jump&nbsp;to</span><a href="#sec1">Gauges</a><a href="#sec3">Forecast</a><a href="#fuseCard">Fused</a><a href="#wxCard">Weather</a><a href="#secmap">Map</a><a href="#sec6">Report</a><a href="#archiveCard">Archive</a><a href="#sec7">History</a></div></nav>
 <div class="wrap">
 
   <div id="alertBanner" style="margin-bottom:4px"></div>
   <div id="histBanner"></div>
+
+  <div id="buildModal" class="modal" onclick="if(event.target===this)closeBuildLog()"><div class="box" style="max-width:560px;max-height:82vh;overflow:auto">
+    <h3>🗒 Version / build log</h3>
+    <div id="buildLogBody" style="font-size:13px;line-height:1.5;color:#38414d"></div>
+    <button class="sm" style="width:100%;margin-top:12px;background:#12202e;color:#fff" onclick="closeBuildLog()">Close</button>
+  </div></div>
+
+  <div id="alertModal" class="modal" onclick="if(event.target===this)closeAlert()"><div class="box" style="max-width:560px;max-height:82vh;overflow:auto">
+    <div id="alertModalBody" style="font-size:13.5px;line-height:1.5;color:#26313d"></div>
+    <button class="sm" style="width:100%;margin-top:12px;background:#12202e;color:#fff" onclick="closeAlert()">Close</button>
+  </div></div>
 
   <!-- 1 CHAIN -->
   <div class="card" id="sec1">
@@ -494,7 +507,7 @@ window.addEventListener('error',function(e){
       <p>The row of gauges from the Hill Country down to Three Rivers. Each one upstream is earlier warning — Asherton crests ~8 days before the ranch, Cotulla ~5. The gauges show <b>stage in feet</b> (height on that gauge). The <b>Ranch</b> box has no gauge, so it shows its <b>current</b> modeled status from the live Tilden reading (DRY / RISING / HIGH / FLOODING / FLOODED) — this is “now,” not a forecast. The <i>forecast</i> for a predicted crest lives in Section 3. Gauges auto-update every 15 minutes; the links open the official NOAA pages.</p>
 
       <h3 id="help-s2">2 · Which kind of flood (mechanism)</h3>
-      <p>The same amount of water behaves very differently depending on how the flood is made. <b>Auto</b> reads the mechanism from the live gauges (mainly the Tilden-vs-Cotulla flow ratio) and picks it for you, explaining why. Tap any button to <b>override</b> for a “what-if” — e.g. force “local rain” or “tropical” to stress-test. A green banner means auto; amber means you’ve overridden, with a link back to auto. Amplifying regimes (local rain, tropical) are the dangerous ones — the ranch can flood even when upstream looks modest.</p>
+      <p>The same amount of water behaves very differently depending on how the flood is made. <b>Auto</b> reads the mechanism from the live gauges (mainly the Tilden-vs-Cotulla flow ratio) and picks it for you, explaining why. Tap any button to <b>override</b> for a “what-if” — e.g. force “gaining reach” or “tropical” to stress-test. A green banner means auto; amber means you’ve overridden, with a link back to auto. The two <b>amplifying</b> regimes — a gaining reach (extra water enters between Cotulla and Tilden, from local rain <i>or</i> a tributary like the Frio) and tropical — are the dangerous ones: the ranch can flood even when the upstream gauge looks modest. The names describe the river’s behaviour, not necessarily rain falling on the ranch itself.</p>
 
       <h3 id="help-s3">3 · Forecast &amp; your locations</h3>
       <p>Slide the <b>Cotulla crest</b> and the mechanism converts it to a predicted <b>Tilden crest</b> (the big red number) — or drag the Tilden slider directly for free what-ifs. Below, the big number is the predicted <b>water-surface elevation at the ranch</b>. The <b>ladder</b> lists every location high-to-low; the blue line is the water surface, rows above it stay dry (green), rows below flood (red) with the depth. <b>Save scenario</b> stores a crest+mechanism you can reload later. <b>＋ Add location</b> lets you add any spot by coordinates with an auto-fetched ground elevation.</p>
@@ -529,9 +542,9 @@ const TILG={lat:28.30889,lon:-98.55724};
 const GAUGES={UVLT2:'nUvl',ASRT2:'nAsh',COTT2:'nCot',TILT2:'nTil'};
 const GAUGE_FLOOD={Uvalde:null,Asherton:20,Cotulla:15,Tilden:14,'3 Rivers':25};
 const REG={
- dry:   ["Dry-channel routed","attenuates hard · slow · 2026",22.0,20.5,23.5,6],
- wet:   ["Wet-channel routed","mild attenuation · 2018-style",23.2,22.0,24.5,4],
- rain:  ["Local rain on the reach","AMPLIFIES · fast · 2002/2013",24.5,23.5,26.0,1.5],
+ dry:   ["Attenuating — dry channel","wave shrinks crossing dry ground · slow · 2026",22.0,20.5,23.5,6],
+ wet:   ["Attenuating — wet channel","mild shrink · 2018-style",23.2,22.0,24.5,4],
+ rain:  ["Gaining reach — amplifies","reach ADDS water (local rain or a tributary) · fast · 2002/2013",24.5,23.5,26.0,1.5],
  tropic:["Tropical / whole-basin","highest · Beulah-class · house at risk",26.5,25.0,28.0,1],
 };
 let REGSEL='dry';
@@ -808,9 +821,9 @@ function detectMechanism(){
   if(!cotUp) return {reg:REGSEL,reason:'No significant upstream flood right now — nothing to classify.',conf:'idle'};
   if(tilF!=null&&tilF>1&&cotF!=null&&cotF>1){
     const r=tilF/cotF;
-    if(r>1.2) return {reg:'rain',reason:`Tilden flow (${tilF.toFixed(0)}k) is ${r.toFixed(1)}× Cotulla (${cotF.toFixed(0)}k) — the reach is ADDING water: local rain, amplifying.`,conf:'high'};
-    if(r>=0.6) return {reg:'wet',reason:`Tilden÷Cotulla flow = ${r.toFixed(2)} — mild loss: wet-channel routed.`,conf:'high'};
-    return {reg:'dry',reason:`Tilden÷Cotulla flow = ${r.toFixed(2)} — heavy loss: dry-channel routed.`,conf:'high'};
+    if(r>1.35) return {reg:'rain',reason:`Tilden flow (${tilF.toFixed(0)}k) is ${r.toFixed(1)}× Cotulla (${cotF.toFixed(0)}k) — the reach is GAINING water between the gauges (local rain or a tributary such as the Frio backing up): amplifying.`,conf:'high'};
+    if(r>=0.6) return {reg:'wet',reason:`Tilden÷Cotulla flow = ${r.toFixed(2)} — mild loss crossing the reach: wet-channel attenuation.`,conf:'high'};
+    return {reg:'dry',reason:`Tilden÷Cotulla flow = ${r.toFixed(2)} — heavy loss crossing a dry reach: strong attenuation.`,conf:'high'};
   }
   if(tilS!=null&&tilS<5) return {reg:'dry',reason:`Cotulla up (${cotF!=null?cotF.toFixed(0)+'k cfs':cotS+' ft'}) but Tilden still ~${tilS} ft — wave being absorbed by a dry channel.`,conf:'med'};
   return {reg:REGSEL,reason:'Not enough signal yet — holding current pick.',conf:'low'};
@@ -1483,12 +1496,52 @@ async function fetchAlerts(){
   try{
     const j=await fetch(`https://api.weather.gov/alerts/active?point=${RANCHPT.lat},${RANCHPT.lon}`,{headers:{'Accept':'application/geo+json'}}).then(r=>r.json());
     ALERTS=(j.features||[]).map(f=>f.properties).filter(p=>p&&/flood/i.test((p.event||'')+ (p.headline||'')));
-    el.innerHTML=ALERTS.length? ALERTS.map(a=>`<div style="background:#7a1220;color:#fff;border-radius:10px;padding:10px 13px;margin-bottom:6px">
+    el.innerHTML=ALERTS.length? ALERTS.map((a,i)=>`<div onclick="openAlert(${i})" role="button" tabindex="0" style="background:#7a1220;color:#fff;border-radius:10px;padding:10px 13px;margin-bottom:6px;cursor:pointer" title="Tap to read the full alert">
         <b>⚠ ${escH(a.event)}</b> <span style="opacity:.85;font-size:12px">— official NWS</span>
+        <span style="float:right;font-size:11px;background:rgba(255,255,255,.18);border-radius:20px;padding:2px 9px">tap to read →</span>
         <div style="font-size:12.5px;margin-top:3px;line-height:1.35">${escH(a.headline||'')}</div>
         <div style="font-size:11px;opacity:.8;margin-top:3px">${escH((a.areaDesc||'').slice(0,140))}</div></div>`).join('') : '';
   }catch(e){ /* leave banner empty if blocked */ }
 }
+function openAlert(i){
+  const a=ALERTS[i]; if(!a)return;
+  const fmt=t=>{try{return new Date(t).toLocaleString();}catch(e){return t||'';}};
+  const para=s=>escH(String(s||'')).replace(/\n\n+/g,'</p><p style="margin:8px 0 0">').replace(/\n/g,'<br>');
+  const url=a['@id']||a.id||'';
+  let h=`<div style="background:#7a1220;color:#fff;border-radius:10px;padding:11px 13px;margin:-2px 0 12px">
+      <div style="font-size:16px;font-weight:800">⚠ ${escH(a.event||'NWS Alert')}</div>
+      <div style="font-size:12px;opacity:.9;margin-top:2px">Official National Weather Service · ${escH(a.severity||'')} ${escH(a.urgency||'')}</div></div>`;
+  if(a.headline) h+=`<p style="margin:0 0 8px;font-weight:700">${escH(a.headline)}</p>`;
+  h+=`<div style="font-size:11.5px;color:#6b7684;margin-bottom:8px">Effective ${fmt(a.effective||a.onset)} → expires ${fmt(a.expires||a.ends)}<br>Area: ${escH(a.areaDesc||'')}</div>`;
+  if(a.description) h+=`<p style="margin:8px 0 0">${para(a.description)}</p>`;
+  if(a.instruction) h+=`<div style="margin-top:10px;background:#fff6e6;border:1px solid #e2c37a;border-radius:9px;padding:9px 11px"><b>What to do:</b><p style="margin:5px 0 0">${para(a.instruction)}</p></div>`;
+  if(/^https?:/.test(url)) h+=`<div style="margin-top:10px;font-size:12px">Source: <a href="${escH(url)}" target="_blank" rel="noopener">view on weather.gov ↗</a></div>`;
+  document.getElementById('alertModalBody').innerHTML=h;
+  document.getElementById('alertModal').style.display='flex';
+}
+function closeAlert(){document.getElementById('alertModal').style.display='none';}
+
+/* ---- version / build log ---- */
+const BUILD_LOG=[
+  ['v42','2026-07-29','Nav bar restyled to stand out (light bar, bright accent, “Jump to” label). Added this build-log. NWS flood alerts are now tappable to read the full text. Section 2 mechanism names clarified — “gaining reach” instead of the misleading “local rain”.'],
+  ['v41','2026-07-29','Startup error-bar now ignores harmless map-tile/resource load errors (only reports real script errors, with a stack).'],
+  ['v40','2026-07-28','LiDAR rasters PNG-compressed (~408 KB → 87 KB) — leaner file, still fully offline-capable.'],
+  ['v37–39','2026-07-28','Real-time timeline rebuilt: left = observed Tilden hydrograph, NOW = live gauge, right = forecast crest. Inundation fills only behind the traveling wave front (upstream first).'],
+  ['v33–36','2026-07-27','Cloud media sharing (family photos/videos sync via Firebase). Weather keeper: live NWS conditions, pressure, forecast, tropical links; rainfall log with GPS + CSV; metrics saved into flood events.'],
+  ['v28–32','2026-07-27','Compare 2–3 flood footprints on the map (each its own colour). Topographic elevation-band layer. Historical review mode clearly separated from live conditions, with reset.'],
+  ['v20–27','2026-07-26','Dashboard restyle. Full-screen map fixes. Flood animation smoothed (in-place tile updates). Leaflet vector visibility fix.'],
+  ['v10–19','2026-07-25','Authentic Nueces channel geometry from USGS NHDPlus HR. Connectivity-aware “bathtub” inundation from 3DEP LiDAR. Front-gated fill so the ranch floods only when the wave arrives.'],
+  ['v1–9','2026-07-24','First tracker: live gauge chain, mechanism-based forecast, fused NOAA + National Water Model + crowd marks, shared reporting.'],
+];
+function openBuildLog(){
+  document.getElementById('buildLogBody').innerHTML=BUILD_LOG.map(r=>
+    `<div style="padding:9px 0;border-bottom:1px solid #eef1f5">
+       <div><b style="color:#12202e">${r[0]}</b> <span style="color:#98a2ad;font-size:11.5px">· ${r[1]}</span></div>
+       <div style="margin-top:2px">${r[2]}</div></div>`).join('')+
+    `<div style="margin-top:10px;font-size:11.5px;color:#98a2ad">Decision aid only — official NWS/NOAA warnings always govern life-safety.</div>`;
+  document.getElementById('buildModal').style.display='flex';
+}
+function closeBuildLog(){document.getElementById('buildModal').style.display='none';}
 
 async function resolveRanchReach(){
   try{
