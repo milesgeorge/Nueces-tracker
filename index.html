@@ -96,12 +96,15 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-27 · v6 — fused NOAA+NWM+satellite, impacts, duration, nowcast, live warnings, tracked wave front</div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
   </div>
 </header>
 <div class="wrap">
+
+  <div id="alertBanner" style="margin-bottom:4px"></div>
 
   <!-- 1 CHAIN -->
   <div class="card">
@@ -355,7 +358,7 @@ window.addEventListener('error',function(e){
       <p>Your locations on aerial imagery, colored <span style="color:#0f8a5f"><b>green</b></span> (dry) or <span style="color:#c1272d"><b>red</b></span> (flooded) for the current scenario. <b>Tap the map</b> anywhere to drop a new location — it grabs the coordinates and fetches the elevation for you.</p>
 
       <h3 id="help-s5">5 · Reach profile</h3>
-      <p>A side-view of the water surface down the whole chain. Pills between gauges are travel time; ⚠ marks a gauge above flood stage; kcfs is live flow; 🌊 is the wave’s current position.</p>
+      <p>A side-view of the water surface down the whole chain. Pills between gauges are travel time; ⚠ marks a gauge above flood stage; kcfs is live flow. 🌊 is the <b>flood-stage front</b> — how far downstream water has reached flood stage. It slides continuously between gauges (so it can sit on the ranch), and reads <b>▶ advancing</b> or <b>◀ receding</b> from the last 18 h of gauge trend. Note it marks the flood-stage boundary, not the very first ripple of the rise, which runs a bit ahead of it.</p>
 
       <h3 id="help-s6">6 · Report water &amp; teach the model</h3>
       <p>Two separate things. A <b>live report</b> (“water is here now”) drops a blue pin on the shared map so everyone can see where the water is — it does <b>not</b> change the forecast. A <b>high-water mark</b> is how the model actually learns: after a flood <i>peaks</i>, you mark the high-water line at a known spot and give that flood's <b>peak</b> Tilden crest, and the tool re-fits its water-surface slope. The reason it must be peak-to-peak is that the ranch floods about a day <i>ahead</i> of the gauge, so a live reading compared to the live gauge would over-steepen the model. In shared mode, high-water marks go to an admin for approval before they move the forecast; live reports appear on the map right away.</p>
@@ -499,6 +502,23 @@ async function fetchChain(){
     document.getElementById('chainNote').textContent='Live fetch blocked (offline or content-blocker) — showing last-known values.';
   }
   if(AUTO)applyAuto(); else render();
+}
+
+/* ================= stage trend (rising vs receding) ================= */
+let TREND={};   // {COTT2:{stage,rate,rising}, TILT2:{...}} from the last ~18 h of USGS data
+async function fetchTrends(){
+  try{
+    const j=await fetch('https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08194000,08194500&parameterCd=00065&period=PT18H').then(r=>r.json());
+    (j.value.timeSeries||[]).forEach(ts=>{
+      const site=ts.sourceInfo.siteCode[0].value, vals=ts.values[0].value;
+      if(!vals||vals.length<2)return;
+      const a=parseFloat(vals[0].value), b=parseFloat(vals[vals.length-1].value);
+      const hrs=Math.max(1,(new Date(vals[vals.length-1].dateTime)-new Date(vals[0].dateTime))/3.6e6);
+      const key={'08194000':'COTT2','08194500':'TILT2'}[site];
+      if(key&&!isNaN(a)&&!isNaN(b))TREND[key]={stage:b,rate:(b-a)/hrs,rising:(b-a)>0.05};
+    });
+  }catch(e){}
+  step(()=>{if(window.render)render();});
 }
 
 /* ================= mechanism ================= */
@@ -759,10 +779,38 @@ function drawProfile(crest){
     labs+=`<text x="${x}" y="${H-19}" font-size="9" font-weight="700" fill="${flooding?'#c1272d':(p.n==='RANCH'?'#c1272d':'#0f8a5f')}" text-anchor="middle">${sub}</text>`;
     if(p.f!=null)labs+=`<text x="${x}" y="${H-8}" font-size="8.5" fill="#6b7684" text-anchor="middle">${(+p.f).toFixed(0)} kcfs</text>`;
   });
-  let front=null;nodes.forEach(p=>{const fl=GAUGE_FLOOD[p.n];if(p.g!=null&&fl!=null&&p.g>=fl)front=p;});
-  let wave='';if(front){const x=xs(front.x),y=ys(front.e);wave=`<text x="${x}" y="${y+20}" font-size="14" text-anchor="middle">🌊</text>`;}
+  // ---- flood-stage front: continuous position between gauges, rising vs receding ----
+  let wave='';
+  (function(){
+    const cot=nodes.find(n=>n.n==='Cotulla'), til=nodes.find(n=>n.n==='Tilden'), ash=nodes.find(n=>n.n==='Asherton');
+    const cS=cot.g, tS=til.g, cFl=15,cAct=9, tFl=14,tAct=11;
+    if(cS==null&&tS==null)return;
+    const trT=TREND.TILT2, trC=TREND.COTT2;
+    let fx=null,label='';
+    if(tS!=null&&tS>=tFl){ fx=til.x; label='at / below Tilden'; }
+    else if(cS!=null&&cS>=cFl){                          // between Cotulla and Tilden — includes the ranch
+      const p=Math.max(0,Math.min(1,((tS!=null?tS:tAct)-tAct)/(tFl-tAct)));
+      fx=cot.x+p*(til.x-cot.x);
+      label=(fx>=0.575&&fx<=0.665)?'over the RANCH reach now':'between Cotulla & Tilden';
+    } else if(cS!=null&&cS>=cAct){                        // approaching, not yet flooding downstream
+      const p=Math.max(0,Math.min(1,(cS-cAct)/(cFl-cAct)));
+      fx=ash.x+p*(cot.x-ash.x); label='approaching Cotulla';
+    } else return;                                        // nothing significant on the reach
+    // receding if the relevant gauges are trending down
+    const receding=(trT&&!trT.rising&&(tS==null||tS<tFl+0.5)&&(!trC||!trC.rising)) || (trT&&!trT.rising&&trC&&!trC.rising);
+    const arrow=receding?'◀ receding':'▶ advancing', col=receding?'#6b7684':'#1a6f8b';
+    const rate=(trT&&Math.abs(trT.rate)>0.02)?` · Tilden ${trT.rising?'▲':'▼'}${Math.abs(trT.rate).toFixed(2)} ft/h`:'';
+    // y on the schematic line at fx
+    let i=0; while(i<nodes.length-1 && nodes[i+1].x<fx) i++;
+    const A=nodes[i],B=nodes[Math.min(i+1,nodes.length-1)], t=(B.x!==A.x)?(fx-A.x)/(B.x-A.x):0, ey=A.e+t*(B.e-A.e);
+    const x=xs(fx),y=ys(ey);
+    wave=`<line x1="${x}" y1="${y+3}" x2="${x}" y2="${y+15}" stroke="${col}" stroke-width="1" stroke-dasharray="2 2"/>`+
+      `<text x="${x}" y="${y+30}" font-size="15" text-anchor="middle">🌊</text>`+
+      `<text x="${x}" y="${y+42}" font-size="8.5" font-weight="700" fill="${col}" text-anchor="middle">${arrow}</text>`+
+      `<text x="${x}" y="${y+52}" font-size="8" fill="${col}" text-anchor="middle">${label}${rate}</text>`;
+  })();
   const leg=`<text x="44" y="16" font-size="10" fill="#6b7684">Water-surface elevation down the reach</text>`+
-    `<text x="44" y="30" font-size="9" fill="#98a2ad">pills = travel time between gauges · ⚠ = gauge above flood stage · kcfs = live flow · 🌊 = wave front now</text>`;
+    `<text x="44" y="30" font-size="9" fill="#98a2ad">pills = travel time · ⚠ = above flood stage · kcfs = live flow · 🌊 = flood-stage front (▶ advancing / ◀ receding)</text>`;
   document.getElementById('profileSvg').innerHTML=`<svg viewBox="0 0 ${W} ${H}"><path d="${path}" fill="none" stroke="#9fb0c0" stroke-width="1.5" stroke-dasharray="4 3"/>${segl}${dots}${labs}${wave}${leg}</svg>`;
 }
 
@@ -1027,6 +1075,10 @@ async function fetchOfficial(){
       fetch('https://api.water.noaa.gov/nwps/v1/gauges/COTT2').then(r=>r.json()).catch(()=>null)
     ]);
     if(t&&t.status&&t.status.forecast){const f=t.status.forecast;OFFICIAL.til={stage:+f.primary,flow:(+f.secondary||0)*1000,cat:f.floodCategory,valid:f.validTime};}
+    if(t&&t.flood){
+      OFFICIAL.impacts=(t.flood.impacts||[]).map(x=>({stage:+x.stage,txt:x.statement})).filter(x=>x.stage>0&&x.txt).sort((a,b)=>a.stage-b.stage);
+      OFFICIAL.floodStage=(t.flood.categories&&t.flood.categories.minor&&+t.flood.categories.minor.stage)||14;
+    }
     if(c&&c.status&&c.status.forecast){const f=c.status.forecast;OFFICIAL.cot={stage:+f.primary,flow:(+f.secondary||0)*1000,cat:f.floodCategory,valid:f.validTime};}
     if(OFFICIAL.til){
       const o=OFFICIAL.til, catTxt=(o.cat||'').replace('_',' ');
@@ -1039,6 +1091,41 @@ async function fetchOfficial(){
   step(renderFusion);
 }
 
+/* Full RFC forecast hydrograph at Tilden → crest time, duration above flood stage, rate of rise */
+async function fetchForecastSeries(){
+  try{
+    let pts=[];
+    for(const u of ['https://api.water.noaa.gov/nwps/v1/gauges/TILT2/stageflow','https://api.water.noaa.gov/nwps/v1/gauges/TILT2/stageflow/forecast']){
+      try{ const j=await fetch(u).then(r=>r.json()); const p=extractTS(j,['primary','stage']); if(p.length>pts.length)pts=p; }catch(e){}
+    }
+    pts=pts.filter(p=>p.t&&!isNaN(new Date(p.t))).sort((a,b)=>new Date(a.t)-new Date(b.t));
+    if(pts.length){
+      let crest=pts[0]; for(const p of pts) if(p.v>crest.v)crest=p;
+      const fs=OFFICIAL.floodStage||14;
+      const above=pts.filter(p=>p.v>=fs);
+      let durHrs=null; if(above.length>=2) durHrs=(new Date(above[above.length-1].t)-new Date(above[0].t))/3.6e6;
+      const now=new Date(); const cur=pts.filter(p=>new Date(p.t)<=now).slice(-1)[0]||pts[0];
+      let rate=null; const h=(new Date(crest.t)-new Date(cur.t))/3.6e6; if(h>0.5) rate=(crest.v-cur.v)/h;
+      OFFICIAL.fcst={crest:crest.v,crestTime:crest.t,durHrs,rate};
+    }
+  }catch(e){}
+  step(renderFusion);
+}
+
+/* Official NWS flood watches/warnings for the ranch point (api.weather.gov) */
+let ALERTS=[];
+async function fetchAlerts(){
+  const el=document.getElementById('alertBanner'); if(!el)return;
+  try{
+    const j=await fetch(`https://api.weather.gov/alerts/active?point=${RANCHPT.lat},${RANCHPT.lon}`,{headers:{'Accept':'application/geo+json'}}).then(r=>r.json());
+    ALERTS=(j.features||[]).map(f=>f.properties).filter(p=>p&&/flood/i.test((p.event||'')+ (p.headline||'')));
+    el.innerHTML=ALERTS.length? ALERTS.map(a=>`<div style="background:#7a1220;color:#fff;border-radius:10px;padding:10px 13px;margin-bottom:6px">
+        <b>⚠ ${escH(a.event)}</b> <span style="opacity:.85;font-size:12px">— official NWS</span>
+        <div style="font-size:12.5px;margin-top:3px;line-height:1.35">${escH(a.headline||'')}</div>
+        <div style="font-size:11px;opacity:.8;margin-top:3px">${escH((a.areaDesc||'').slice(0,140))}</div></div>`).join('') : '';
+  }catch(e){ /* leave banner empty if blocked */ }
+}
+
 async function resolveRanchReach(){
   try{
     const j=await fetch(`https://api.water.usgs.gov/nldi/linked-data/comid/position?coords=POINT(${RANCHPT.lon} ${RANCHPT.lat})`).then(r=>r.json());
@@ -1048,17 +1135,22 @@ async function resolveRanchReach(){
   }catch(e){}
   return TIL_REACH;   // fallback: use the Tilden reach if lookup fails
 }
-function extractSeries(obj){   // defensively pull [{t,flow}] out of an NWPS reaches/streamflow payload of unknown shape
+/* defensively pull the longest [{t,v}] time-series out of a payload of unknown shape */
+function extractTS(obj,vkeys){
   let best=[];
   (function walk(o){ if(!o||typeof o!=='object')return;
     if(Array.isArray(o)){ if(o.length&&o[0]&&typeof o[0]==='object'){
-        const pts=o.map(e=>({t:e.validTime||e.time||e.forecastTime||e.t, flow:+(e.flow!=null?e.flow:e.value!=null?e.value:e.streamflow)})).filter(x=>!isNaN(x.flow));
+        const pts=o.map(e=>{let v; for(const k of vkeys){ if(e[k]!=null&&!isNaN(+e[k])){v=+e[k];break;} } return {t:e.validTime||e.time||e.forecastTime||e.t, v};}).filter(x=>x.v!=null&&!isNaN(x.v));
         if(pts.length>best.length)best=pts;
       } o.forEach(walk); return; }
     Object.values(o).forEach(walk);
   })(obj);
   return best;
 }
+function extractSeries(obj){ return extractTS(obj,['flow','streamflow','value']).map(p=>({t:p.t,flow:p.v})); }
+function escH(x){ return String(x==null?'':x).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+/* highest-stage official NOAA impact statement at/below a Tilden stage */
+function impactFor(st){ if(!OFFICIAL.impacts||!OFFICIAL.impacts.length||!(st>0))return null; let best=null; for(const im of OFFICIAL.impacts){ if(st>=im.stage) best=im; } return best; }
 async function fetchNWM(){
   const box=document.getElementById('nwmBox'); if(!box)return;
   try{
@@ -1068,15 +1160,25 @@ async function fetchNWM(){
       try{ const j=await fetch(`https://api.water.noaa.gov/nwps/v1/reaches/${RANCH_REACH}/streamflow?series=${s}`).then(r=>r.json());
         const p=extractSeries(j); if(p.length>pts.length)pts=p; }catch(e){}
     }
-    if(!pts.length){ box.innerHTML='<span class="sub">National Water Model reach forecast not reachable right now (or none active). Cross-check unavailable — official + calibration still drive the forecast.</span>'; NWM=null; return; }
-    let peak=pts[0]; for(const x of pts) if(x.flow>peak.flow)peak=x;
-    // NWPS reaches streamflow is in cfs; if values look like kcfs (tiny), scale up.
-    let qcfs=peak.flow; if(qcfs>0&&qcfs<300)qcfs*=1000;
-    NWM={flow:qcfs,peakTime:peak.t,impliedStage:stageFromFlow(qcfs),reach:RANCH_REACH,source:(RANCH_REACH===TIL_REACH?'Tilden reach (ranch lookup unavailable)':'ranch reach')};
-    box.innerHTML=`Modeled peak flow <b>${Math.round(qcfs).toLocaleString()} cfs</b> on the <b>${NWM.source}</b>`+
-      (peak.t?` around <b>${fmtWhen(peak.t)}</b>`:'')+
-      (NWM.impliedStage?`<br><span class="sub">≈ ${NWM.impliedStage.toFixed(1)} ft Tilden-equivalent (approx. cross-check via rating curve)</span>`:'')+
-      `<br><span class="sub">The ranch reach is upstream of Tilden, so this peaks <i>before</i> the gauge — an early read on arrival timing.</span>`;
+    const scale=q=>(q>0&&q<300)?q*1000:q;   // NWPS reaches flow is cfs; scale up if it looks like kcfs
+    // nowcast: analysis/assimilation latest = live best-estimate flow at the reach (a virtual gauge)
+    let nowcast=null,nowT=null;
+    for(const s of ['analysis_assimilation','analysis_assim']){
+      try{ const j=await fetch(`https://api.water.noaa.gov/nwps/v1/reaches/${RANCH_REACH}/streamflow?series=${s}`).then(r=>r.json());
+        const p=extractSeries(j); if(p.length){ const last=p[p.length-1]; nowcast=scale(last.flow); nowT=last.t; break; } }catch(e){}
+    }
+    if(!pts.length&&nowcast==null){ box.innerHTML='<span class="sub">National Water Model reach data not reachable right now (or none active). Cross-check unavailable — official + calibration still drive the forecast.</span>'; NWM=null; step(renderFusion); return; }
+    const src=(RANCH_REACH===TIL_REACH?'Tilden reach (ranch lookup unavailable)':'ranch reach');
+    NWM={reach:RANCH_REACH,source:src,nowcast,nowcastTime:nowT};
+    let html='';
+    if(nowcast!=null){ html+=`Live nowcast <b>${Math.round(nowcast).toLocaleString()} cfs</b> at the <b>${src}</b>${nowT?` <span class="sub">(as of ${fmtWhen(nowT)})</span>`:''} — a virtual gauge where none exists.`; }
+    if(pts.length){ let peak=pts[0]; for(const x of pts) if(x.flow>peak.flow)peak=x; const qcfs=scale(peak.flow);
+      NWM.flow=qcfs; NWM.peakTime=peak.t; NWM.impliedStage=stageFromFlow(qcfs);
+      html+=(html?'<br>':'')+`Forecast peak <b>${Math.round(qcfs).toLocaleString()} cfs</b>${peak.t?` around <b>${fmtWhen(peak.t)}</b>`:''}`+
+        (NWM.impliedStage?` <span class="sub">≈ ${NWM.impliedStage.toFixed(1)} ft Tilden-equiv. (approx.)</span>`:'');
+    }
+    html+=`<br><span class="sub">The ranch reach is upstream of Tilden, so it moves <i>before</i> the gauge — an early read on arrival.</span>`;
+    box.innerHTML=html;
   }catch(e){ box.innerHTML='<span class="sub">National Water Model fetch blocked by the browser.</span>'; NWM=null; }
   step(renderFusion);
 }
@@ -1105,9 +1207,15 @@ function renderFusion(){
   let src = off!=null?`NOAA official (${off.toFixed(1)} ft)`:(nwm!=null?`NWM cross-check (${nwm.toFixed(1)} ft)`:`your scenario slider (${slider.toFixed(1)} ft)`);
   let band = (cands.length>1&&hi-lo>0.2)?` <span class="sub">(sources span ${lo.toFixed(1)}–${hi.toFixed(1)} ft)</span>`:'';
   let timing = NWM&&NWM.peakTime?` Arrival read from NWM: peak near <b>${fmtWhen(NWM.peakTime)}</b> at the ranch reach (leads the gauge).`:(OFFICIAL.til&&OFFICIAL.til.valid?` NOAA crest valid <b>${fmtWhen(OFFICIAL.til.valid)}</b>.`:'');
+  const fc=OFFICIAL.fcst;
+  let dur = fc?`<br><span class="sub">NOAA forecast hydrograph: crest ~<b>${fmtWhen(fc.crestTime)}</b>`+
+    (fc.durHrs?`, ~<b>${Math.round(fc.durHrs)} h</b> above Tilden flood stage`:'')+
+    (fc.rate&&Math.abs(fc.rate)>0.02?`, rising ~${fc.rate.toFixed(2)} ft/h`:'')+`.</span>`:'';
+  const im=impactFor(fused);
+  let impact = im?`<br><span style="color:#7a1220">📋 <b>NOAA impact near ${fused.toFixed(0)} ft (Tilden):</b> ${escH(im.txt)}</span>`:'';
   out.innerHTML=`Fused Tilden crest <b>${fused.toFixed(1)} ft</b>${band} — anchored on ${src}.`+
     `<br>Ranch water surface ≈ <b>${r.wse.toFixed(0)} ft NAVD88</b> → <b style="color:${oc[1]}">${oc[0]}</b>.`+
-    `<br>${spotTxt}.`+timing+
+    `<br>${spotTxt}.`+timing+dur+impact+
     `<br><span class="sub">Slider is at ${slider.toFixed(1)} ft; press “Use NOAA's forecast crest” to align them.</span>`;
 }
 
@@ -1161,9 +1269,11 @@ function boot(){
   step(function(){ if(window.fetchChain) fetchChain(); });
   // new multi-source backbones — official NOAA forecast, National Water Model, satellite panel
   step(buildSatPanel);
-  step(function(){ if(window.fetchOfficial) fetchOfficial(); });
+  step(function(){ if(window.fetchOfficial) fetchOfficial().then(()=>{ if(window.fetchForecastSeries)fetchForecastSeries(); }); });
   step(function(){ if(window.fetchNWM) fetchNWM(); });
-  try{ setInterval(function(){ if(document.visibilityState!=='hidden'){ if(window.fetchChain)fetchChain(); if(window.fetchOfficial)fetchOfficial(); if(window.fetchNWM)fetchNWM(); } }, 900000); }catch(e){}
+  step(function(){ if(window.fetchTrends) fetchTrends(); });
+  step(function(){ if(window.fetchAlerts) fetchAlerts(); });
+  try{ setInterval(function(){ if(document.visibilityState!=='hidden'){ if(window.fetchChain)fetchChain(); if(window.fetchOfficial)fetchOfficial(); if(window.fetchForecastSeries)fetchForecastSeries(); if(window.fetchNWM)fetchNWM(); if(window.fetchTrends)fetchTrends(); if(window.fetchAlerts)fetchAlerts(); } }, 900000); }catch(e){}
 }
 if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',boot); else boot();
 </script>
