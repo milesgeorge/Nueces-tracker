@@ -96,7 +96,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-27 · v9 — Section 5 graphic overhaul (bigger fonts, wave-front band, amber flood ring); now vs forecast split; fused NOAA+NWM+satellite, impacts, duration, nowcast, live warnings</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-27 · v11 — “now” = sightings (with time-ago) › NWM nowcast › gauge; crest auto-pulls NOAA forecast; Section 5 overhaul; fused NOAA+NWM+satellite, impacts, duration, warnings</div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -154,16 +154,16 @@ window.addEventListener('error',function(e){
     <p class="sub">Set a predicted <b>Cotulla</b> crest and the mechanism translates it to a <b>Tilden</b> crest — or drag the Tilden slider directly for what-ifs.</p>
 
     <label style="margin-top:2px">Predicted Cotulla crest (upstream input): <b><span id="cotVal">29.0</span> ft</b></label>
-    <input id="cotCrest" type="range" min="14" max="33" step="0.1" value="29.0" oninput="onCotulla()">
+    <input id="cotCrest" type="range" min="14" max="33" step="0.1" value="29.0" oninput="onCotulla(true)">
 
     <div style="background:#fdf1f1;border:1px solid var(--red);border-radius:10px;padding:10px 12px;margin-top:12px">
       <div style="font-size:13px;color:var(--mut)">PREDICTED TILDEN CREST</div>
       <div style="font-size:34px;font-weight:800;color:var(--red);line-height:1.1"><span id="crestVal">22.0</span> ft
         <span id="crestBand" style="font-size:13px;font-weight:600;color:var(--mut)"></span></div>
-      <input id="crest" type="range" min="14" max="28" step="0.1" value="22.0" oninput="onTilden()" style="margin-top:6px">
+      <input id="crest" type="range" min="14" max="28" step="0.1" value="22.0" oninput="onTilden(true)" style="margin-top:6px">
     </div>
     <div style="background:#f2f6fa;border:1px solid var(--rule);border-radius:8px;padding:8px 11px;margin-top:8px;font-size:12px;color:#38414d">
-      <b>Note:</b> the crest is set by you, not auto-pulled. A live gauge only shows the <i>current</i> stage — which sits below the peak both while the river rises and while it falls — so auto-filling it would give a confidently wrong forecast. The gauges and mechanism are data; the crest is your judgment. It's seeded to the mechanism's historic band as a starting point.
+      <b>Note:</b> when NOAA has an official crest forecast out, this <b>auto-fills to it</b> (their River Forecast Center value, shown as “auto from NOAA” by the number). Drag the slider anytime to override — it switches to “manual.” A live <i>gauge</i> reading is deliberately never used to set the crest: it shows only the current stage, which sits below the peak, so it would under-forecast.
     </div>
 
     <div class="big" id="ranchWSE" style="margin-top:12px">—</div>
@@ -183,7 +183,8 @@ window.addEventListener('error',function(e){
       <b style="font-size:13px">Locations</b>
       <button class="add sm" onclick="openLoc()">＋ Add location</button>
     </div>
-    <table id="locTable"><thead><tr><th>name</th><th>ground</th><th>now <span style="font-weight:400;color:var(--mut)">(live gauge)</span></th><th>at crest <span style="font-weight:400;color:var(--mut)">(forecast)</span></th><th></th></tr></thead><tbody></tbody></table>
+    <table id="locTable"><thead><tr><th>name</th><th>ground</th><th>now <span style="font-weight:400;color:var(--mut)">(observed, else est.)</span></th><th>at crest <span style="font-weight:400;color:var(--mut)">(forecast)</span></th><th></th></tr></thead><tbody></tbody></table>
+    <div class="sub" style="margin-top:6px;line-height:1.45"><b>“now” priority (best first):</b> ① <span style="color:#1a6f8b;font-weight:700">💧 blue observed</span> = someone logged water there, with how long ago — ground truth. ② <b>“NWM est.”</b> = modeled at the ranch's <i>own</i> reach (lag-free). ③ plain <b>“est.”</b> = only the Tilden gauge, which sits ~a day <i>downstream</i>, so on a rising river an “est. dry” spot may already be wet. Trust eyes first — and log it so it turns blue.</div>
   </div>
 
   <!-- 3B OFFICIAL FORECAST + FUSION + SATELLITE -->
@@ -524,6 +525,7 @@ async function fetchTrends(){
 
 /* ================= mechanism ================= */
 let AUTO=true;
+let crestUserSet=false, crestAutoPulled=false;   // crest auto-fills from NOAA forecast unless the user drags it
 const rb=document.getElementById('regBtns');
 Object.entries(REG).forEach(([k,v])=>{const b=document.createElement('button');b.className='regbtn'+(k===REGSEL?' on':'');b.id='rb_'+k;b.innerHTML=`${v[0]}<small>${v[1]}</small>`;b.onclick=()=>pickReg(k);rb.appendChild(b);});
 function selectReg(k){REGSEL=k;document.querySelectorAll('.regbtn').forEach(x=>x.classList.remove('on'));document.getElementById('rb_'+k).classList.add('on');
@@ -573,7 +575,8 @@ function alertFor(t){
 }
 /* Cotulla → Tilden transfer factor by mechanism (ft Tilden per ft Cotulla above 29) */
 const COTK={dry:0.35,wet:0.45,rain:0.6,tropic:0.7};
-function onCotulla(){
+function onCotulla(u){
+  if(u)crestUserSet=true;        // dragging Cotulla is a manual what-if
   const cot=parseFloat(document.getElementById('cotCrest').value);
   document.getElementById('cotVal').textContent=cot.toFixed(1);
   const v=REG[REGSEL], center=v[2], k=COTK[REGSEL];
@@ -582,11 +585,11 @@ function onCotulla(){
   document.getElementById('crest').value=til.toFixed(1);
   render();
 }
-function onTilden(){render();}   // dragging Tilden directly is a free what-if
+function onTilden(u){ if(u)crestUserSet=true; render(); }   // dragging Tilden directly is a free what-if
 function render(){
   const crest=parseFloat(document.getElementById('crest').value);
   document.getElementById('crestVal').textContent=crest.toFixed(1);
-  const v=REG[REGSEL];document.getElementById('crestBand').textContent=`(band ${v[3]}–${v[4]})`;
+  const v=REG[REGSEL];const srcTxt=crestUserSet?' · manual':(crestAutoPulled?' · auto from NOAA':'');document.getElementById('crestBand').textContent=`(band ${v[3]}–${v[4]})${srcTxt}`;
   const wseR=TIL_ZERO+crest+offsetAt(18.0);
   document.getElementById('ranchWSE').textContent=wseR.toFixed(1)+' ft';
   // Section 1 RANCH node = CURRENT conditions from the live Tilden gauge (not the forecast crest)
@@ -601,8 +604,10 @@ function render(){
     rx.textContent = margin>0 ? 'now · dry, '+margin.toFixed(1)+' ft to flood' : 'now · '+(-margin).toFixed(1)+' ft on low ground';
     rn.title='modeled water surface ≈'+nowWSE.toFixed(0)+' ft NAVD88 (elevation, not depth)';
     const rNow=document.getElementById('ranchNow');
-    if(rNow){ const mNow=lowest-nowWSE; rNow.innerHTML=`NOW (live Tilden ${nowStage.toFixed(1)} ft): ranch surface ≈ ${nowWSE.toFixed(1)} ft NAVD88 — `+
-      (mNow>0?`<span style="color:#0f8a5f">${mNow.toFixed(1)} ft below the lowest spot (dry)</span>`:`<span style="color:#c1272d">${(-mNow).toFixed(1)} ft over the lowest spot</span>`); }
+    if(rNow){ const nt=nowTilEq(); const rWSEnow=nt?TIL_ZERO+nt.stage+offsetAt(18.0):nowWSE, mNow=lowest-rWSEnow, isNWM=nt&&nt.src==='NWM';
+      rNow.innerHTML=`NOW ${isNWM?'(NWM nowcast — modeled at the ranch reach)':`est. (from Tilden ${nowStage.toFixed(1)} ft)`}: ranch surface ≈ ${rWSEnow.toFixed(1)} ft NAVD88 — `+
+      (mNow>0?`<span style="color:#0f8a5f">${mNow.toFixed(1)} ft below the lowest spot</span>`:`<span style="color:#c1272d">${(-mNow).toFixed(1)} ft over the lowest spot</span>`)+
+      `<br><span style="color:#98a2ad">`+(isNWM?'Lag-free — modeled at the ranch itself. ':'Estimate only — the gauge is ~a day downstream, so on a rising river the ranch is already higher than this. ')+`Field sightings always override it.</span>`; }
   } else { rn.textContent='—'; rn.style.color='#cfe0ee'; rx.textContent='no gauge data';
     const rNow=document.getElementById('ranchNow'); if(rNow)rNow.textContent='NOW: waiting on live gauge data.'; }
   // Section 3 alert = PREDICTION for the chosen crest (clearly labeled, so it isn't read as "now")
@@ -832,16 +837,39 @@ function drawProfile(crest){
   document.getElementById('profileSvg').innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto"><path d="${path}" fill="none" stroke="#9fb0c0" stroke-width="1.8" stroke-dasharray="5 3"/>${segl}${dots}${labs}${nowMarks}${wave}${leg}</svg>`;
 }
 
+/* ---- "now" helpers: report time, relative age, and a lag-free Tilden-equivalent stage ---- */
+function repTime(r){ if(r&&r.epoch)return +r.epoch;
+  if(r&&r.ts){ if(typeof r.ts==='number')return r.ts<1e12?r.ts*1000:r.ts; if(r.ts.seconds)return r.ts.seconds*1000; }
+  if(r&&r.t){ const s=String(r.t).replace(/\s*\((obs\.|field)\)\s*$/,''); const d=Date.parse(s); if(!isNaN(d))return d; }
+  return null; }
+function agoStr(ms){ if(ms==null)return''; let m=Math.round((Date.now()-ms)/60000); if(m<0)m=0;
+  if(m<1)return'just now'; if(m<60)return m+'m ago'; const h=Math.round(m/60); if(h<24)return h+'h ago'; return Math.round(h/24)+'d ago'; }
+/* Best "now" expressed as a Tilden-equivalent stage. Prefer the NWM nowcast (measured AT the ranch reach,
+   so it does NOT lag); fall back to the live Tilden gauge (which does lag the ranch on a rising river). */
+function nowTilEq(){ try{ if(NWM&&NWM.nowcast>0){ const s=stageFromFlow(NWM.nowcast); if(s!=null)return{stage:s,src:'NWM'}; } }catch(e){}
+  const g=gval('nTil'); return g!=null?{stage:g,src:'gauge'}:null; }
+
 /* ---- location table ---- */
 function renderLocs(crest){
   const b=document.querySelector('#locTable tbody');b.innerHTML='';
-  const nowStage=gval('nTil');
-  const depthTag=(d)=> d>0?`<span class="tag" style="background:#c1272d">${d.toFixed(1)}′ under</span>`:`<span class="tag" style="background:#0f8a5f">${(-d).toFixed(1)}′ dry</span>`;
+  const R=reports();
+  const nt=nowTilEq();   // best lag-free "now" Tilden-equivalent stage (NWM nowcast if available, else live gauge)
+  const depthTag=(d,lab)=> d>0
+    ? `<span class="tag" style="background:#c1272d">${d.toFixed(1)}′ under${lab?` <span style="opacity:.85">${lab}</span>`:''}</span>`
+    : `<span class="tag" style="background:${lab?'#5b7a53':'#0f8a5f'}">${(-d).toFixed(1)}′ dry${lab?` <span style="opacity:.85">${lab}</span>`:''}</span>`;
+  // strongest field observation at a location (name match, or within ~0.1 mi) — ground truth beats the gauge
+  const obsFor=(l)=>{ let best=null; for(const r of R){ let m=(r.where&&r.where===l.name);
+      if(!m&&r.lat!=null&&r.lon!=null&&l.lat!=null&&l.lon!=null) m=miAB({lat:l.lat,lon:l.lon},{lat:r.lat,lon:r.lon})<0.1;
+      if(m&&(best==null||(+r.depth||0)>(+best.depth||0))) best=r; } return best; };
   locs().sort((a,b)=>a.elev-b.elev).forEach(l=>{
     const wse=wseAt(l,crest), d=wse-l.elev;               // FORECAST depth at the scenario crest
-    const tag=depthTag(d);
-    let nowTag='<span class="sub">no gauge</span>';        // LIVE depth from the current Tilden gauge
-    if(nowStage!=null){ const dNow=(TIL_ZERO+nowStage+offsetAt(riverMi(l)))-l.elev; nowTag=depthTag(dNow); }
+    const tag=depthTag(d,'');
+    let nowTag;
+    const ob=obsFor(l);
+    if(ob){ const od=+ob.depth||0, ag=agoStr(repTime(ob));
+      nowTag=`<span class="tag" style="background:#1a6f8b">💧 ${od>0?od.toFixed(1)+'′ deep':'water here'}</span>${ag?` <span class="sub">${ag}</span>`:''}`; }
+    else if(nt){ nowTag=depthTag((TIL_ZERO+nt.stage+offsetAt(riverMi(l)))-l.elev, nt.src==='NWM'?'NWM est':'est'); }
+    else nowTag='<span class="sub">—</span>';
     const tr=document.createElement('tr');tr.className='locrow';
     tr.innerHTML=`<td>${l.name}</td><td>${l.elev.toFixed(1)}</td><td>${nowTag}</td><td>${tag}</td>`+
       `<td style="white-space:nowrap"><button class="sm" style="padding:4px 8px" onclick="openLoc('${l.id}')">edit</button> ${l.seed?'':`<button class="sm" style="padding:4px 8px;background:#8a1f1f" onclick="delLoc('${l.id}')">✕</button>`}</td>`;
@@ -933,8 +961,9 @@ async function addReport(){
   if(!loc){alert('Pick or add a location.');return;}
   const whenVal=document.getElementById('rWhen').value;
   const t = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : new Date().toLocaleString();
+  const epoch = whenVal ? new Date(whenVal).getTime() : Date.now();
   const a=reports();
-  a.unshift({id:'r'+Date.now(),t,who,where:loc.name,lat:loc.lat,lon:loc.lon,depth:dep});
+  a.unshift({id:'r'+Date.now(),t,epoch,who,where:loc.name,lat:loc.lat,lon:loc.lon,depth:dep});
   saveReports(a);
   document.getElementById('reportMsg').innerHTML='<span style="color:#1a6f8b">✓ Added to the shared map. (Live reports show where water is — they do not change the forecast.)</span>';
   document.getElementById('rDep').value='';document.getElementById('rWhen').value='';
@@ -1110,6 +1139,11 @@ async function fetchOfficial(){
         (OFFICIAL.cot?`<br><span class="sub">Upstream Cotulla forecast: ${OFFICIAL.cot.stage.toFixed(1)} ft (${(OFFICIAL.cot.cat||'').replace('_',' ')})</span>`:'');
     } else box.innerHTML='<span class="sub">No active NOAA forecast right now (forecasts are issued only during high water). The scenario slider is yours to set.</span>';
   }catch(e){ box.innerHTML='<span class="sub">NOAA forecast fetch blocked — open water.noaa.gov/gauges/TILT2 to read it.</span>'; }
+  // Auto-fill the scenario crest with NOAA's official forecast (unless the user has taken manual control)
+  if(OFFICIAL.til && OFFICIAL.til.stage>=14 && OFFICIAL.til.stage<=28 && !crestUserSet){
+    const cr=document.getElementById('crest');
+    if(cr){ crestAutoPulled=true; if(Math.abs(parseFloat(cr.value)-OFFICIAL.til.stage)>0.05){ cr.value=OFFICIAL.til.stage.toFixed(1); if(window.render)render(); } }
+  }
   step(renderFusion);
 }
 
@@ -1334,8 +1368,9 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
     if (!loc) { alert('Pick or add a location.'); return; }
     const whenVal = document.getElementById('rWhen').value;
     const t = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : new Date().toLocaleString();
+    const epoch = whenVal ? new Date(whenVal).getTime() : Date.now();
     try {
-      await addDoc(collection(db,'reports'), { who, where:loc.name, lat:loc.lat, lon:loc.lon, depth:dep, t, ts: serverTimestamp() });
+      await addDoc(collection(db,'reports'), { who, where:loc.name, lat:loc.lat, lon:loc.lon, depth:dep, t, epoch, ts: serverTimestamp() });
       document.getElementById('reportMsg').innerHTML = '<span style="color:#1a6f8b">\u2713 Added to the shared map.</span>';
       document.getElementById('rDep').value=''; document.getElementById('rWhen').value='';
     } catch(e){ alert('Could not send: '+(e.code||e.message)); }
