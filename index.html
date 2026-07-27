@@ -96,7 +96,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-27 · v6 — fused NOAA+NWM+satellite, impacts, duration, nowcast, live warnings, tracked wave front</div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-27 · v9 — Section 5 graphic overhaul (bigger fonts, wave-front band, amber flood ring); now vs forecast split; fused NOAA+NWM+satellite, impacts, duration, nowcast, live warnings</div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -167,7 +167,8 @@ window.addEventListener('error',function(e){
     </div>
 
     <div class="big" id="ranchWSE" style="margin-top:12px">—</div>
-    <div class="sub" style="text-align:center">predicted water-surface elevation at the ranch (ft NAVD88)</div>
+    <div class="sub" style="text-align:center">FORECAST water-surface elevation at the ranch (ft NAVD88) — if Tilden crests at the slider value above</div>
+    <div id="ranchNow" class="sub" style="text-align:center;margin-top:3px;font-weight:600"></div>
     <div id="alertBox" style="margin-top:10px"></div>
 
     <div id="ladderBox" style="margin-top:8px"></div>
@@ -182,7 +183,7 @@ window.addEventListener('error',function(e){
       <b style="font-size:13px">Locations</b>
       <button class="add sm" onclick="openLoc()">＋ Add location</button>
     </div>
-    <table id="locTable"><thead><tr><th>name</th><th>ground</th><th>status now</th><th></th></tr></thead><tbody></tbody></table>
+    <table id="locTable"><thead><tr><th>name</th><th>ground</th><th>now <span style="font-weight:400;color:var(--mut)">(live gauge)</span></th><th>at crest <span style="font-weight:400;color:var(--mut)">(forecast)</span></th><th></th></tr></thead><tbody></tbody></table>
   </div>
 
   <!-- 3B OFFICIAL FORECAST + FUSION + SATELLITE -->
@@ -227,7 +228,7 @@ window.addEventListener('error',function(e){
   <!-- 5 REACH PROFILE -->
   <div class="card">
     <h2>5 · Reach profile</h2>
-    <p class="sub">Water surface down the whole chain, with flood status, travel time between gauges, and the wave's current position.</p>
+    <p class="sub">Side-view down the whole chain. <b style="color:#c1272d">Red ●</b> = forecast crest surface (from the slider); <b style="color:#1a6f8b">blue ○</b> = current surface right now (live gauge). Pills are travel time between gauges; 🌊 is the flood-stage front.</p>
     <div id="profileSvg"></div>
   </div>
 
@@ -599,7 +600,11 @@ function render(){
     rn.textContent=ns[0]; rn.style.color=ns[1];
     rx.textContent = margin>0 ? 'now · dry, '+margin.toFixed(1)+' ft to flood' : 'now · '+(-margin).toFixed(1)+' ft on low ground';
     rn.title='modeled water surface ≈'+nowWSE.toFixed(0)+' ft NAVD88 (elevation, not depth)';
-  } else { rn.textContent='—'; rn.style.color='#cfe0ee'; rx.textContent='no gauge data'; }
+    const rNow=document.getElementById('ranchNow');
+    if(rNow){ const mNow=lowest-nowWSE; rNow.innerHTML=`NOW (live Tilden ${nowStage.toFixed(1)} ft): ranch surface ≈ ${nowWSE.toFixed(1)} ft NAVD88 — `+
+      (mNow>0?`<span style="color:#0f8a5f">${mNow.toFixed(1)} ft below the lowest spot (dry)</span>`:`<span style="color:#c1272d">${(-mNow).toFixed(1)} ft over the lowest spot</span>`); }
+  } else { rn.textContent='—'; rn.style.color='#cfe0ee'; rx.textContent='no gauge data';
+    const rNow=document.getElementById('ranchNow'); if(rNow)rNow.textContent='NOW: waiting on live gauge data.'; }
   // Section 3 alert = PREDICTION for the chosen crest (clearly labeled, so it isn't read as "now")
   const A=alertFor(crest);
   document.getElementById('alertBox').innerHTML=`<div id="alert" style="background:${A.c}">`+
@@ -748,7 +753,7 @@ function drawLadder(crest){
 function gval(id){const t=document.getElementById(id).textContent;return t==='—'||t==='?'?null:parseFloat(t);}
 let CHAINFLOW={};   // filled by fetchChain: {ASRT2:kcfs,...}
 function drawProfile(crest){
-  const W=800,H=234,padB=64,padT=44;
+  const W=820,H=384,padT=68,padB=126,ML=52,MR=30;
   const wseR=TIL_ZERO+crest+offsetAt(18.0);
   const nodes=[
    {n:'Uvalde',x:0.00,e:520,g:gval('nUvl'),f:CHAINFLOW.UVLT2},
@@ -759,27 +764,36 @@ function drawProfile(crest){
    {n:'3 Rivers',x:1.00,e:140,g:null,f:null},
   ];
   const segLabel=['~2 d','~3 d','~5 d','~1 d','~2 d'];   // between consecutive nodes
-  const xs=v=>44+v*(W-88), lo=120,hi=545, ys=e=>H-padB-(e-lo)/(hi-lo)*(H-padT-padB);
-  let path='',dots='',labs='',segl='';
+  const xs=v=>ML+v*(W-ML-MR), lo=120,hi=545, ys=e=>H-padB-(e-lo)/(hi-lo)*(H-padT-padB);
+  const nameY=H-58, nowY=H-38, kcfsY=H-20;               // bottom label band (roomy)
+  let path='',dots='',labs='',segl='',nowMarks='';
+  const nowStage=gval('nTil');
   nodes.forEach((p,i)=>{const x=xs(p.x),y=ys(p.e);path+=(i?'L':'M')+x+' '+y+' ';});
-  // travel-time labels at segment midpoints, ON the line
+  // travel-time pills at segment midpoints, on the line
   for(let i=0;i<nodes.length-1;i++){
     const xm=(xs(nodes[i].x)+xs(nodes[i+1].x))/2, ym=(ys(nodes[i].e)+ys(nodes[i+1].e))/2;
-    segl+=`<rect x="${xm-15}" y="${ym-19}" width="30" height="13" rx="6" fill="#fff" stroke="#d3d9e0"/>`;
-    segl+=`<text x="${xm}" y="${ym-9}" font-size="8.5" fill="#6b7684" text-anchor="middle">${segLabel[i]}</text>`;
+    segl+=`<rect x="${xm-20}" y="${ym-22}" width="40" height="17" rx="8" fill="#fff" stroke="#d3d9e0"/>`;
+    segl+=`<text x="${xm}" y="${ym-10}" font-size="11" fill="#6b7684" text-anchor="middle">${segLabel[i]}</text>`;
   }
   nodes.forEach(p=>{const x=xs(p.x),y=ys(p.e);
     const fl=GAUGE_FLOOD[p.n],flooding=(p.g!=null&&fl!=null&&p.g>=fl);
-    const c=p.n==='RANCH'?'#c1272d':(flooding?'#c1272d':'#20374b');
-    dots+=`<circle cx="${x}" cy="${y}" r="${p.n==='RANCH'?6:4.5}" fill="${c}"/>`;
-    if(flooding)dots+=`<circle cx="${x}" cy="${y}" r="9" fill="none" stroke="#c1272d" stroke-width="1.5" opacity=".6"/>`;
-    labs+=`<text x="${x}" y="${y-9}" font-size="9" fill="${c}" text-anchor="middle">${p.e.toFixed(0)} ft</text>`;
-    labs+=`<text x="${x}" y="${H-32}" font-size="10.5" font-weight="600" fill="#1d2430" text-anchor="middle">${p.n}</text>`;
-    let sub = p.g!=null ? `${p.g.toFixed(1)} ft${flooding?' ⚠':''}` : (p.n==='RANCH'?'predicted':'');
-    labs+=`<text x="${x}" y="${H-19}" font-size="9" font-weight="700" fill="${flooding?'#c1272d':(p.n==='RANCH'?'#c1272d':'#0f8a5f')}" text-anchor="middle">${sub}</text>`;
-    if(p.f!=null)labs+=`<text x="${x}" y="${H-8}" font-size="8.5" fill="#6b7684" text-anchor="middle">${(+p.f).toFixed(0)} kcfs</text>`;
+    const isWater=(p.n==='RANCH'||p.n==='Tilden');       // these nodes plot the FORECAST flood surface
+    const c=p.n==='RANCH'?'#c1272d':(isWater?'#c1272d':'#20374b');
+    if(flooding)dots+=`<circle cx="${x}" cy="${y}" r="13" fill="none" stroke="#e08a00" stroke-width="2.5"/>`;  // amber = gauge above flood stage NOW
+    dots+=`<circle cx="${x}" cy="${y}" r="${p.n==='RANCH'?8:6}" fill="${c}"/>`;
+    labs+=`<text x="${x}" y="${y-13}" font-size="11.5" font-weight="600" fill="${c}" text-anchor="middle">${p.e.toFixed(0)} ft ${isWater?'crest':'ground'}</text>`;
+    labs+=`<text x="${x}" y="${nameY}" font-size="14" font-weight="700" fill="#1d2430" text-anchor="middle">${p.n}</text>`;
+    let sub = p.g!=null ? `now ${p.g.toFixed(1)} ft${flooding?' ⚠':''}` : (p.n==='RANCH'?'forecast only':'');
+    labs+=`<text x="${x}" y="${nowY}" font-size="12" font-weight="700" fill="${flooding?'#c1272d':(isWater?'#c1272d':'#0f8a5f')}" text-anchor="middle">${sub}</text>`;
+    if(p.f!=null)labs+=`<text x="${x}" y="${kcfsY}" font-size="11" fill="#6b7684" text-anchor="middle">${(+p.f).toFixed(0)} kcfs</text>`;
+    // NOW water-surface marker (blue open ring) at the water nodes, from the live Tilden gauge
+    if(isWater && nowStage!=null){
+      const nowE=TIL_ZERO+nowStage+(p.n==='RANCH'?offsetAt(18.0):0), ny=ys(nowE);
+      nowMarks+=`<circle cx="${x}" cy="${ny}" r="5.5" fill="#fff" stroke="#1a6f8b" stroke-width="2.5"/>`+
+        `<text x="${x}" y="${ny+18}" font-size="11" font-weight="700" fill="#1a6f8b" text-anchor="middle">now ${nowE.toFixed(0)}</text>`;
+    }
   });
-  // ---- flood-stage front: continuous position between gauges, rising vs receding ----
+  // ---- flood-stage front: continuous position, rising vs receding, in its OWN band above the labels ----
   let wave='';
   (function(){
     const cot=nodes.find(n=>n.n==='Cotulla'), til=nodes.find(n=>n.n==='Tilden'), ash=nodes.find(n=>n.n==='Asherton');
@@ -788,40 +802,48 @@ function drawProfile(crest){
     const trT=TREND.TILT2, trC=TREND.COTT2;
     let fx=null,label='';
     if(tS!=null&&tS>=tFl){ fx=til.x; label='at / below Tilden'; }
-    else if(cS!=null&&cS>=cFl){                          // between Cotulla and Tilden — includes the ranch
+    else if(cS!=null&&cS>=cFl){
       const p=Math.max(0,Math.min(1,((tS!=null?tS:tAct)-tAct)/(tFl-tAct)));
       fx=cot.x+p*(til.x-cot.x);
       label=(fx>=0.575&&fx<=0.665)?'over the RANCH reach now':'between Cotulla & Tilden';
-    } else if(cS!=null&&cS>=cAct){                        // approaching, not yet flooding downstream
+    } else if(cS!=null&&cS>=cAct){
       const p=Math.max(0,Math.min(1,(cS-cAct)/(cFl-cAct)));
       fx=ash.x+p*(cot.x-ash.x); label='approaching Cotulla';
-    } else return;                                        // nothing significant on the reach
-    // receding if the relevant gauges are trending down
+    } else return;
     const receding=(trT&&!trT.rising&&(tS==null||tS<tFl+0.5)&&(!trC||!trC.rising)) || (trT&&!trT.rising&&trC&&!trC.rising);
-    const arrow=receding?'◀ receding':'▶ advancing', col=receding?'#6b7684':'#1a6f8b';
-    const rate=(trT&&Math.abs(trT.rate)>0.02)?` · Tilden ${trT.rising?'▲':'▼'}${Math.abs(trT.rate).toFixed(2)} ft/h`:'';
-    // y on the schematic line at fx
+    const arrow=(receding?'◀ receding':'▶ advancing'), col=receding?'#6b7684':'#1a6f8b';
+    const rate=(trT&&Math.abs(trT.rate)>0.02)?`Tilden ${trT.rising?'▲':'▼'}${Math.abs(trT.rate).toFixed(2)} ft/h`:'';
     let i=0; while(i<nodes.length-1 && nodes[i+1].x<fx) i++;
     const A=nodes[i],B=nodes[Math.min(i+1,nodes.length-1)], t=(B.x!==A.x)?(fx-A.x)/(B.x-A.x):0, ey=A.e+t*(B.e-A.e);
     const x=xs(fx),y=ys(ey);
-    wave=`<line x1="${x}" y1="${y+3}" x2="${x}" y2="${y+15}" stroke="${col}" stroke-width="1" stroke-dasharray="2 2"/>`+
-      `<text x="${x}" y="${y+30}" font-size="15" text-anchor="middle">🌊</text>`+
-      `<text x="${x}" y="${y+42}" font-size="8.5" font-weight="700" fill="${col}" text-anchor="middle">${arrow}</text>`+
-      `<text x="${x}" y="${y+52}" font-size="8" fill="${col}" text-anchor="middle">${label}${rate}</text>`;
+    const bandY=H-96;                                     // reserved strip between plot and labels
+    const cx=Math.max(96,Math.min(W-96,x));
+    const line2=label+(rate?' · '+rate:'');
+    const wpx=Math.max(('🌊 '+arrow).length,line2.length)*6.6+18, half=wpx/2;
+    wave=`<line x1="${x}" y1="${y+6}" x2="${cx}" y2="${bandY-20}" stroke="${col}" stroke-width="1.2" stroke-dasharray="3 3"/>`+
+      `<circle cx="${x}" cy="${y}" r="4.5" fill="${col}"/>`+
+      `<rect x="${cx-half}" y="${bandY-19}" width="${wpx}" height="34" rx="8" fill="#fff" stroke="${col}" stroke-width="1.2"/>`+
+      `<text x="${cx}" y="${bandY-3}" font-size="13" font-weight="800" fill="${col}" text-anchor="middle">🌊 ${arrow}</text>`+
+      `<text x="${cx}" y="${bandY+12}" font-size="11" fill="${col}" text-anchor="middle">${line2}</text>`;
   })();
-  const leg=`<text x="44" y="16" font-size="10" fill="#6b7684">Water-surface elevation down the reach</text>`+
-    `<text x="44" y="30" font-size="9" fill="#98a2ad">pills = travel time · ⚠ = above flood stage · kcfs = live flow · 🌊 = flood-stage front (▶ advancing / ◀ receding)</text>`;
-  document.getElementById('profileSvg').innerHTML=`<svg viewBox="0 0 ${W} ${H}"><path d="${path}" fill="none" stroke="#9fb0c0" stroke-width="1.5" stroke-dasharray="4 3"/>${segl}${dots}${labs}${wave}${leg}</svg>`;
+  const leg=`<text x="${ML}" y="22" font-size="13" font-weight="700" fill="#20374b">Reach profile — water surface down the whole chain</text>`+
+    `<text x="${ML}" y="42" font-size="11.5" fill="#6b7684"><tspan fill="#c1272d" font-weight="700">● forecast crest</tspan>  ·  <tspan fill="#1a6f8b" font-weight="700">○ now (live gauge)</tspan>  ·  <tspan fill="#e08a00" font-weight="700">◯ amber ring = above flood stage now</tspan></text>`+
+    `<text x="${ML}" y="58" font-size="11" fill="#98a2ad">pills = travel time between sites  ·  kcfs = live flow  ·  🌊 = flood-stage front (▶ advancing / ◀ receding)</text>`;
+  document.getElementById('profileSvg').innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto"><path d="${path}" fill="none" stroke="#9fb0c0" stroke-width="1.8" stroke-dasharray="5 3"/>${segl}${dots}${labs}${nowMarks}${wave}${leg}</svg>`;
 }
 
 /* ---- location table ---- */
 function renderLocs(crest){
   const b=document.querySelector('#locTable tbody');b.innerHTML='';
+  const nowStage=gval('nTil');
+  const depthTag=(d)=> d>0?`<span class="tag" style="background:#c1272d">${d.toFixed(1)}′ under</span>`:`<span class="tag" style="background:#0f8a5f">${(-d).toFixed(1)}′ dry</span>`;
   locs().sort((a,b)=>a.elev-b.elev).forEach(l=>{
-    const wse=wseAt(l,crest), d=wse-l.elev, under=d>0;
-    const tag=under?`<span class="tag" style="background:#c1272d">${d.toFixed(1)}′ under</span>`:`<span class="tag" style="background:#0f8a5f">${(-d).toFixed(1)}′ dry</span>`;
+    const wse=wseAt(l,crest), d=wse-l.elev;               // FORECAST depth at the scenario crest
+    const tag=depthTag(d);
+    let nowTag='<span class="sub">no gauge</span>';        // LIVE depth from the current Tilden gauge
+    if(nowStage!=null){ const dNow=(TIL_ZERO+nowStage+offsetAt(riverMi(l)))-l.elev; nowTag=depthTag(dNow); }
     const tr=document.createElement('tr');tr.className='locrow';
-    tr.innerHTML=`<td>${l.name}</td><td>${l.elev.toFixed(1)}</td><td>${tag}</td>`+
+    tr.innerHTML=`<td>${l.name}</td><td>${l.elev.toFixed(1)}</td><td>${nowTag}</td><td>${tag}</td>`+
       `<td style="white-space:nowrap"><button class="sm" style="padding:4px 8px" onclick="openLoc('${l.id}')">edit</button> ${l.seed?'':`<button class="sm" style="padding:4px 8px;background:#8a1f1f" onclick="delLoc('${l.id}')">✕</button>`}</td>`;
     b.appendChild(tr);
   });
