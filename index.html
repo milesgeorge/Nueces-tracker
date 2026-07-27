@@ -144,7 +144,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v42 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v43 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -156,15 +156,15 @@ window.addEventListener('error',function(e){
   <div id="alertBanner" style="margin-bottom:4px"></div>
   <div id="histBanner"></div>
 
-  <div id="buildModal" class="modal" onclick="if(event.target===this)closeBuildLog()"><div class="box" style="max-width:560px;max-height:82vh;overflow:auto">
-    <h3>🗒 Version / build log</h3>
-    <div id="buildLogBody" style="font-size:13px;line-height:1.5;color:#38414d"></div>
-    <button class="sm" style="width:100%;margin-top:12px;background:#12202e;color:#fff" onclick="closeBuildLog()">Close</button>
+  <div id="buildModal" class="modal" onclick="if(event.target===this)closeBuildLog()"><div class="box" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column">
+    <h3 style="flex:none">🗒 Version / build log</h3>
+    <div id="buildLogBody" style="flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;font-size:13px;line-height:1.5;color:#38414d"></div>
+    <button class="sm" style="flex:none;width:100%;margin-top:12px;background:#12202e;color:#fff" onclick="closeBuildLog()">Close</button>
   </div></div>
 
-  <div id="alertModal" class="modal" onclick="if(event.target===this)closeAlert()"><div class="box" style="max-width:560px;max-height:82vh;overflow:auto">
-    <div id="alertModalBody" style="font-size:13.5px;line-height:1.5;color:#26313d"></div>
-    <button class="sm" style="width:100%;margin-top:12px;background:#12202e;color:#fff" onclick="closeAlert()">Close</button>
+  <div id="alertModal" class="modal" onclick="if(event.target===this)closeAlert()"><div class="box" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column">
+    <div id="alertModalBody" style="flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;font-size:13.5px;line-height:1.5;color:#26313d"></div>
+    <button class="sm" style="flex:none;width:100%;margin-top:12px;background:#12202e;color:#fff" onclick="closeAlert()">Close</button>
   </div></div>
 
   <!-- 1 CHAIN -->
@@ -1523,6 +1523,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v43','2026-07-29','Fixed the build-log and alert pop-ups so long content scrolls (body scrolls; title and Close button stay pinned).'],
   ['v42','2026-07-29','Nav bar restyled to stand out (light bar, bright accent, “Jump to” label). Added this build-log. NWS flood alerts are now tappable to read the full text. Section 2 mechanism names clarified — “gaining reach” instead of the misleading “local rain”.'],
   ['v41','2026-07-29','Startup error-bar now ignores harmless map-tile/resource load errors (only reports real script errors, with a stack).'],
   ['v40','2026-07-28','LiDAR rasters PNG-compressed (~408 KB → 87 KB) — leaner file, still fully offline-capable.'],
