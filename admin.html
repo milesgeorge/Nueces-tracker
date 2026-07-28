@@ -106,7 +106,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc, addDoc, getDocs, arrayUnion, arrayRemove, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -161,8 +161,25 @@ function renderAdmins(){ const el=document.getElementById('adminList'); if(!el) 
   el.innerHTML='<div class="muted" style="margin-top:6px">Current admins:</div>'+all.map(e=>{const root=(''+e).toLowerCase()===ROOT_ADMIN; return '<div class="row"><span>'+esc(e)+(root?' <span class="muted">(owner)</span>':'')+'</span>'+(root?'':'<button class="sm no" onclick="removeAdmin(\''+esc(e)+'\')">Remove</button>')+'</div>';}).join(''); }
 window.addAdmin = async () => { const em=(document.getElementById('newAdmin').value||'').trim().toLowerCase(); const msg=document.getElementById('adminMsg'); if(!em){ msg.textContent='Enter an email.'; return; } try{ await setDoc(doc(db,'config','settings'), { adminEmails: arrayUnion(em) }, {merge:true}); msg.textContent='Added '+em+' as an admin.'; document.getElementById('newAdmin').value=''; }catch(e){ msg.textContent='Could not add: '+(e.code||e.message); } };
 window.removeAdmin = async (em) => { try{ await setDoc(doc(db,'config','settings'), { adminEmails: arrayRemove(em) }, {merge:true}); }catch(e){} };
-function watchPeople(){ if(unsubPeople) return; unsubPeople = onSnapshot(collection(db,'users'), snap => { const el=document.getElementById('peopleList'); if(!el) return; if(!snap.size){ el.textContent='No registered accounts yet.'; return; } el.innerHTML=snap.docs.map(d=>{ const u=d.data(); return '<div class="row"><span><b>'+esc(u.name||'\u2014')+'</b> '+esc(u.email||'')+'</span><button class="sm" onclick="makeAdmin(\''+esc(u.email||'')+'\')">Make admin</button></div>'; }).join(''); }); }
+function isAdminEmail(em){ em=(''+em).toLowerCase(); return em===ROOT_ADMIN || ADMIN_EMAILS.map(x=>(''+x).toLowerCase()).includes(em); }
+function watchPeople(){ if(unsubPeople) return; unsubPeople = onSnapshot(collection(db,'users'), snap => {
+  const el=document.getElementById('peopleList'); if(!el) return;
+  if(!snap.size){ el.textContent='No registered accounts yet.'; return; }
+  el.innerHTML = snap.docs.map(d => {
+    const u=d.data(), em=u.email||'', adm=isAdminEmail(em), sub=!!u.notifyEmail, root=((''+em).toLowerCase()===ROOT_ADMIN);
+    const badges=(adm?'<span class="muted"> · admin'+(root?' (owner)':'')+'</span>':'')+(sub?' <span class="muted">· 🔔</span>':'');
+    let b='';
+    if(!root){ b += adm ? '<button class="sm no" onclick="removeAdmin(\''+esc(em)+'\')">Remove admin</button>' : '<button class="sm" onclick="makeAdmin(\''+esc(em)+'\')">Make admin</button>'; }
+    if(em) b += '<button class="sm" onclick="resetUserPw(\''+esc(em)+'\')">Reset pw</button>';
+    b += '<button class="sm" onclick="toggleSub(\''+d.id+'\','+(sub?'true':'false')+')">'+(sub?'Unsub':'Subscribe')+'</button>';
+    if(!root) b += '<button class="sm no" onclick="delUser(\''+d.id+'\',\''+esc(em)+'\')">Delete</button>';
+    return '<div class="row"><span><b>'+esc(u.name||'\u2014')+'</b> '+esc(em)+badges+'</span><span style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">'+b+'</span></div>';
+  }).join('');
+}); }
 window.makeAdmin = (em) => { if(em){ document.getElementById('newAdmin').value=em; window.addAdmin(); } };
+window.resetUserPw = async (em) => { if(!em){ return; } try{ await sendPasswordResetEmail(auth, em); alert('Password-reset email sent to '+em+'.'); }catch(e){ alert('Could not send reset: '+(e.code||e.message)); } };
+window.toggleSub = async (uid, on) => { try{ await updateDoc(doc(db,'users',uid), { notifyEmail: !on }); }catch(e){ alert('Could not change subscription: '+(e.code||e.message)); } };
+window.delUser = async (uid, em) => { if(!confirm('Remove '+(em||'this person')+"'s profile and alert subscription?\n\nTheir actual login account stays until you delete it in Firebase console -> Authentication -> Users. This just removes them from the People list and alerts."))return; try{ await deleteDoc(doc(db,'users',uid)); }catch(e){ alert('Could not remove: '+(e.code||e.message)); } };
 onAuthStateChanged(auth, user => { CURRENT_USER = user||null; watchSettings(); applyAdminUI(); });
 
 let PENDING = [];
