@@ -144,7 +144,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v49 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v50 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -738,7 +738,7 @@ function cycleSpeed(){ ANIMspeedI=(ANIMspeedI+1)%SPEEDS.length; ANIMspeed=SPEEDS
 function playFlood(){ if(!MAP)return; if(ANIMt){clearInterval(ANIMt);ANIMt=null;}
   ANIMstart=CHANNEL_RM[0][2]; ANIMf=0; ANIMpaused=false; ANIMvT=EVENT_VT||((typeof OFFICIAL!=='undefined'&&OFFICIAL.til&&OFFICIAL.til.valid)?new Date(OFFICIAL.til.valid):null); ANIMt0=(EVENT_VT?(EVENT_VT.getTime()-14*3600000):Date.now());
   const pb=document.getElementById('pauseBtn'); if(pb){pb.style.display='inline-block';pb.textContent='⏸ Pause';}
-  FLOOD_ON=true; try{MAP.setView([28.235,-98.655],13);}catch(e){} if(HIST_ON){applyHist(0);} else {ANIM=ANIMstart; drawFloodAt(parseFloat(document.getElementById("crest").value), ANIMstart);} {const ts=document.getElementById("timeScrub"); if(ts)ts.value=0;}
+  FLOOD_ON=true; /* keep the user's current pan/zoom — do not recenter on play */ if(HIST_ON){applyHist(0);} else {ANIM=ANIMstart; drawFloodAt(parseFloat(document.getElementById("crest").value), ANIMstart);} {const ts=document.getElementById("timeScrub"); if(ts)ts.value=0;}
   const lab=document.getElementById('animClock'); if(lab)lab.textContent='🌊 wave entering the reach at Cotulla…';
   ANIMt=setInterval(_animStep,ANIMspeed); }
 function pauseFlood(){ const pb=document.getElementById('pauseBtn');
@@ -1211,8 +1211,10 @@ function drawFloodAt(crest,frontRm){ if(!MAP)return;
   if(FLOODIMG){ FLOODIMG.setUrl(url); } else { FLOODIMG=L.imageOverlay(url,bounds,{opacity:0.82,interactive:false}).addTo(MAP); }
   const b=document.getElementById('floodBtn'); if(b)b.textContent='🌊 Flood extent: '+crest.toFixed(1)+' ft'; }
 function drawFlood(){ if(!MAP||!FLOOD_ON)return; drawFloodAt(parseFloat(document.getElementById('crest').value)); }
+/* recenter on the ranch ONLY if it isn't already on screen — never yank the user's current pan/zoom */
+function ensureReach(z){ try{ if(!MAP)return; var c=L.latLng(28.235,-98.655); if(!MAP.getBounds().contains(c)){ MAP.setView(c, z||13); } }catch(e){} }
 function toggleFlood(){ if(!MAP)return; FLOOD_ON=!FLOOD_ON;
-  if(FLOOD_ON){ drawFlood(); try{ MAP.setView([28.235,-98.655],13); }catch(e){} }
+  if(FLOOD_ON){ drawFlood(); ensureReach(13); }
   else { if(FLOODIMG){MAP.removeLayer(FLOODIMG);FLOODIMG=null;} const b=document.getElementById('floodBtn'); if(b)b.textContent='🌊 Flood extent'; }
 }
 function toggleMapSize(){
@@ -1530,6 +1532,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v50','2026-07-29','Play flood advance (and the map layer toggles) no longer yank the map back to the ranch \u2014 they keep your current pan and zoom, only recentering if the ranch is not already on screen. Zoom into any spot and hit Play without losing your place.'],
   ['v49','2026-07-29','Contour labels: every line is now numbered, not just the bold 5-ft lines. Set the Elev. lines dropdown to 1 ft (or 2 ft) and each foot line gets its elevation, with smart spacing so numbers never stack (bold 5-ft lines claim space first). Same for flood-stage lines.'],
   ['v48','2026-07-29','Flood model regenerated & extended along the corridor to the oxbow (south) and the TILT2/Tilden gauge (north) — the blue flood extent and the flood-stage lines now cover the whole reach, not just the ranch. Connectivity redone with a minimax-from-channel fill (no false-flooding). Over the ranch tracts the flood-stage lines are computed from the 1 m LiDAR for extra sharpness. Validated: house floods last (~25.5 ft), matching the 2013 high-water calibration.'],
   ['v47','2026-07-29','Real 1 m LiDAR (USGS 3DEP, TX Hurricane-2018) folded in for the ranch tracts — when you zoom into the ranch, elevation contours down to ~1 ft now draw from a ~5 m grid built from true 1 m data instead of the coarse 30 m DEM, so the lines are far crisper. Falls back to the 30 m grid outside the ranch box.'],
@@ -1811,7 +1814,7 @@ function addCompare(){ if(!MAP){return;} const s=document.getElementById('cmpPic
   let crest=null,label=''; if(v.charAt(0)==='h'){ const p=v.slice(2).split('|'); crest=parseFloat(p[0]); label=(p[1]||'flood')+' · '+crest.toFixed(1)+' ft'; } else { const ev=events().find(function(e){return e.id===v.slice(2);}); if(!ev||!ev.crest){alert('That event has no crest to map.');return;} crest=ev.crest; label=ev.name+' · '+crest.toFixed(1)+' ft'; }
   const used=COMPARE.map(function(c){return c.ci;}); let ci=0; while(used.indexOf(ci)>=0){ci++;} if(ci>2){return;} const rgb=CMP_COLORS[ci];
   const u=floodURL(crest,rgb,150); if(!u){alert('Map data still loading — try again in a moment.');return;} const layer=L.imageOverlay(u,[[FLOOD_RASTER.south,FLOOD_RASTER.west],[FLOOD_RASTER.north,FLOOD_RASTER.east]],{opacity:0.55,interactive:false}).addTo(MAP);
-  COMPARE.push({label:label,crest:crest,ci:ci,rgb:rgb,layer:layer}); try{MAP.setView([28.235,-98.655],13);}catch(e){} renderCompareUI(); }
+  COMPARE.push({label:label,crest:crest,ci:ci,rgb:rgb,layer:layer}); ensureReach(13); renderCompareUI(); }
 function removeCompare(i){ const c=COMPARE[i]; if(c&&c.layer){try{MAP.removeLayer(c.layer);}catch(e){}} COMPARE.splice(i,1); renderCompareUI(); }
 function clearCompare(){ COMPARE.forEach(function(c){if(c.layer){try{MAP.removeLayer(c.layer);}catch(e){}}}); COMPARE=[]; renderCompareUI(); }
 function renderCompareUI(){ const el=document.getElementById('cmpList'); if(el)el.innerHTML=COMPARE.length?COMPARE.map(function(c,i){return '<span style="display:inline-flex;align-items:center;gap:5px;margin:2px 6px 2px 0;padding:2px 8px;border:1px solid var(--rule);border-radius:20px"><span style="width:11px;height:11px;border-radius:3px;background:rgb('+c.rgb.join(',')+')"></span>'+cmpEsc(c.label)+' <button style="background:#8a1f1f;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:10px;padding:0 4px" onclick="removeCompare('+i+')">✕</button></span>';}).join(''):'<span class="sub">No comparison overlays yet.</span>';
@@ -1823,7 +1826,7 @@ function elevBytes(){ return ELEVBYTES; }
 function elevColor(t){ const s=[[0,[46,110,70]],[0.2,[120,160,80]],[0.42,[214,205,130]],[0.62,[196,150,96]],[0.8,[150,110,84]],[1,[238,238,240]]]; for(let i=0;i<s.length-1;i++){ if(t>=s[i][0]&&t<=s[i+1][0]){ const f=(t-s[i][0])/((s[i+1][0]-s[i][0])||1); const A=s[i][1],B=s[i+1][1]; return [Math.round(A[0]+f*(B[0]-A[0])),Math.round(A[1]+f*(B[1]-A[1])),Math.round(A[2]+f*(B[2]-A[2]))]; } } return s[s.length-1][1]; }
 function drawElev(){ if(!MAP)return; const w=ELEV_RASTER.w,hh=ELEV_RASTER.h,on=elevBytes(); if(!on)return; const cv=document.createElement('canvas');cv.width=w;cv.height=hh;const ctx=cv.getContext('2d');const im=ctx.createImageData(w,hh);const d=im.data; for(let i=0;i<w*hh;i++){const v=on[i]; if(v===255)continue; const c=elevColor(v/254); const j=i*4; d[j]=c[0];d[j+1]=c[1];d[j+2]=c[2];d[j+3]=150;} ctx.putImageData(im,0,0); const bounds=[[ELEV_RASTER.south,ELEV_RASTER.west],[ELEV_RASTER.north,ELEV_RASTER.east]]; if(ELEVIMG){ELEVIMG.setUrl(cv.toDataURL());} else {ELEVIMG=L.imageOverlay(cv.toDataURL(),bounds,{opacity:0.6,interactive:false}).addTo(MAP); try{ELEVIMG.bringToBack();}catch(e){}} }
 function toggleElev(){ if(!MAP)return; ELEV_ON=!ELEV_ON; const b=document.getElementById('elevBtn');
-  if(ELEV_ON){ drawElev(); if(b)b.textContent='⛰ Elevation: ON'; try{MAP.setView([28.235,-98.655],13);}catch(e){}
+  if(ELEV_ON){ drawElev(); if(b)b.textContent='⛰ Elevation: ON'; ensureReach(13);
     if(ELEVLEG){try{MAP.removeControl(ELEVLEG);}catch(e){}} ELEVLEG=L.control({position:'bottomleft'}); const base=ELEV_RASTER.base, top=ELEV_RASTER.base+ELEV_RASTER.step*254;
     ELEVLEG.onAdd=function(){var dd=L.DomUtil.create('div');dd.style.cssText='background:rgba(18,32,46,.9);color:#fff;padding:6px 9px;border-radius:8px;font:600 11px sans-serif';var _q1=base+(top-base)*.25,_mid=(base+top)/2,_q3=base+(top-base)*.75;dd.innerHTML='⛰ Ground elevation (ft) — low→high'+'<div style=\'height:11px;width:180px;margin:3px 0;border-radius:3px;background:linear-gradient(90deg,rgb(46,110,70),rgb(120,160,80),rgb(214,205,130),rgb(196,150,96),rgb(150,110,84),rgb(238,238,240))\'></div>'+'<div style=\'display:flex;justify-content:space-between;width:180px;font-weight:700\'><span>'+Math.round(base)+'</span><span>'+Math.round(_q1)+'</span><span>'+Math.round(_mid)+'</span><span>'+Math.round(_q3)+'</span><span>'+Math.round(top)+'</span></div>';return dd;}; ELEVLEG.addTo(MAP);
   } else { if(ELEVIMG){MAP.removeLayer(ELEVIMG);ELEVIMG=null;} if(ELEVLEG){try{MAP.removeControl(ELEVLEG);}catch(e){}ELEVLEG=null;} if(b)b.textContent='⛰ Elevation'; } }
@@ -1919,7 +1922,7 @@ function reContour(kind){ if(CONTOUR[kind].on) contourDraw(kind); }
 function toggleContour(kind){ if(!MAP)return; var C=CONTOUR[kind]; C.on=!C.on;
   var b=document.getElementById(C.btn), sel=document.getElementById(C.sel);
   var onTxt=kind==='flood'?'〰 Flood-stage lines: ON':'🗺 Elev. lines: ON', offTxt=kind==='flood'?'〰 Flood-stage lines':'🗺 Elev. lines';
-  if(C.on){ if(sel)sel.style.display=''; if(b)b.textContent=onTxt; try{MAP.setView([28.235,-98.655],Math.max(MAP.getZoom(),13));}catch(e){} contourDraw(kind);
+  if(C.on){ if(sel)sel.style.display=''; if(b)b.textContent=onTxt; ensureReach(Math.max(MAP.getZoom(),13)); contourDraw(kind);
     C.handler=function(){ contourDraw(kind); }; MAP.on('moveend',C.handler);
   } else { if(C.handler){MAP.off('moveend',C.handler);C.handler=null;} setCLayer(kind,null); if(b)b.textContent=offTxt; if(sel)sel.style.display='none'; } }
 function toggleEContours(){ toggleContour('elev'); }
