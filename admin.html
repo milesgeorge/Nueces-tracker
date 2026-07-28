@@ -110,6 +110,8 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendP
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc, addDoc, getDocs, arrayUnion, arrayRemove, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFunctions, httpsCallable }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 
 /* ▼▼▼ PASTE THE SAME firebaseConfig YOU PUT IN THE TRACKER ▼▼▼ */
 const firebaseConfig = {
@@ -125,6 +127,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const functions = getFunctions(app);
 let unsub = null;
 
 window.doLogin = async () => {
@@ -179,7 +182,18 @@ function watchPeople(){ if(unsubPeople) return; unsubPeople = onSnapshot(collect
 window.makeAdmin = (em) => { if(em){ document.getElementById('newAdmin').value=em; window.addAdmin(); } };
 window.resetUserPw = async (em) => { if(!em){ return; } try{ await sendPasswordResetEmail(auth, em); alert('Password-reset email sent to '+em+'.'); }catch(e){ alert('Could not send reset: '+(e.code||e.message)); } };
 window.toggleSub = async (uid, on) => { try{ await updateDoc(doc(db,'users',uid), { notifyEmail: !on }); }catch(e){ alert('Could not change subscription: '+(e.code||e.message)); } };
-window.delUser = async (uid, em) => { if(!confirm('Remove '+(em||'this person')+"'s profile and alert subscription?\n\nTheir actual login account stays until you delete it in Firebase console -> Authentication -> Users. This just removes them from the People list and alerts."))return; try{ await deleteDoc(doc(db,'users',uid)); }catch(e){ alert('Could not remove: '+(e.code||e.message)); } };
+window.delUser = async (uid, em) => {
+  if(!confirm('Permanently delete '+(em||'this account')+'?\n\nThis removes their LOGIN and their profile. Cannot be undone.')) return;
+  try{
+    const call = httpsCallable(functions, 'deleteUserAccount');
+    await call({ uid: uid });
+    alert('Account fully deleted (login + profile).');
+  }catch(e){
+    if(confirm('Full deletion is unavailable — the Cloud Function may not be deployed yet ('+((e&&(e.message||e.code))||'error')+').\n\nRemove just their profile + alert subscription instead? (Their login would remain; delete it later in Firebase console -> Authentication.)')){
+      try{ await deleteDoc(doc(db,'users',uid)); }catch(e2){ alert('Could not remove: '+(e2.code||e2.message)); }
+    }
+  }
+};
 onAuthStateChanged(auth, user => { CURRENT_USER = user||null; watchSettings(); applyAdminUI(); });
 
 let PENDING = [];
@@ -198,17 +212,27 @@ function watchPending(){
     document.getElementById('empty').style.display = snap.size ? 'none' : 'block';
     snap.forEach(d => {
       const s = d.data();
-      const sl = s.off / s.rm;
-      const bad = (sl < 0.6 || sl > 2.0);
       const el = document.createElement('div'); el.className = 'row';
-      el.innerHTML = `<div><b>${esc(s.where)}</b> — ${esc(s.event||'high-water mark')}<br>
-        <span class="muted">rise ${(+s.off).toFixed(1)} ft over ${(+s.rm).toFixed(1)} river-mi = ${sl.toFixed(2)} ft/mi · peak ${(+s.peak).toFixed(1)} ft ${bad?'<span class="flag">⚠ check</span>':''}</span></div>
-        <div style="white-space:nowrap">
-          <button class="sm ok" data-a="ok" data-id="${d.id}">Approve</button>
-          <button class="sm no" data-a="no" data-id="${d.id}">Reject</button></div>`;
+      if (s.provisional) {
+        el.innerHTML = `<div><b>${esc(s.where)}</b> — field high-water mark<br>
+          <span class="muted">debris line ${(s.depth!=null?(+s.depth).toFixed(1):'?')} ft above ground · ${(+s.rm).toFixed(1)} river-mi up · ${esc(s.t||'')}<br>
+          <b>Confirm the flood's PEAK Tilden crest, then approve:</b></span>
+          <div style="margin-top:4px"><input type="number" step="0.1" id="pk_${d.id}" value="${s.peak!=null?(+s.peak).toFixed(1):''}" placeholder="peak ft" style="width:90px;display:inline-block;padding:6px"></div></div>
+          <div style="white-space:nowrap">
+            <button class="sm ok" data-a="okpeak" data-id="${d.id}" data-elev="${s.elev!=null?s.elev:''}" data-depth="${s.depth!=null?s.depth:''}">Set peak & approve</button>
+            <button class="sm no" data-a="no" data-id="${d.id}">Reject</button></div>`;
+      } else {
+        const sl = s.off / s.rm;
+        const bad = (sl < 0.6 || sl > 2.0);
+        el.innerHTML = `<div><b>${esc(s.where)}</b> — ${esc(s.event||'high-water mark')}<br>
+          <span class="muted">rise ${(+s.off).toFixed(1)} ft over ${(+s.rm).toFixed(1)} river-mi = ${sl.toFixed(2)} ft/mi · peak ${(+s.peak).toFixed(1)} ft ${bad?'<span class="flag">⚠ check</span>':''}</span></div>
+          <div style="white-space:nowrap">
+            <button class="sm ok" data-a="ok" data-id="${d.id}">Approve</button>
+            <button class="sm no" data-a="no" data-id="${d.id}">Reject</button></div>`;
+      }
       list.appendChild(el);
     });
-    list.querySelectorAll('button').forEach(b => b.onclick = () => act(b.dataset.a, b.dataset.id));
+    list.querySelectorAll('button').forEach(b => b.onclick = () => act(b.dataset.a, b.dataset.id, b));
   });
 }
 let unsubLogs = null;
@@ -276,10 +300,18 @@ window.checkRules = async () => {
     else out.textContent='No rule met right now (checked '+snap.size+' rule(s)).';
   }catch(e){ out.textContent='Check failed: '+(e.code||e.message); }
 };
-async function act(a, id){
+async function act(a, id, btn){
   const ref = doc(db,'hwm',id);
-  if (a === 'ok') await updateDoc(ref, { status:'approved' });
-  else await deleteDoc(ref);
+  if (a === 'ok') { await updateDoc(ref, { status:'approved', provisional:false }); }
+  else if (a === 'okpeak') {
+    const pk = parseFloat((document.getElementById('pk_'+id)||{}).value);
+    if (isNaN(pk)) { alert("Enter the flood's peak Tilden crest (ft) first."); return; }
+    const elev = parseFloat(btn.dataset.elev), depth = parseFloat(btn.dataset.depth);
+    const upd = { peak: pk, provisional:false, status:'approved' };
+    if (!isNaN(elev) && !isNaN(depth)) upd.off = +(elev + depth - 183.10 - pk).toFixed(2);
+    await updateDoc(ref, upd);
+  }
+  else { await deleteDoc(ref); }
 }
 function esc(x){ return String(x||'').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
 </script>

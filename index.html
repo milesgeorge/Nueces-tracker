@@ -152,12 +152,13 @@ window.addEventListener('error',function(e){
 </style>
 </head>
 <body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <header>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;max-width:1200px;margin:0 auto">
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v59 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v61 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -176,7 +177,7 @@ window.addEventListener('error',function(e){
   </div>
   <div id="alertBanner" style="margin-bottom:4px"></div>
   <div id="alertOptIn" style="display:none;background:#eef4fa;border:1px solid #cfe0ee;border-radius:10px;padding:10px 13px;margin-bottom:10px;font-size:13px">
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0"><input type="checkbox" id="notifyChk" onchange="toggleNotify()" style="width:auto"> <span>🔔 <b>Email me Nueces River flood alerts</b> — a heads-up when a big rise is on the way. Uses your login email.</span></label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0"><input type="checkbox" id="notifyChk" onchange="toggleNotify()" style="width:auto"> <span>🔔 <b>Email me Miles Ranch–Nueces Reach Flood Notifications</b> <span style="color:#8aa0b4">(uses your login email)</span></span></label>
   </div>
   <div id="histBanner"></div>
 
@@ -195,6 +196,10 @@ window.addEventListener('error',function(e){
     <button class="sm" onclick="doGoogle()" style="width:100%;margin-top:8px;background:#fff;color:#12202e;border:1px solid var(--rule)">Continue with Google</button>
     <button class="sm" onclick="closeAuth()" style="width:100%;margin-top:8px;background:#12202e;color:#fff">Close</button>
     <div class="sub" style="margin-top:8px;font-size:11px;color:#98a2ad">Free. Your email is used only for sign-in and (if you opt in later) flood alerts.</div>
+  </div></div>
+  <div id="evDetailModal" class="modal" onclick="if(event.target===this)closeEvDetail()"><div class="box" style="max-width:640px;max-height:85vh;display:flex;flex-direction:column">
+    <div id="evDetailBody" style="flex:1 1 auto;min-height:0;overflow-y:auto;font-size:13.5px;line-height:1.5;color:#26313d"></div>
+    <button class="sm" style="flex:none;width:100%;margin-top:10px;background:#12202e;color:#fff" onclick="closeEvDetail()">Close</button>
   </div></div>
   <div id="buildModal" class="modal" onclick="if(event.target===this)closeBuildLog()"><div class="box" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column">
     <h3 style="flex:none">🗒 Version / build log</h3>
@@ -432,6 +437,7 @@ window.addEventListener('error',function(e){
       <button class="add sm" style="width:100%;margin-top:8px" onclick="addReport()">＋ Add report to the map</button>
       <div id="reportMsg" style="font-size:12.5px;margin-top:6px"></div>
       <table id="reportTable"><thead><tr><th>time</th><th>who</th><th>where</th><th>depth</th><th></th></tr></thead><tbody></tbody></table>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><button class="sm" onclick="dlReports()">⬇ Field logs (CSV)</button><button class="sm" onclick="dlHWM()">⬇ High-water marks (CSV)</button></div>
     </div>
 
     <!-- Part B: HIGH-WATER MARK (calibration) -->
@@ -495,7 +501,7 @@ window.addEventListener('error',function(e){
     <div id="eventList" style="margin-top:10px"></div>
     <div id="trashWrap" style="display:none;margin-top:8px"></div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button class="sm" onclick="exportAll()">⬇ Download everything (offline backup)</button>
+      <button class="sm" onclick="exportAll()">⬇ Full backup (JSON · re-importable)</button><button class="sm" onclick="downloadAllZip()">⬇ All data as ZIP (CSVs + photos)</button><button class="sm" onclick="dlEventsCSV()">⬇ Events (CSV)</button>
       <label class="sm" style="cursor:pointer;padding:9px 13px;border:1px solid var(--rule);border-radius:8px;background:#f6f8fa">⬆ Import backup<input type="file" accept="application/json,.json" style="display:none" onchange="importAll(this.files&&this.files[0])"></label>
       <button class="sm" onclick="renderPresets()">📜 Historic floods on record</button>
       <span class="sub" id="whoTag" style="margin-left:auto"></span>
@@ -511,7 +517,9 @@ window.addEventListener('error',function(e){
     <h2>7 · Historical context — every flood on record</h2>
     <p class="sub">The full Tilden flood record (crests ≥ flood stage, 1935–2026). Your scenario is ranked against all of them. Tap any event for its story and a compare/contrast to what you're watching now. <b>★</b> = benchmark flood with full detail.</p>
     <button class="sm" style="margin-bottom:8px" onclick="fetchCrests()">↻ Update record from NOAA</button>
+    <button class="sm" style="margin-bottom:8px" onclick="dlHistoric()">⬇ Historic record (CSV)</button>
     <span class="sub" id="crestFetchNote"></span>
+    <div id="featuredEvents" style="margin:8px 0"></div>
     <div id="histRank" style="text-align:center;margin:6px 0 6px"></div>
     <div id="histExplain" style="background:#f2f6fa;border:1px solid var(--rule);border-radius:8px;padding:9px 11px;font-size:12.5px;margin-bottom:10px"></div>
     <div id="histDetail"></div>
@@ -1585,6 +1593,8 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v61','2026-07-29','Promote to Section 7: admins get a \u2b50 Promote button on a saved flood so it appears in Section 7 as a documented flood with its full record (Load / Details). Quick Log app now has a 💧 Current water vs 🎯 High-water mark toggle so field crews can capture either in a couple taps (auto-GPS); field high-water marks arrive as provisional and the moderation page lets you set the flood\u2019s peak crest before approving (keeps calibration clean).'],
+  ['v60','2026-07-29','Data export + housekeeping. Per-section CSV downloads (field logs, high-water marks, historic record, events), plus a \u201cDownload all data as ZIP\u201d (every CSV + the photos/videos + a re-importable JSON). Relabeled the archive backup button so it is clearly a full JSON backup. Event ownership is now tied to your LOGIN email (not the free-text name), so no one can accidentally take over or lose events by typing a name. Each saved flood now has a \u201c\ud83d\udccb Details\u201d button that opens all its captured data (notes, weather, logs, marks, photos) to review, with Close. Renamed the alert opt-in to \u201cEmail me Miles Ranch\u2013Nueces Reach Flood Notifications\u201d.'],
   ['v59','2026-07-29','Phase 4 foundation — email flood alerts. Logged-in users can opt in with a bell (\u201cEmail me Nueces River flood alerts\u201d). The moderation page has a Flood alerts composer that sends to all subscribers, plus gauge-threshold rules with a \u201ccheck gauges now\u201d that drafts an alert when a level is crossed, and a history of what was sent. Sending turns on once the Firebase email extension is connected (see the setup guide).'],
   ['v58','2026-07-29','Phase 3 — admin powers now tied to your login (no PIN). The archive \u201cAdmin\u201d lights up automatically when you sign in as an admin. The moderation page gates every control to admin emails, shows a \u201cnot an admin\u201d state otherwise, and has a new Admins & People section to add/remove admins and see registered accounts. Paired Firestore/Storage rules enforce it at the database.'],
   ['v57','2026-07-29','Field logs are now moderated: a log submitted from the phone log page (or the tracker) is held as PENDING and only appears on the shared map after you approve it on the moderation page, which now has a Pending field logs queue (Approve / Reject). Reject is non-destructive.'],
@@ -1788,8 +1798,8 @@ async function saveEvent(){ var nm=(document.getElementById('evName').value||'')
   var cEl=document.getElementById('evCrest'); var crestM=(cEl&&cEl.value!=='')?parseFloat(cEl.value):null;
   var crest=(crestM!=null&&!isNaN(crestM))?crestM:(live?(parseFloat(document.getElementById('crest').value)||null):null);
   var tEl=document.getElementById('evTags'); var tags=(tEl?tEl.value:'').split(',').map(function(x){return x.trim();}).filter(Boolean);
-  var hs=document.getElementById('histStart'),he=document.getElementById('histEnd'); var owner=whoAmI();
-  var ev={id:'e'+Date.now(),name:nm,notes:notes,when:when,crest:crest,tags:tags,owner:owner,createdBy:owner,createdAt:Date.now(),deleted:false,histStart:(live&&hs)?hs.value:'',histEnd:(live&&he)?he.value:'',media:STAGED.slice(),reports:live?reports():[],hwm:live?hwm():[],weather:live?currentWxSnapshot():null};
+  var hs=document.getElementById('histStart'),he=document.getElementById('histEnd'); if(!realUser())whoAmI(); var owner=myIdentity(); var ownerName=(realUser()&&window.__user?(window.__user.displayName||window.__user.email):(whoCached()||'anon'));
+  var ev={id:'e'+Date.now(),name:nm,notes:notes,when:when,crest:crest,tags:tags,owner:owner,ownerName:ownerName,createdBy:owner,createdAt:Date.now(),deleted:false,histStart:(live&&hs)?hs.value:'',histEnd:(live&&he)?he.value:'',media:STAGED.slice(),reports:live?reports():[],hwm:live?hwm():[],weather:live?currentWxSnapshot():null};
   var a=events_all();a.unshift(ev);saveEventsArr(a);
   if(window.__cloudSaveEvent){ try{ var blobs={}; for(var i=0;i<ev.media.length;i++){ var b=await idbGet(ev.media[i].key); if(b)blobs[ev.media[i].key]=b; } window.__cloudSaveEvent(ev,blobs); }catch(e){} }
   STAGED=[];document.getElementById('evName').value='';document.getElementById('evNotes').value=''; if(cEl)cEl.value=''; if(tEl)tEl.value=''; renderStaged();renderEvents(); }
@@ -1798,20 +1808,20 @@ function restoreEvent(id){ var all=events_all(); var ev=all.find(function(e){ret
 function purgeEvent(id){ if(!ADMIN){alert('Admin only.');return;} if(!confirm('PERMANENTLY delete this event and its photos for everyone? This cannot be undone.'))return; var all=events_all(); var ev=all.find(function(e){return e.id===id;}); if(ev&&ev.media)ev.media.forEach(function(m){idbDel(m.key);}); saveEventsArr(all.filter(function(e){return e.id!==id;})); if(window.__cloudPurgeEvent)window.__cloudPurgeEvent(id); renderEvents(); }
 function editEvent(id){ var all=events_all(); var ev=all.find(function(e){return e.id===id;}); if(!ev)return; var me=whoCached(); if(!(ADMIN||(ev.owner&&ev.owner===me))){ alert('Only '+(ev.owner||'its owner')+' or the admin can edit this.'); return; } var nm=prompt('Event name:',ev.name); if(nm===null)return; if(nm.trim())ev.name=nm.trim(); var d=prompt('Date (YYYY-MM-DD):', new Date(ev.when).toISOString().slice(0,10)); if(d){var t=new Date(d+'T12:00:00').getTime(); if(!isNaN(t))ev.when=t;} var c=prompt('Peak crest ft (blank = none):', ev.crest!=null?ev.crest:''); if(c!==null){var cv=c.trim(); ev.crest=(cv===''?null:parseFloat(cv));} var tg=prompt('Tags (comma-separated):',(ev.tags||[]).join(', ')); if(tg!==null)ev.tags=tg.split(',').map(function(x){return x.trim();}).filter(Boolean); var no=prompt('Notes:',ev.notes||''); if(no!==null)ev.notes=no; ev.editedBy=me||'anon'; ev.editedAt=Date.now(); saveEventsArr(all); if(window.__cloudSaveEvent){ (async function(){ try{ var blobs={}; for(var i=0;i<(ev.media||[]).length;i++){ if(!ev.media[i].url){ var b=await idbGet(ev.media[i].key); if(b)blobs[ev.media[i].key]=b; } } window.__cloudSaveEvent(ev,blobs); }catch(e){} })(); } renderEvents(); }
 function loadEvent(id){ var ev=events_all().find(function(e){return e.id===id;}); if(!ev)return; if(ev.crest && !(ev.histStart&&ev.histEnd) && typeof enterHistFlood==='function'){ enterHistFlood(ev.name+' · '+new Date(ev.when).toLocaleDateString(), ev.crest); } else { enterHistReview(ev.name+' · '+new Date(ev.when).toLocaleDateString(), ev.crest||null, {histStart:ev.histStart,histEnd:ev.histEnd}); } }
-function renderEvents(){ var el=document.getElementById('eventList'); if(!el)return; fillPrefill(); updateWhoTag(); var me=whoCached();
+function renderEvents(){ var el=document.getElementById('eventList'); if(!el)return; fillPrefill(); updateWhoTag(); var me=myIdentity();
   var esc=function(x){return String(x==null?'':x).replace(/[<>&]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c];});};
   var q=((document.getElementById('evSearch')||{}).value||'').toLowerCase().trim();
   var a=events(); if(q){ a=a.filter(function(ev){ var hay=(ev.name+' '+(ev.notes||'')+' '+((ev.tags||[]).join(' '))+' '+new Date(ev.when).getFullYear()+' '+(ev.owner||'')).toLowerCase(); return hay.indexOf(q)>=0; }); }
   if(!a.length){ el.innerHTML='<div class="sub">'+(q?'No events match "'+esc(q)+'".':'No saved events yet — set a crest or load a replay, add notes/photos, then "Save as event". For an OLD photo, set its Date and uncheck "attach current live…".')+'</div>'; }
   else { el.innerHTML=a.map(function(ev){ var can=ADMIN||(ev.owner&&ev.owner===me);
     var tagsH=(ev.tags&&ev.tags.length)?'<div class="sub" style="margin-top:2px">🏷 '+ev.tags.map(esc).join(', ')+'</div>':'';
-    var ownH=ev.owner?'<span class="sub"> · added by '+esc(ev.owner)+'</span>':'';
-    var btns='<button class="sm" onclick="loadEvent(\''+ev.id+'\')">↺ Load / replay</button>'+(can?'<button class="sm" onclick="editEvent(\''+ev.id+'\')">✎ Edit</button><button class="sm" style="background:#8a1f1f" onclick="delEvent(\''+ev.id+'\')">🗑 Remove</button>':'<span class="sub" style="align-self:center;color:#98a2ad">🔒 only '+(esc(ev.owner)||'owner')+' can change</span>');
+    var ownH=(ev.ownerName||ev.owner)?'<span class="sub"> · added by '+esc(ev.ownerName||ev.owner)+'</span>':'';
+    var btns='<button class="sm" onclick="loadEvent(\''+ev.id+'\')">↺ Load / replay</button><button class="sm" onclick="eventDetail(\''+ev.id+'\')">📋 Details</button>'+(ADMIN?'<button class="sm" onclick="promoteEvent(\''+ev.id+'\')">'+(ev.promoted?'★ in §7':'⭐ Promote to §7')+'</button>':'')+(can?'<button class="sm" onclick="editEvent(\''+ev.id+'\')">✎ Edit</button><button class="sm" style="background:#8a1f1f" onclick="delEvent(\''+ev.id+'\')">🗑 Remove</button>':'<span class="sub" style="align-self:center;color:#98a2ad">🔒 only '+(esc(ev.owner)||'owner')+' can change</span>');
     return '<div class="evcard"><div class="evh"><b>'+esc(ev.name)+'</b><span class="sub">'+new Date(ev.when).toLocaleDateString()+(ev.crest?' · crest '+(+ev.crest).toFixed(1)+' ft':'')+' · '+((ev.media||[]).length)+' media · '+((ev.reports||[]).length)+' logs</span>'+ownH+'</div>'+(ev.notes?'<div class="sub" style="margin-top:3px">'+esc(ev.notes)+'</div>':'')+tagsH+((ev.weather&&wxSummary(ev.weather))?'<div class="sub" style="margin-top:3px">🌦 '+esc(wxSummary(ev.weather))+'</div>':'')+'<div class="mediaGrid" data-ev="'+ev.id+'">'+(ev.media||[]).map(function(m){return thumbHTML(m,'');}).join('')+'</div><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+btns+'</div></div>';
   }).join(''); }
   el.querySelectorAll('.mediaGrid').forEach(function(g){paintVideoThumbs(g); g.querySelectorAll('.th').forEach(function(t){t.onclick=function(){openMedia(t.dataset.k,t.dataset.url,t.dataset.type);};});});
   var tw=document.getElementById('trashWrap'); if(tw){ var tr=trashEvents(); if(ADMIN&&tr.length){ tw.style.display='block'; tw.innerHTML='<div class="sub" style="margin:6px 0;font-weight:700;color:#8a1f1f">🗑 Trash ('+tr.length+') — admin can restore or permanently delete</div>'+tr.map(function(ev){return '<div class="evcard" style="opacity:.85"><div class="evh"><b>'+esc(ev.name)+'</b><span class="sub"> · removed by '+esc(ev.deletedBy||'?')+'</span></div><div style="margin-top:6px;display:flex;gap:6px"><button class="sm" onclick="restoreEvent(\''+ev.id+'\')">♻ Restore</button><button class="sm" style="background:#8a1f1f" onclick="purgeEvent(\''+ev.id+'\')">✕ Delete forever</button></div></div>';}).join(''); } else { tw.style.display='none'; tw.innerHTML=''; } }
-  if(window.renderComparePicker)renderComparePicker(); }
+  if(window.renderComparePicker)renderComparePicker(); if(window.renderFeatured)renderFeatured(); }
 async function openMedia(k,url,type){ let src=url; if(!src){ const b=await idbGet(k); if(!b)return; src=URL.createObjectURL(b); type=(b.type||''); } const isVid=(type||'').indexOf('video')>=0; const w=window.open('','_blank'); if(w){ w.document.write(isVid?'<body style="margin:0;background:#000"><video src="'+src+'" controls autoplay playsinline style="width:100%;height:100vh;object-fit:contain"></video>':'<body style="margin:0;background:#000"><img src="'+src+'" style="width:100%;height:100vh;object-fit:contain">'); } }
 function blobToB64(b){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b);});}
 function b64ToBlob(d){const p=d.split(',');const mime=(p[0].match(/:(.*?);/)||[])[1]||'application/octet-stream';const bin=atob(p[1]);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
@@ -2076,6 +2086,55 @@ async function refreshNotify(){ var el=document.getElementById('alertOptIn'); if
 async function toggleNotify(){ var c=document.getElementById('notifyChk'); if(window.__setNotify){ var ok=await window.__setNotify(c.checked); if(!ok&&c)c.checked=!c.checked; } }
 async function doReset(){ var msg=document.getElementById('authMsg'); var email=(document.getElementById('auEmail').value||'').trim(); if(!email){ if(msg){msg.style.color='#8a1f1f';msg.textContent='Type your email in the box above first, then tap this.'; } return; } if(!window.__authReset){ if(msg){msg.style.color='#8a1f1f';msg.textContent='Password reset unavailable (cloud off in this copy).';} return; } if(msg){msg.style.color='#38414d';msg.textContent='Sending reset link…';} try{ await window.__authReset(email); if(msg){msg.style.color='#0f6b45';msg.textContent='Reset link sent to '+email+'. Check your inbox (and spam), set a new password, then come back and Log in.';} }catch(e){ var code=((e&&(e.code||e.message))||'').replace('auth/',''); if(msg){msg.style.color='#8a1f1f';msg.textContent=(code.indexOf('user-not-found')>=0?'No account for that email yet — tap Register instead.':'Could not send reset: '+code);} } }
 
+/* ===== identity + data export (CSV/ZIP) + event detail (v60) ===== */
+function myIdentity(){ if(realUser() && window.__user && window.__user.email){ return 'e:'+(''+window.__user.email).toLowerCase(); } return 'n:'+((whoCached()||'anon')); }
+function dlFile(name, content, type){ var b=(content instanceof Blob)?content:new Blob([content],{type:type||'text/plain'}); var a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click(); a.remove(); }
+function toCSV(rows){ var q=function(s){ s=String(s==null?'':s); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }; return rows.map(function(r){return r.map(q).join(',');}).join('\n'); }
+function csvReports(){ var rows=[['when','who','where','lat','lon','depth_ft','tilden_ft','status']]; reports().forEach(function(r){ rows.push([r.t||'',r.who||r.name||'',r.where||'',r.lat==null?'':r.lat,r.lon==null?'':r.lon,r.depth==null?'':r.depth,r.tilden==null?'':r.tilden,r.status||'approved']); }); return rows; }
+function csvHWM(){ var rows=[['event','where','river_mi','offset_ft','peak_ft','status']]; hwm().forEach(function(m){ rows.push([m.event||'',m.where||'',m.rm==null?'':m.rm,m.off==null?'':m.off,m.peak==null?'':m.peak,m.status||'approved']); }); return rows; }
+function csvHistoric(){ var a=(typeof HISTX!=='undefined'?HISTX:HIST); var rows=[['crest_ft','year','name_or_duration','flow','mechanism']]; a.forEach(function(x){ rows.push([x[0],x[1],x[2]||'',x[3]||'',x[4]||'']); }); return rows; }
+function csvLocations(){ var rows=[['name','lat','lon','elev_ft']]; locs().forEach(function(l){ rows.push([l.name||'',l.lat,l.lon,l.elev]); }); return rows; }
+function csvRain(){ var rows=[['datetime','lat','lon','amount_in','storm','who']]; rainReports().forEach(function(r){ rows.push([new Date(r.t).toISOString(),r.lat==null?'':r.lat,r.lon==null?'':r.lon,r.amount,r.storm||'',r.who||'']); }); return rows; }
+function csvEvents(){ var rows=[['name','date','crest_ft','tags','added_by','media','logs','notes']]; events().forEach(function(e){ rows.push([e.name||'',new Date(e.when).toISOString(),e.crest==null?'':e.crest,(e.tags||[]).join('; '),e.ownerName||e.owner||'',(e.media||[]).length,(e.reports||[]).length,e.notes||'']); }); return rows; }
+function dlReports(){ dlFile('Nueces_field_logs.csv', toCSV(csvReports()), 'text/csv'); }
+function dlHWM(){ dlFile('Nueces_high_water_marks.csv', toCSV(csvHWM()), 'text/csv'); }
+function dlHistoric(){ dlFile('Nueces_historic_record.csv', toCSV(csvHistoric()), 'text/csv'); }
+function dlEventsCSV(){ dlFile('Nueces_events_summary.csv', toCSV(csvEvents()), 'text/csv'); }
+async function downloadAllZip(){
+  if(typeof JSZip==='undefined'){ alert('ZIP library still loading — try again in a moment.'); return; }
+  var zip=new JSZip();
+  zip.file('field_logs.csv', toCSV(csvReports()));
+  zip.file('high_water_marks.csv', toCSV(csvHWM()));
+  zip.file('historic_record.csv', toCSV(csvHistoric()));
+  zip.file('locations.csv', toCSV(csvLocations()));
+  zip.file('events_summary.csv', toCSV(csvEvents()));
+  zip.file('rainfall.csv', toCSV(csvRain()));
+  try{ var meta={ app:'NuecesReachModel', exported:new Date().toISOString(), events:events(), reports:reports(), hwm:hwm(), locations:locs(), rain:rainReports(), historic:(typeof HISTX!=='undefined'?HISTX:HIST) }; zip.file('all_data.json', JSON.stringify(meta)); }catch(e){}
+  var mf=zip.folder('media'); var evs=events();
+  for(var i=0;i<evs.length;i++){ var ev=evs[i]; var nm=(ev.name||'event').replace(/[^a-z0-9]/gi,'_').slice(0,40);
+    for(var j=0;j<(ev.media||[]).length;j++){ var m=ev.media[j]; try{ var bb=await idbGet(m.key); if(bb){ mf.file(nm+'_'+m.key+(m.type==='video'?'.mp4':'.jpg'), bb); } }catch(e){} } }
+  var blob=await zip.generateAsync({type:'blob'});
+  dlFile('Nueces_full_export_'+new Date().toISOString().slice(0,10)+'.zip', blob, 'application/zip');
+}
+function closeEvDetail(){ var m=document.getElementById('evDetailModal'); if(m)m.style.display='none'; }
+function eventDetail(id){ var ev=events_all().find(function(e){return e.id===id;}); if(!ev)return;
+  var esc=function(x){return String(x==null?'':x).replace(/[<>&]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c];});};
+  var h='<h3 style="margin:0 0 4px">'+esc(ev.name)+'</h3>';
+  h+='<div class="sub">'+new Date(ev.when).toLocaleString()+(ev.crest!=null?' · crest '+(+ev.crest).toFixed(1)+' ft':'')+(ev.ownerName?' · added by '+esc(ev.ownerName):'')+'</div>';
+  if(ev.tags&&ev.tags.length) h+='<div class="sub" style="margin-top:3px">🏷 '+ev.tags.map(esc).join(', ')+'</div>';
+  if(ev.notes) h+='<p style="margin:8px 0">'+esc(ev.notes).replace(/\n/g,'<br>')+'</p>';
+  if(ev.weather&&window.wxSummary&&wxSummary(ev.weather)) h+='<div class="sub" style="margin:6px 0">🌦 '+esc(wxSummary(ev.weather))+'</div>';
+  if(ev.reports&&ev.reports.length){ h+='<div style="margin-top:8px"><b>Field logs ('+ev.reports.length+')</b><div style="max-height:170px;overflow:auto;margin-top:4px">'+ev.reports.map(function(r){return '<div class="sub">• '+esc(r.who||r.name||'')+' — '+esc(r.where||'')+(r.depth!=null?' · '+esc(r.depth)+' ft':'')+' · '+esc(r.t||'')+'</div>';}).join('')+'</div></div>'; }
+  if(ev.hwm&&ev.hwm.length){ h+='<div style="margin-top:8px"><b>High-water marks ('+ev.hwm.length+')</b><div style="margin-top:4px">'+ev.hwm.map(function(m){return '<div class="sub">• '+esc(m.where||'')+' · peak '+esc(m.peak)+' ft</div>';}).join('')+'</div></div>'; }
+  if(ev.media&&ev.media.length){ h+='<div style="margin-top:8px"><b>Photos / videos ('+ev.media.length+')</b><div class="mediaGrid" id="evDetailMedia" style="margin-top:4px">'+ev.media.map(function(m){return thumbHTML(m,'');}).join('')+'</div></div>'; }
+  var body=document.getElementById('evDetailBody'); if(!body)return; body.innerHTML=h;
+  var mg=document.getElementById('evDetailMedia'); if(mg){ paintVideoThumbs(mg); mg.querySelectorAll('.th').forEach(function(t){ t.onclick=function(){openMedia(t.dataset.k,t.dataset.url,t.dataset.type);}; }); }
+  document.getElementById('evDetailModal').style.display='flex';
+}
+
+function promoteEvent(id){ if(!ADMIN){ alert('Admins can promote a flood into Section 7 (Historical).'); return; } var all=events_all(); var ev=all.find(function(e){return e.id===id;}); if(!ev)return; ev.promoted=!ev.promoted; saveEventsArr(all); if(window.__cloudSaveEvent){ (async function(){ try{ window.__cloudSaveEvent(ev,{}); }catch(e){} })(); } renderEvents(); renderFeatured(); }
+function renderFeatured(){ var el=document.getElementById('featuredEvents'); if(!el)return; var f=events().filter(function(e){return e.promoted;}); var esc=function(x){return String(x==null?'':x).replace(/[<>&]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c];});}; if(!f.length){ el.innerHTML=''; return; }
+  el.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:4px">\u2605 Documented floods \u2014 full records</div>'+f.sort(function(a,b){return (b.when||0)-(a.when||0);}).map(function(ev){ return '<div class="evcard" style="padding:8px 10px;margin:4px 0"><div class="evh"><b>'+esc(ev.name)+'</b><span class="sub"> \u00b7 '+new Date(ev.when).toLocaleDateString()+(ev.crest!=null?' \u00b7 crest '+(+ev.crest).toFixed(1)+' ft':'')+' \u00b7 '+((ev.media||[]).length)+' media</span></div><div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap"><button class="sm" onclick="loadEvent(\''+ev.id+'\')">\u21ba Load / replay</button><button class="sm" onclick="eventDetail(\''+ev.id+'\')">\ud83d\udccb Details</button></div></div>'; }).join(''); }
 function boot(){
   step(function(){ if(window.initRasters) initRasters(); });
   step(function(){ if(window.updateAuthChip)updateAuthChip(); if(window.applyGate)applyGate(); if(window.refreshAdmin)refreshAdmin(); });
@@ -2228,7 +2287,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
         if (b) { const r = ref(storage, 'events/' + ev.id + '/' + m.key); await uploadBytes(r, b); media.push({ key:m.key, type:m.type, url: await getDownloadURL(r), name:m.name||'' }); }
         else if (m.url) { media.push(m); }
       }
-      await setDoc(doc(db,'events',ev.id), { id:ev.id, name:ev.name, notes:ev.notes||'', when:ev.when, crest:ev.crest||null, tags:ev.tags||[], owner:ev.owner||'', createdBy:ev.createdBy||ev.owner||'', createdAt:ev.createdAt||ev.when||Date.now(), editedBy:ev.editedBy||'', editedAt:ev.editedAt||null, deleted:!!ev.deleted, deletedBy:ev.deletedBy||'', histStart:ev.histStart||'', histEnd:ev.histEnd||'', weather:ev.weather||null, media:media, reports:ev.reports||[], hwm:ev.hwm||[] }, { merge:true });
+      await setDoc(doc(db,'events',ev.id), { id:ev.id, name:ev.name, notes:ev.notes||'', when:ev.when, crest:ev.crest||null, tags:ev.tags||[], owner:ev.owner||'', ownerName:ev.ownerName||'', promoted:!!ev.promoted, createdBy:ev.createdBy||ev.owner||'', createdAt:ev.createdAt||ev.when||Date.now(), editedBy:ev.editedBy||'', editedAt:ev.editedAt||null, deleted:!!ev.deleted, deletedBy:ev.deletedBy||'', histStart:ev.histStart||'', histEnd:ev.histEnd||'', weather:ev.weather||null, media:media, reports:ev.reports||[], hwm:ev.hwm||[] }, { merge:true });
     } catch(e){ console.warn('cloud event', e); alert('Could not upload the event to the cloud ('+(e.code||e.message)+') — it is still saved on this device and in your backup.'); }
   };
   /* SOFT delete: mark hidden but keep the data + photos so nothing is permanently wiped; admin can restore */

@@ -44,8 +44,17 @@
   <div class="card">
     <label>Your name</label>
     <input id="who" placeholder="who's reporting">
-    <label>Water depth here (feet · 0 = just reaching the ground)</label>
+
+    <label>What are you logging?</label>
+    <div style="display:flex;gap:8px;margin:2px 0 6px">
+      <button type="button" id="modeCur" onclick="setMode('cur')" style="flex:1;padding:12px;font-size:15px;background:var(--blu)">💧 Current water</button>
+      <button type="button" id="modeHwm" onclick="setMode('hwm')" style="flex:1;padding:12px;font-size:15px;background:#39505f">🎯 High-water mark</button>
+    </div>
+
+    <label id="depLbl">Water depth here (feet · 0 = just reaching the ground)</label>
     <input id="dep" class="big" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 1.5">
+    <div id="hwmHint" class="sub" style="display:none;margin-top:6px">Measure the <b>debris / mud line</b> — the highest the water reached — above the ground at this exact spot. The flood's peak Tilden crest is added for you and confirmed by the admin.</div>
+
     <label>Spot nickname (optional)</label>
     <input id="nick" placeholder="e.g. river pump, low crossing">
     <button class="go" id="submitBtn" onclick="submit()" disabled>Get location first ↑</button>
@@ -73,7 +82,14 @@ const firebaseConfig = {
 const db = getFirestore(initializeApp(firebaseConfig));
 
 const TIL_ZERO=183.10, SIN=2.2, TILG={lat:28.30889,lon:-98.55724};
-let LAT=null, LON=null, ELEV=null, TIL=null;
+let LAT=null, LON=null, ELEV=null, TIL=null, MODE='cur';
+window.setMode=function(m){ MODE=m;
+  document.getElementById('modeCur').style.background=(m==='cur'?'var(--blu)':'#39505f');
+  document.getElementById('modeHwm').style.background=(m==='hwm'?'var(--grn)':'#39505f');
+  document.getElementById('depLbl').textContent=(m==='hwm'?'Height of the high-water / debris line above the ground here (feet · 0 = mud line at the ground)':'Water depth here (feet · 0 = just reaching the ground)');
+  document.getElementById('hwmHint').style.display=(m==='hwm'?'block':'none');
+  document.getElementById('dep').placeholder=(m==='hwm'?'e.g. 3.2':'e.g. 1.5');
+};
 
 function riverMi(lat,lon){const dy=(lat-TILG.lat)*69.05, dx=(lon-TILG.lon)*69.05*Math.cos(lat*Math.PI/180); return Math.hypot(dx,dy)*SIN;}
 function box(html){const b=document.getElementById('locBox');b.style.display='block';b.innerHTML=html;}
@@ -113,16 +129,27 @@ window.submit = async function(){
   const msg=document.getElementById('msg');
   msg.innerHTML='Sending…';
   try{
-    // A field log is a LIVE REPORT — shows on the shared map immediately.
-    // It does NOT recalibrate the forecast (only high-water marks in the main tool do).
-    await addDoc(collection(db,'reports'), {
-      who, where:nick, lat:LAT, lon:LON, depth:dep, tilden:TIL, status:'pending',
-      t:new Date().toLocaleString()+' (field)', epoch:Date.now(), ts:serverTimestamp()
-    });
-    msg.innerHTML='<span class="ok">✓ Sent! It will show on the shared map once an admin approves it. Thank you.</span>'+
-      '<button class="gps" style="margin-top:12px" onclick="logAnother()">＋ Log another spot</button>';
+    if(MODE==='hwm'){
+      const rm = riverMi(LAT,LON);
+      const peak = (TIL!=null? TIL : null);
+      const off = (ELEV!=null && peak!=null) ? +(ELEV + dep - TIL_ZERO - peak).toFixed(2) : null;
+      await addDoc(collection(db,'hwm'), {
+        event:'field HWM'+(peak!=null?(' · prov. peak '+peak.toFixed(1)+' ft'):''),
+        where:nick, lat:LAT, lon:LON, elev:(ELEV!=null?ELEV:null), depth:dep,
+        rm:+rm.toFixed(2), peak:peak, off:off, provisional:true, who,
+        status:'pending', t:new Date().toLocaleString()+' (field)', epoch:Date.now(), ts:serverTimestamp()
+      });
+      msg.innerHTML='<span class="ok">✓ High-water mark sent for approval. The admin confirms the flood\'s peak crest, then it sharpens the forecast. Thank you.</span>'+
+        '<button class="gps" style="margin-top:12px" onclick="logAnother()">＋ Log another spot</button>';
+    } else {
+      await addDoc(collection(db,'reports'), {
+        who, where:nick, lat:LAT, lon:LON, depth:dep, tilden:TIL, status:'pending',
+        t:new Date().toLocaleString()+' (field)', epoch:Date.now(), ts:serverTimestamp()
+      });
+      msg.innerHTML='<span class="ok">✓ Sent! It will show on the shared map once an admin approves it. Thank you.</span>'+
+        '<button class="gps" style="margin-top:12px" onclick="logAnother()">＋ Log another spot</button>';
+    }
     document.getElementById('dep').value='';document.getElementById('nick').value='';
-    // require a fresh GPS grab before the next submit, so location/gauge/time are current
     LAT=null;const b=document.getElementById('submitBtn');b.disabled=true;b.textContent='Get location first ↑';
   }catch(e){ msg.innerHTML='<span class="err">Could not send: '+(e.code||e.message)+'. Check your signal and try again.</span>'; }
 };
