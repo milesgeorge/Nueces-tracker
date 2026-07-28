@@ -144,7 +144,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v50 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v52 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -719,7 +719,7 @@ function timeToProg(t){ const S=HIST_SERIES; if(!S.length)return 1; const a=S[0]
 function jumpNow(){ const p=timeToProg(Date.now()); const ts=document.getElementById('timeScrub'); if(ts)ts.value=Math.round(p*100); applyHist(p); }
 function applyHist(prog){ const S=HIST_SERIES; if(!S.length)return; const a=S[0].t,b=S[S.length-1].t; const tt=a+prog*(b-a); const stage=stageAtTime(tt);
   const cr=document.getElementById('crest'); if(cr){cr.value=Math.max(14,Math.min(28,stage)).toFixed(1);} crestUserSet=true; ANIM=null; if(window.render)render(); drawFloodAt(stage);
-  const lab=document.getElementById('simClock'); if(!lab)return; const past=(tt<=TL_NOW+120000); const tag=past?'<span style="color:#0f8a5f">observed</span>':'<span style="color:#b9770a">projected</span>'; const nowMark=(Math.abs(tt-TL_NOW)<20*60000)?' · <b style="color:#1a6f8b">◀ NOW (live gauge)</b>':'';
+  const lab=document.getElementById('simClock'); if(!lab)return; if(HIST_SYNTH){ var _h=(tt-a)/3600000; var _pk=Math.max.apply(null,S.map(function(p){return p.stage;})); var _at=Math.abs(stage-_pk)<0.3; lab.innerHTML='📜 <b>+'+_h.toFixed(0)+' h</b> into the flood · Tilden <b>'+stage.toFixed(1)+' ft</b>'+(_at?' · <b style="color:#ff3b3b">near PEAK</b>':(prog>0.4?' · <span style="color:#b9770a">receding</span>':' · <span style="color:#1a6f8b">rising</span>')); return; } const past=(tt<=TL_NOW+120000); const tag=past?'<span style="color:#0f8a5f">observed</span>':'<span style="color:#b9770a">projected</span>'; const nowMark=(Math.abs(tt-TL_NOW)<20*60000)?' · <b style="color:#1a6f8b">◀ NOW (live gauge)</b>':'';
   lab.innerHTML='⏱ <b>'+new Date(tt).toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+'</b> · Tilden <b>'+stage.toFixed(1)+' ft</b> ('+tag+')'+nowMark; }
 async function buildLiveTimeline(){
   try{
@@ -1211,8 +1211,8 @@ function drawFloodAt(crest,frontRm){ if(!MAP)return;
   if(FLOODIMG){ FLOODIMG.setUrl(url); } else { FLOODIMG=L.imageOverlay(url,bounds,{opacity:0.82,interactive:false}).addTo(MAP); }
   const b=document.getElementById('floodBtn'); if(b)b.textContent='🌊 Flood extent: '+crest.toFixed(1)+' ft'; }
 function drawFlood(){ if(!MAP||!FLOOD_ON)return; drawFloodAt(parseFloat(document.getElementById('crest').value)); }
-/* recenter on the ranch ONLY if it isn't already on screen — never yank the user's current pan/zoom */
-function ensureReach(z){ try{ if(!MAP)return; var c=L.latLng(28.235,-98.655); if(!MAP.getBounds().contains(c)){ MAP.setView(c, z||13); } }catch(e){} }
+/* never auto-move the map — the user's pan/zoom is sacred. (Initial load + Expand + Reset still position it.) */
+function ensureReach(z){ /* intentionally a no-op */ }
 function toggleFlood(){ if(!MAP)return; FLOOD_ON=!FLOOD_ON;
   if(FLOOD_ON){ drawFlood(); ensureReach(13); }
   else { if(FLOODIMG){MAP.removeLayer(FLOODIMG);FLOODIMG=null;} const b=document.getElementById('floodBtn'); if(b)b.textContent='🌊 Flood extent'; }
@@ -1532,6 +1532,8 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v52','2026-07-29','Historic floods now play as a TIME-LAPSE: pick one from Section 7 and the timeline slider scrubs the water rising, cresting, and receding (Play animates it too). Reset with Return to LIVE. The map now shows a bold HISTORICAL: <name> tag (top-right) that stays visible even when the map is expanded.'],
+  ['v51','2026-07-29','The map now NEVER auto-moves on Play or on any layer toggle \u2014 your pan and zoom stay put no matter what. Only the initial load, Expand map, and the Reset-to-current button reposition it.'],
   ['v50','2026-07-29','Play flood advance (and the map layer toggles) no longer yank the map back to the ranch \u2014 they keep your current pan and zoom, only recentering if the ranch is not already on screen. Zoom into any spot and hit Play without losing your place.'],
   ['v49','2026-07-29','Contour labels: every line is now numbered, not just the bold 5-ft lines. Set the Elev. lines dropdown to 1 ft (or 2 ft) and each foot line gets its elevation, with smart spacing so numbers never stack (bold 5-ft lines claim space first). Same for flood-stage lines.'],
   ['v48','2026-07-29','Flood model regenerated & extended along the corridor to the oxbow (south) and the TILT2/Tilden gauge (north) — the blue flood extent and the flood-stage lines now cover the whole reach, not just the ranch. Connectivity redone with a minimax-from-channel fill (no false-flooding). Over the ranch tracts the flood-stage lines are computed from the 1 m LiDAR for extra sharpness. Validated: house floods last (~25.5 ft), matching the 2013 high-water calibration.'],
@@ -1728,7 +1730,22 @@ async function importAll(file){ if(!file)return; try{ const d=JSON.parse(await f
 }catch(e){ alert('Could not import that file: '+e.message); } }
 function renderPresets(){ const el=document.getElementById('presetList'); if(!el)return; const rows=(typeof HISTX!=='undefined'?HISTX:HIST).slice().sort((a,b)=>b[0]-a[0]);
   el.innerHTML='<div class="sub" style="margin:4px 0">Click a flood to <b>review it in Historical mode</b> (loads its recorded crest + peak inundation; every section is marked HISTORICAL). Events from ~2007 on can also be Played as a full time-lapse via 📼 Replay.</div>'+rows.map(function(r){var lab=(r[2]||r[1]).replace(/'/g,'');return '<button class="sm" style="margin:2px" onclick="loadPreset('+r[0]+",'"+lab+"')\">"+(r[2]||r[1])+' · '+(+r[0]).toFixed(1)+' ft</button>';}).join(''); }
-function loadPreset(stage,label){ enterHistReview((label||'Historic flood')+' · '+(+stage).toFixed(1)+' ft (peak inundation)', +stage); }
+var HIST_SYNTH=false;
+function enterHistFlood(name, peak){
+  peak=+peak; var days=Math.max(3, Math.min(9, 3+(peak-18)*0.5));
+  var n=64, base=Math.max(7, peak-15), tPk=0.33, arr=[];
+  for(var i=0;i<n;i++){ var f=i/(n-1), s;
+    if(f<=tPk){ var x=f/tPk; s=base+(peak-base)*(x*x*(3-2*x)); }
+    else { var x2=(f-tPk)/(1-tPk); s=base+(peak-base)*Math.exp(-2.2*x2); }
+    arr.push({t:Math.round(f*days*86400000), stage:s}); }
+  HIST_SERIES=arr; HIST_ON=true; HIST_SYNTH=true; TL_NOW=arr[arr.length-1].t+1e9; FLOOD_ON=true;
+  var fb=document.getElementById('floodBtn'); if(fb)fb.textContent='\ud83c\udf0a Flood extent: ON';
+  enterHistReview(name+' · peak '+peak.toFixed(1)+' ft — time-lapse', null);
+  var bn=document.getElementById('histBanner'); if(bn)bn.innerHTML='📜 <b>Historic flood — time-lapse:</b> '+name+'. Drag the <b>⏱ Timeline</b> slider (or press ▶ Play flood advance) to watch it rise and recede. <button class="sm" style="background:#12202e;margin-left:8px" onclick="resetLive()">↩ Return to LIVE</button>';
+  var ts=document.getElementById('timeScrub'); if(ts)ts.value=Math.round(tPk*100);
+  applyHist(tPk);
+}
+function loadPreset(stage,label){ enterHistFlood((label||'Historic flood'), +stage); }
 
 /* ============ WEATHER KEEPER (NWS live + tropical + event logging) ============ */
 let WEATHER=null;
@@ -1787,7 +1804,7 @@ function toggleRain(){ if(!MAP)return; RAIN_ON=!RAIN_ON; const b=document.getEle
 
 /* ============ HISTORICAL REVIEW MODE ============ */
 let HIST_REVIEW=null, HISTCTL=null;
-function setMapHistLabel(txt){ if(!MAP)return; if(HISTCTL){try{MAP.removeControl(HISTCTL);}catch(e){}HISTCTL=null;} if(!txt)return; try{ HISTCTL=L.control({position:'bottomright'}); HISTCTL.onAdd=function(){var d=L.DomUtil.create('div');d.style.cssText='background:rgba(122,18,32,.92);color:#fff;padding:6px 10px;border-radius:8px;font:700 12px sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.4);max-width:60vw';d.innerHTML='📜 '+txt;return d;}; HISTCTL.addTo(MAP);}catch(e){} }
+function setMapHistLabel(txt){ if(!MAP)return; if(HISTCTL){try{MAP.removeControl(HISTCTL);}catch(e){}HISTCTL=null;} if(!txt)return; try{ HISTCTL=L.control({position:'topright'}); HISTCTL.onAdd=function(){var d=L.DomUtil.create('div');d.style.cssText='background:rgba(122,18,32,.95);color:#fff;padding:7px 12px;border-radius:9px;font:800 13px sans-serif;box-shadow:0 2px 7px rgba(0,0,0,.5);border:2px solid #fff;max-width:72vw';d.innerHTML='📜 HISTORICAL: '+txt;return d;}; HISTCTL.addTo(MAP);}catch(e){} }
 function enterHistReview(name,crest,opts){ HIST_REVIEW={name:name}; document.body.classList.add('histmode');
   const bn=document.getElementById('histBanner'); if(bn)bn.innerHTML='📜 <b>Reviewing historic flood:</b> '+name+' — this is an <b>ARCHIVE</b> view, not current conditions. <button class="sm" style="background:#12202e;margin-left:8px" onclick="resetLive()">↩ Return to LIVE</button>';
   const hb=document.getElementById('histBar'); if(hb){hb.style.display='block'; const nm=document.getElementById('histBarName'); if(nm)nm.textContent=name;}
@@ -1796,7 +1813,7 @@ function enterHistReview(name,crest,opts){ HIST_REVIEW={name:name}; document.bod
   if(opts){ if(opts.histStart&&document.getElementById('histStart'))document.getElementById('histStart').value=opts.histStart; if(opts.histEnd&&document.getElementById('histEnd'))document.getElementById('histEnd').value=opts.histEnd; }
   if(window.render)render();
   const m=document.getElementById('map'); if(m)m.scrollIntoView({behavior:'smooth',block:'start'}); }
-function resetLive(){ HIST_REVIEW=null; HIST_ON=false; document.body.classList.remove('histmode');
+function resetLive(){ HIST_REVIEW=null; HIST_ON=false; HIST_SYNTH=false; document.body.classList.remove('histmode');
   const hb=document.getElementById('histBar'); if(hb)hb.style.display='none'; const hn=document.getElementById('histNote'); if(hn)hn.textContent=''; setMapHistLabel('');
   if(typeof OFFICIAL!=='undefined'&&OFFICIAL.til&&OFFICIAL.til.stage>0){document.getElementById('crest').value=Math.max(14,Math.min(28,OFFICIAL.til.stage)).toFixed(1);crestUserSet=false;crestAutoPulled=true;}
   if(window.render)render(); if(window.fetchWeather)fetchWeather(); if(window.buildLiveTimeline)buildLiveTimeline(); }
