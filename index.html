@@ -157,7 +157,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v58 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v59 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -175,6 +175,9 @@ window.addEventListener('error',function(e){
     <button class="help-btn" style="margin-top:11px;background:#fff;color:#12324f;font-weight:800;border-color:#fff" onclick="openAuth()">🔑 Log in / Register (free)</button>
   </div>
   <div id="alertBanner" style="margin-bottom:4px"></div>
+  <div id="alertOptIn" style="display:none;background:#eef4fa;border:1px solid #cfe0ee;border-radius:10px;padding:10px 13px;margin-bottom:10px;font-size:13px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0"><input type="checkbox" id="notifyChk" onchange="toggleNotify()" style="width:auto"> <span>🔔 <b>Email me Nueces River flood alerts</b> — a heads-up when a big rise is on the way. Uses your login email.</span></label>
+  </div>
   <div id="histBanner"></div>
 
   <div id="authModal" class="modal" onclick="if(event.target===this)closeAuth()"><div class="box" style="max-width:400px">
@@ -1582,6 +1585,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v59','2026-07-29','Phase 4 foundation — email flood alerts. Logged-in users can opt in with a bell (\u201cEmail me Nueces River flood alerts\u201d). The moderation page has a Flood alerts composer that sends to all subscribers, plus gauge-threshold rules with a \u201ccheck gauges now\u201d that drafts an alert when a level is crossed, and a history of what was sent. Sending turns on once the Firebase email extension is connected (see the setup guide).'],
   ['v58','2026-07-29','Phase 3 — admin powers now tied to your login (no PIN). The archive \u201cAdmin\u201d lights up automatically when you sign in as an admin. The moderation page gates every control to admin emails, shows a \u201cnot an admin\u201d state otherwise, and has a new Admins & People section to add/remove admins and see registered accounts. Paired Firestore/Storage rules enforce it at the database.'],
   ['v57','2026-07-29','Field logs are now moderated: a log submitted from the phone log page (or the tracker) is held as PENDING and only appears on the shared map after you approve it on the moderation page, which now has a Pending field logs queue (Approve / Reject). Reject is non-destructive.'],
   ['v56','2026-07-29','Login polish: fixed the invisible \u201cContinue with Google\u201d button, added a \u201cForgot password? Email me a reset link\u201d option, and made sign-in errors helpful \u2014 \u201cemail already in use\u201d switches you to Log in, unknown email switches to Register.'],
@@ -2052,7 +2056,7 @@ function initMapResize(){
 function realUser(){ var u=window.__user; return !!(u && !u.isAnonymous); }
 function updateAuthChip(){ var el=document.getElementById('authChip'); if(!el)return; if(realUser()){ var nm=(window.__user.displayName||window.__user.email||'signed in'); el.innerHTML='👤 '+nm+' · <a onclick="doLogout()">sign out</a>'; } else { el.innerHTML='<a onclick="openAuth()">🔑 Log in / Register</a>'; } }
 function applyGate(){ var need=!!(window.__settings&&window.__settings.requireLogin); document.body.classList.toggle('gated', need && !realUser()); }
-window.onAuthChange=function(u){ updateAuthChip(); applyGate(); if(window.refreshAdmin)refreshAdmin(); if(window.renderEvents)renderEvents(); };
+window.onAuthChange=function(u){ updateAuthChip(); applyGate(); if(window.refreshAdmin)refreshAdmin(); if(window.renderEvents)renderEvents(); if(window.refreshNotify)refreshNotify(); };
 window.onSettings=function(s){ applyGate(); if(window.refreshAdmin)refreshAdmin(); if(window.renderEvents)renderEvents(); };
 function openAuth(){ var m=document.getElementById('authModal'); if(m){ authTab('login'); m.style.display='flex'; } }
 function closeAuth(){ var m=document.getElementById('authModal'); if(m)m.style.display='none'; var msg=document.getElementById('authMsg'); if(msg)msg.textContent=''; }
@@ -2068,6 +2072,8 @@ async function authSubmit(){ var msg=document.getElementById('authMsg'); var ema
     if(msg){msg.style.color='#8a1f1f';msg.textContent=(AUTH_MODE==='register'?'Could not register: ':'Could not log in: ')+code.replace('auth/','');} } }
 async function doGoogle(){ var msg=document.getElementById('authMsg'); if(!window.__authGoogle){ if(msg)msg.textContent='Google sign-in unavailable.'; return;} try{ await window.__authGoogle(); closeAuth(); }catch(e){ if(msg)msg.textContent='Google sign-in failed: '+((e&&(e.code||e.message))||''); } }
 async function doLogout(){ try{ if(window.__authLogout)await window.__authLogout(); }catch(e){} updateAuthChip(); applyGate(); }
+async function refreshNotify(){ var el=document.getElementById('alertOptIn'); if(!el)return; if(realUser()){ el.style.display='block'; if(window.__getNotify){ try{ var on=await window.__getNotify(); var c=document.getElementById('notifyChk'); if(c)c.checked=!!on; }catch(e){} } } else { el.style.display='none'; } }
+async function toggleNotify(){ var c=document.getElementById('notifyChk'); if(window.__setNotify){ var ok=await window.__setNotify(c.checked); if(!ok&&c)c.checked=!c.checked; } }
 async function doReset(){ var msg=document.getElementById('authMsg'); var email=(document.getElementById('auEmail').value||'').trim(); if(!email){ if(msg){msg.style.color='#8a1f1f';msg.textContent='Type your email in the box above first, then tap this.'; } return; } if(!window.__authReset){ if(msg){msg.style.color='#8a1f1f';msg.textContent='Password reset unavailable (cloud off in this copy).';} return; } if(msg){msg.style.color='#38414d';msg.textContent='Sending reset link…';} try{ await window.__authReset(email); if(msg){msg.style.color='#0f6b45';msg.textContent='Reset link sent to '+email+'. Check your inbox (and spam), set a new password, then come back and Log in.';} }catch(e){ var code=((e&&(e.code||e.message))||'').replace('auth/',''); if(msg){msg.style.color='#8a1f1f';msg.textContent=(code.indexOf('user-not-found')>=0?'No account for that email yet — tap Register instead.':'Could not send reset: '+code);} } }
 
 function boot(){
@@ -2108,7 +2114,7 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
 <!-- ============================================================= -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getFirestore, collection, addDoc, setDoc, deleteDoc, doc, onSnapshot, query, where, serverTimestamp }
+import { getFirestore, collection, addDoc, setDoc, deleteDoc, doc, getDoc, onSnapshot, query, where, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
@@ -2141,6 +2147,8 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   window.__authGoogle = async function(){ return (await signInWithPopup(auth,new GoogleAuthProvider())).user; };
   window.__authLogout = async function(){ await signOut(auth); window.__user=null; if(window.onAuthChange)window.onAuthChange(null); __maybeAnon(); };
   window.__authReset = async function(email){ await sendPasswordResetEmail(auth,email); };
+  window.__setNotify = async function(on){ try{ var u=auth.currentUser; if(!u||u.isAnonymous)return false; await setDoc(doc(db,'users',u.uid),{uid:u.uid,name:u.displayName||'',email:u.email||'',notifyEmail:!!on},{merge:true}); return true; }catch(e){ return false; } };
+  window.__getNotify = async function(){ try{ var u=auth.currentUser; if(!u||u.isAnonymous)return false; var d=await getDoc(doc(db,'users',u.uid)); return d.exists()&&!!d.data().notifyEmail; }catch(e){ return false; } };
   window.__saveSettings = async function(obj){ try{ await setDoc(doc(db,'config','settings'),obj,{merge:true}); return true; }catch(e){ return false; } };
   window.__authReady = true;
   const badge = document.createElement('div');
