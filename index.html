@@ -144,7 +144,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v48 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v49 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -1530,6 +1530,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v49','2026-07-29','Contour labels: every line is now numbered, not just the bold 5-ft lines. Set the Elev. lines dropdown to 1 ft (or 2 ft) and each foot line gets its elevation, with smart spacing so numbers never stack (bold 5-ft lines claim space first). Same for flood-stage lines.'],
   ['v48','2026-07-29','Flood model regenerated & extended along the corridor to the oxbow (south) and the TILT2/Tilden gauge (north) — the blue flood extent and the flood-stage lines now cover the whole reach, not just the ranch. Connectivity redone with a minimax-from-channel fill (no false-flooding). Over the ranch tracts the flood-stage lines are computed from the 1 m LiDAR for extra sharpness. Validated: house floods last (~25.5 ft), matching the 2013 high-water calibration.'],
   ['v47','2026-07-29','Real 1 m LiDAR (USGS 3DEP, TX Hurricane-2018) folded in for the ranch tracts — when you zoom into the ranch, elevation contours down to ~1 ft now draw from a ~5 m grid built from true 1 m data instead of the coarse 30 m DEM, so the lines are far crisper. Falls back to the 30 m grid outside the ranch box.'],
   ['v46','2026-07-29','Elevation/topography coverage extended to the full area of interest — west to the tile edge near Cotulla, north to the TILT2 (Tilden) gauge, east to about Hwy 16, south beyond the oxbow/FM624 (186–526 ft). Contour engine now spans this whole box. Flood-stage lines stay on the calibrated ranch corridor. Groundwork laid to layer in 1 m LiDAR precision for the ranch tracts.'],
@@ -1889,21 +1890,29 @@ function contourDraw(kind){
   var major=majorFor(kind,interval);
   var group=L.layerGroup();
   var lineCol=kind==='flood'?'#2f8fd0':'#8a5a2b', idxCol=kind==='flood'?'#0b4a9c':'#5c3610';
-  var labCol=kind==='flood'?'rgba(11,74,156,.92)':'rgba(92,54,16,.92)';
+  var labCol=kind==='flood'?'rgba(11,74,156,.94)':'rgba(92,54,16,.94)';       // bold index labels
+  var labCol2=kind==='flood'?'rgba(47,143,208,.92)':'rgba(138,90,43,.92)';    // every-foot labels
   var start=Math.ceil(vmin/interval)*interval;
+  // draw every line; remember them so we can label ALL of them (index first) with shared spacing
+  var levData=[];
   for(var lev=start; lev<=vmax+1e-9; lev+=interval){
     var isIdx=Math.abs(lev/major-Math.round(lev/major))<1e-6;
     var segs=[]; msLevel(V,lonAt,latAt,c0,c1,r0,r1,lev,segs);
     if(!segs.length)continue;
-    group.addLayer(L.polyline(segs,{color:isIdx?idxCol:lineCol,weight:isIdx?1.7:0.6,opacity:isIdx?0.95:0.55,interactive:false}));
-    if(isIdx){
-      var txt=kind==='flood'?((Math.round(lev*10)/10)+' ft'):(Math.round(lev)+"'");
-      var last=null, stepN=Math.max(1,Math.floor(segs.length/45));
-      for(var i=0;i<segs.length;i+=stepN){ var s=segs[i]; var mid=[(s[0][0]+s[1][0])/2,(s[0][1]+s[1][1])/2];
-        var p=MAP.latLngToContainerPoint(mid); if(last&&Math.abs(p.x-last.x)+Math.abs(p.y-last.y)<120)continue; last=p;
-        group.addLayer(L.marker(mid,{interactive:false,keyboard:false,icon:labelIcon(txt,labCol)})); }
-    }
+    group.addLayer(L.polyline(segs,{color:isIdx?idxCol:lineCol,weight:isIdx?1.7:0.6,opacity:isIdx?0.95:0.6,interactive:false}));
+    levData.push({lev:lev,isIdx:isIdx,segs:segs});
   }
+  // label placement with a shared pixel-grid so numbers never stack; bold 5-ft lines claim space first
+  var occ={}, CELL=76;
+  function placeLbl(mid,txt,col){ var p=MAP.latLngToContainerPoint(mid);
+    var key=Math.round(p.x/CELL)+'_'+Math.round(p.y/CELL); if(occ[key])return; occ[key]=1;
+    group.addLayer(L.marker(mid,{interactive:false,keyboard:false,icon:labelIcon(txt,col)})); }
+  function lblPass(wantIdx){ for(var k=0;k<levData.length;k++){ var Ld=levData[k]; if(!!Ld.isIdx!==wantIdx)continue;
+    var txt=kind==='flood'?((Math.round(Ld.lev*10)/10)+' ft'):(Math.round(Ld.lev)+"'");
+    var col=Ld.isIdx?labCol:labCol2, stepN=Math.max(1,Math.floor(Ld.segs.length/70));
+    for(var i=0;i<Ld.segs.length;i+=stepN){ var s=Ld.segs[i]; placeLbl([(s[0][0]+s[1][0])/2,(s[0][1]+s[1][1])/2],txt,col); }
+  } }
+  lblPass(true); lblPass(false);
   setCLayer(kind,group);
 }
 function reContour(kind){ if(CONTOUR[kind].on) contourDraw(kind); }
