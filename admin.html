@@ -43,6 +43,12 @@
     <div class="muted" id="empty" style="margin-top:8px">Nothing pending. 👍</div>
   </div>
 
+  <div class="card hide" id="setCard">
+    <b>⚙ Settings</b>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="reqLogin" onchange="saveReqLogin()" style="width:auto"> <span>Require login to use the tracker <span class="muted">— signed-out visitors see only Section 1 (the gauge ladder)</span></span></label>
+    <div class="muted" id="setMsg" style="margin-top:6px"></div>
+  </div>
+
   <p class="muted">Config below must match the one in your tracker. A mark whose implied water-surface slope is outside ~0.6–2.0 ft/river-mile is auto-flagged <span class="flag">⚠ check</span> — that usually means the depth or the peak crest value is off.</p>
 </div>
 
@@ -50,7 +56,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, deleteDoc }
+import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 /* ▼▼▼ PASTE THE SAME firebaseConfig YOU PUT IN THE TRACKER ▼▼▼ */
@@ -77,10 +83,20 @@ window.doLogin = async () => {
 };
 window.doLogout = () => signOut(auth);
 
+let unsubSet = null;
+function watchSettings(){ if(unsubSet) return; unsubSet = onSnapshot(doc(db,'config','settings'), s => { const v = s.exists()? s.data():{}; const cb=document.getElementById('reqLogin'); if(cb) cb.checked = !!v.requireLogin; }); }
+window.saveReqLogin = async () => {
+  const on = document.getElementById('reqLogin').checked;
+  document.getElementById('setMsg').textContent = 'Saving…';
+  try { await setDoc(doc(db,'config','settings'), { requireLogin: on }, { merge:true });
+    document.getElementById('setMsg').textContent = on ? 'Login now REQUIRED — signed-out visitors see only Section 1.' : 'Login not required — the tool is open to everyone.';
+  } catch(e){ document.getElementById('setMsg').textContent = 'Could not save: ' + (e.code||e.message); }
+};
 onAuthStateChanged(auth, user => {
   document.getElementById('loginCard').classList.toggle('hide', !!user);
   document.getElementById('modCard').classList.toggle('hide', !user);
-  if (user) watchPending(); else if (unsub) unsub();
+  document.getElementById('setCard').classList.toggle('hide', !user);
+  if (user) { watchPending(); watchSettings(); } else if (unsub) unsub();
 });
 
 let PENDING = [];

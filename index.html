@@ -132,6 +132,14 @@ window.addEventListener('error',function(e){
   #topnav a:hover{color:#fff;background:#2f8fd0}
   #topnav a:active{transform:translateY(1px)}
   body.mapbig #topnav{display:none}
+  /* ---- Phase 2: login gate ---- */
+  #gateBanner{display:none}
+  body.gated #topnav{display:none}
+  body.gated .wrap>.card{display:none}
+  body.gated #sec1{display:block !important}
+  body.gated #gateBanner{display:block}
+  #authChip a{color:#7fd3ff;cursor:pointer;text-decoration:none;font-weight:700}
+  #authModal input{width:100%;padding:10px;border:1px solid var(--rule);border-radius:9px;font:inherit;margin:4px 0}
   .card{border-radius:14px;box-shadow:0 2px 10px rgba(20,40,60,.06);border-color:#e3e8ee;padding:15px 16px}
   .card>h2{font-size:15.5px;text-transform:none;letter-spacing:0;color:#12202e;font-weight:800;margin-bottom:9px;padding-bottom:8px;border-bottom:1px solid #eef1f5}
   .card .sub{color:#586977}
@@ -149,18 +157,41 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v53 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v55 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
-    <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+      <div id="authChip" style="color:#cfe0ee;font-size:12px"></div>
+      <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
+    </div>
   </div>
 </header>
 <nav id="topnav"><div class="navinner"><span class="navlbl">☰ Jump&nbsp;to</span><a href="#sec1">Gauges</a><a href="#sec3">Forecast</a><a href="#fuseCard">Fused</a><a href="#wxCard">Weather</a><a href="#secmap">Map</a><a href="#sec6">Report</a><a href="#archiveCard">Archive</a><a href="#sec7">History</a></div></nav>
 <div class="wrap">
 
+  <div id="gateBanner" style="background:linear-gradient(135deg,#12324f,#0f7a55);color:#fff;border-radius:12px;padding:16px 18px;margin-bottom:12px;box-shadow:0 2px 10px rgba(20,40,60,.15)">
+    <div style="font-size:17px;font-weight:800">🔒 Members-only below this preview</div>
+    <div style="font-size:13.5px;margin-top:6px;line-height:1.55;max-width:660px">You're seeing the live gauge ladder (Section 1) as a preview. The full ranch flood map, site-specific forecast, historical replays, field logging, rainfall, and the photo/event archive are open to family &amp; neighbors with a <b>free login</b>. This took a lot of work to build — a quick sign-in keeps it for the people who actually use it, and lets you get flood alerts.</div>
+    <button class="help-btn" style="margin-top:11px;background:#fff;color:#12324f;font-weight:800;border-color:#fff" onclick="openAuth()">🔑 Log in / Register (free)</button>
+  </div>
   <div id="alertBanner" style="margin-bottom:4px"></div>
   <div id="histBanner"></div>
 
+  <div id="authModal" class="modal" onclick="if(event.target===this)closeAuth()"><div class="box" style="max-width:400px">
+    <h3 id="authTitle">Log in</h3>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button class="sm" id="tabLogin" onclick="authTab('login')" style="flex:1;background:#0f8a5f;color:#fff">Log in</button>
+      <button class="sm" id="tabReg" onclick="authTab('register')" style="flex:1;background:#e9eef3;color:#12202e">Register</button>
+    </div>
+    <div id="regNameWrap" style="display:none"><input id="auName" placeholder="Your name"></div>
+    <input id="auEmail" type="email" placeholder="email" autocomplete="username">
+    <input id="auPass" type="password" placeholder="password" autocomplete="current-password">
+    <div id="authMsg" class="sub" style="margin:6px 0;min-height:16px;color:#8a1f1f"></div>
+    <button class="sm" id="authGo" onclick="authSubmit()" style="width:100%;background:#0f8a5f;color:#fff">Log in</button>
+    <button class="sm" onclick="doGoogle()" style="width:100%;margin-top:8px;background:#fff;border:1px solid var(--rule)">Continue with Google</button>
+    <button class="sm" onclick="closeAuth()" style="width:100%;margin-top:8px;background:#12202e;color:#fff">Close</button>
+    <div class="sub" style="margin-top:8px;font-size:11px;color:#98a2ad">Free. Your email is used only for sign-in and (if you opt in later) flood alerts.</div>
+  </div></div>
   <div id="buildModal" class="modal" onclick="if(event.target===this)closeBuildLog()"><div class="box" style="max-width:560px;max-height:85vh;display:flex;flex-direction:column">
     <h3 style="flex:none">🗒 Version / build log</h3>
     <div id="buildLogBody" style="flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;font-size:13px;line-height:1.5;color:#38414d"></div>
@@ -438,22 +469,34 @@ window.addEventListener('error',function(e){
 
   <!-- 6B EVENT ARCHIVE -->
   <div class="card" id="archiveCard">
-    <h2>📂 Flood event archive</h2>
-    <p class="sub">Save a flood — its crest, inundation, logs, notes and <b>photos/videos</b> — so it stays in the dashboard and can be reviewed later. On a phone the picker offers <b>Take Photo/Video</b> (capture in the field) or your library; on a desktop it opens files. <b>Download everything</b> makes an offline backup you can re-import.</p>
+    <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between"><span>📂 Flood event archive</span>
+      <input id="evSearch" placeholder="🔍 search name, notes, tags, year…" oninput="renderEvents()" style="flex:1;min-width:150px;max-width:340px;font:inherit;padding:6px 10px;border:1px solid var(--rule);border-radius:8px;font-weight:400"></h2>
+    <p class="sub">Save a flood — crest, inundation, logs, notes and <b>photos/videos</b>. For an <b>old/historic photo</b> (e.g., the 1935 flood), set its <b>Date</b> and <b>uncheck "attach current live…"</b> so it is not tagged with today's flood. You can also <b>prefill</b> from a known flood on record.</p>
     <div class="row" style="align-items:flex-start">
-      <input id="evName" placeholder="event name — e.g., July 2026 flood">
-      <button class="add sm" onclick="saveEvent()">➕ Save current as event</button>
+      <input id="evName" placeholder="event name — e.g., July 2026 flood, or 1935 flood">
+      <button class="add sm" onclick="saveEvent()">➕ Save as event</button>
     </div>
+    <div class="row" style="margin-top:8px;flex-wrap:wrap;gap:10px;align-items:center">
+      <label class="sub">Date of flood <input id="evDate" type="date" style="font:inherit;padding:5px 7px;border:1px solid var(--rule);border-radius:7px"></label>
+      <label class="sub">Peak crest ft <input id="evCrest" type="number" step="0.1" placeholder="opt" style="width:74px;font:inherit;padding:5px 7px;border:1px solid var(--rule);border-radius:7px"></label>
+      <label class="sub">Tags <input id="evTags" placeholder="Beulah, tropical, 1935" style="width:150px;font:inherit;padding:5px 7px;border:1px solid var(--rule);border-radius:7px"></label>
+      <label class="sub"><select id="evPrefill" onchange="prefillEvent(this.value)" style="font:inherit;padding:5px 7px;border:1px solid var(--rule);border-radius:7px"><option value="">prefill from a known flood…</option></select></label>
+    </div>
+    <label class="sub" style="display:flex;align-items:center;gap:7px;margin-top:8px"><input type="checkbox" id="evAttachLive" checked style="width:auto"> Attach the <b>current</b> live gauge crest + weather snapshot <span style="color:#98a2ad">— uncheck for old / historic photos</span></label>
     <label class="sub" style="display:block;margin-top:8px">Notes / observations</label>
     <textarea id="evNotes" rows="2" placeholder="what happened, what was seen, who reported…"></textarea>
     <label class="sub" style="display:block;margin-top:8px">📷 Add photos / videos</label>
     <input id="evMedia" type="file" accept="image/*,video/*" multiple onchange="stageMedia(this.files)">
     <div id="evMediaPreview" class="mediaGrid"></div>
     <div id="eventList" style="margin-top:10px"></div>
+    <div id="trashWrap" style="display:none;margin-top:8px"></div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="sm" onclick="exportAll()">⬇ Download everything (offline backup)</button>
       <label class="sm" style="cursor:pointer;padding:9px 13px;border:1px solid var(--rule);border-radius:8px;background:#f6f8fa">⬆ Import backup<input type="file" accept="application/json,.json" style="display:none" onchange="importAll(this.files&&this.files[0])"></label>
       <button class="sm" onclick="renderPresets()">📜 Historic floods on record</button>
+      <span class="sub" id="whoTag" style="margin-left:auto"></span>
+      <button class="sm" onclick="changeWho()">🙂 Your name</button>
+      <button class="sm" id="adminBtn" onclick="toggleAdmin()">🔒 Admin</button>
     </div>
     <div id="presetList" style="margin-top:8px"></div>
     <div class="sub" style="margin-top:8px">Saved on this device and in your downloadable backup (works offline). To also share photos/videos in the cloud for the whole family, we can add Firebase Storage next.</div>
@@ -1538,6 +1581,8 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v55','2026-07-29','Phase 2 — accounts. Added free login / register (email + Google) with a sign-in chip in the header. When the admin turns on \u201crequire login\u201d (from the moderation page), signed-out visitors see only Section 1 with a members-only teaser; a login unlocks the full tool. When it\u2019s off, the tool works for everyone as before. Foundation for flood-alert sign-ups.'],
+  ['v54','2026-07-29','Event archive: (1) fixed old-photo dating — set the flood Date, optional peak crest, and Tags, and uncheck \u201cattach current live\u201d so a 1935 photo is not tagged with today\u2019s numbers; prefill from a known flood. (2) Added a search box in the archive header (name/notes/tags/year). (3) Ownership + safety: entries record who added them, only that person (or the admin PIN) can edit/remove, and Remove is a soft-delete to a Trash that the admin can restore \u2014 nothing is permanently wiped by others.'],
   ['v53','2026-07-29','Added a drag bar under the Section 4 map (desktop): grab the \u201cdrag to resize\u201d strip and pull down to make the map taller (or up to shrink it). Double-click it to reset. Your chosen height is remembered.'],
   ['v52','2026-07-29','Historic floods now play as a TIME-LAPSE: pick one from Section 7 and the timeline slider scrubs the water rising, cresting, and receding (Play animates it too). Reset with Return to LIVE. The map now shows a bold HISTORICAL: <name> tag (top-right) that stays visible even when the map is expanded.'],
   ['v51','2026-07-29','The map now NEVER auto-moves on Play or on any layer toggle \u2014 your pan and zoom stay put no matter what. Only the initial load, Expand map, and the Reset-to-current button reposition it.'],
@@ -1705,7 +1750,18 @@ function idb(){return new Promise((res,rej)=>{ if(IDB)return res(IDB); try{const
 async function idbPut(k,b){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction('m','readwrite');t.objectStore('m').put(b,k);t.oncomplete=()=>res();t.onerror=rej;});}
 async function idbGet(k){const db=await idb();return new Promise((res)=>{const t=db.transaction('m','readonly');const q=t.objectStore('m').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>res(null);});}
 async function idbDel(k){const db=await idb();return new Promise((res)=>{const t=db.transaction('m','readwrite');t.objectStore('m').delete(k);t.oncomplete=()=>res();t.onerror=()=>res();});}
-function events(){try{return JSON.parse(localStorage.getItem('nueces_v2_events')||'[]')}catch(e){return[]}}
+function events_all(){try{return JSON.parse(localStorage.getItem('nueces_v2_events')||'[]')}catch(e){return[]}}
+function events(){return events_all().filter(function(e){return !e.deleted;});}
+function trashEvents(){return events_all().filter(function(e){return e.deleted;});}
+function whoCached(){try{return localStorage.getItem('nueces_who')||'';}catch(e){return '';}}
+function whoAmI(){var w=whoCached(); if(!w){w=((prompt('Your name (so the shared archive knows who added or changed what):','')||'').trim()); if(w){try{localStorage.setItem('nueces_who',w);}catch(e){}}} return w||'anon';}
+function changeWho(){var w=((prompt('Your name for the shared archive:', whoCached())||'').trim()); if(w){try{localStorage.setItem('nueces_who',w);}catch(e){} updateWhoTag(); renderEvents();}}
+function updateWhoTag(){var t=document.getElementById('whoTag'); if(t)t.textContent=(whoCached()?'you: '+whoCached():'← set your name');}
+var ADMIN=false; var ADMIN_PIN='miles1935';
+function toggleAdmin(){ if(ADMIN){ADMIN=false;} else { var p=(prompt('Owner/admin PIN (to manage or restore ANY event):','')||''); if(p!==ADMIN_PIN){ if(p!=='')alert('Wrong PIN.'); return;} ADMIN=true;} var b=document.getElementById('adminBtn'); if(b){b.textContent=ADMIN?'🔓 Admin ON':'🔒 Admin'; b.style.background=ADMIN?'#0f8a5f':''; b.style.color=ADMIN?'#fff':'';} renderEvents(); }
+function knownFloodRows(){try{return (typeof HISTX!=='undefined'?HISTX:HIST);}catch(e){return [];}}
+function fillPrefill(){var s=document.getElementById('evPrefill'); if(!s)return; var cur=s.value; var rows=knownFloodRows().slice().sort(function(a,b){return b[0]-a[0];}); s.innerHTML='<option value="">prefill from a known flood…</option>'+rows.map(function(r,i){return '<option value="'+i+'">'+((r[2]||r[1]))+' · '+(+r[0]).toFixed(1)+' ft</option>';}).join(''); s.value=cur;}
+function prefillEvent(i){ if(i===''||i==null)return; var rows=knownFloodRows().slice().sort(function(a,b){return b[0]-a[0];}); var r=rows[+i]; if(!r)return; var yrM=(''+(r[1]||'')).match(/\d{4}/); var nm=(r[2]||('Flood '+(r[1]||''))); var ev=document.getElementById('evName'); if(ev)ev.value=nm+(yrM&&(''+nm).indexOf(yrM[0])<0?' '+yrM[0]:''); var d=document.getElementById('evDate'); if(d&&yrM)d.value=yrM[0]+'-06-01'; var c=document.getElementById('evCrest'); if(c)c.value=(+r[0]).toFixed(1); var tg=document.getElementById('evTags'); if(tg)tg.value=(yrM?yrM[0]+', ':'')+'historic'; var al=document.getElementById('evAttachLive'); if(al)al.checked=false; }
 function saveEventsArr(a){localStorage.setItem('nueces_v2_events',JSON.stringify(a));}
 let STAGED=[];
 function compressImg(file){return new Promise(res=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height,M=1280;if(w>M||h>M){if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;}}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);c.toBlob(b=>res({blob:b||file,thumb:c.toDataURL('image/jpeg',0.45)}),'image/jpeg',0.75);};img.onerror=()=>res({blob:file,thumb:''});img.src=URL.createObjectURL(file);});}
@@ -1714,19 +1770,41 @@ function thumbHTML(m,onx){ const u=m.url||''; const inner=m.type==='image'?((u||
 async function paintVideoThumbs(container){ if(!container)return; const vids=container.querySelectorAll('video'); for(const v of vids){ if(v.getAttribute('src'))continue; const th=v.closest('.th'); if(!th)continue; const b=await idbGet(th.dataset.k); if(b){try{v.src=URL.createObjectURL(b);}catch(e){}} } }
 function renderStaged(){ const el=document.getElementById('evMediaPreview'); if(!el)return; el.innerHTML=STAGED.map(m=>thumbHTML(m,'unstage')).join(''); paintVideoThumbs(el); }
 function unstage(k){ STAGED=STAGED.filter(m=>m.key!==k); idbDel(k); renderStaged(); }
-async function saveEvent(){ const nm=(document.getElementById('evName').value||'').trim()||('Event '+new Date().toLocaleDateString()); const notes=(document.getElementById('evNotes').value||'').trim(); const hs=document.getElementById('histStart'),he=document.getElementById('histEnd');
-  const ev={id:'e'+Date.now(),name:nm,notes:notes,when:Date.now(),crest:parseFloat(document.getElementById('crest').value)||null,histStart:hs?hs.value:'',histEnd:he?he.value:'',media:STAGED.slice(),reports:reports(),hwm:hwm(),weather:currentWxSnapshot()};
-  const a=events();a.unshift(ev);saveEventsArr(a); if(window.__cloudSaveEvent){ try{ const blobs={}; for(const m of ev.media){ const b=await idbGet(m.key); if(b)blobs[m.key]=b; } window.__cloudSaveEvent(ev,blobs); }catch(e){} } STAGED=[];document.getElementById('evName').value='';document.getElementById('evNotes').value='';renderStaged();renderEvents(); }
-function delEvent(id){ if(!confirm('Delete this saved event? (kept in any downloaded backup)'))return; const a=events();const ev=a.find(e=>e.id===id); if(ev&&ev.media)ev.media.forEach(m=>idbDel(m.key)); saveEventsArr(a.filter(e=>e.id!==id)); if(window.__cloudDelEvent)window.__cloudDelEvent(id); renderEvents(); }
-function loadEvent(id){ const ev=events().find(e=>e.id===id); if(!ev)return; enterHistReview(ev.name+' · '+new Date(ev.when).toLocaleDateString(), ev.crest||null, {histStart:ev.histStart,histEnd:ev.histEnd}); }
-function renderEvents(){ const el=document.getElementById('eventList'); if(!el)return; const a=events(); if(!a.length){el.innerHTML='<div class="sub">No saved events yet — set a crest or load a replay, add notes/photos, then “Save current as event”.</div>';return;}
-  const esc=(x)=>String(x==null?'':x).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
-  el.innerHTML=a.map(ev=>'<div class="evcard"><div class="evh"><b>'+esc(ev.name)+'</b><span class="sub">'+new Date(ev.when).toLocaleDateString()+(ev.crest?' · crest '+ev.crest.toFixed(1)+' ft':'')+' · '+(ev.media?ev.media.length:0)+' media · '+((ev.reports||[]).length)+' logs</span></div>'+(ev.notes?'<div class="sub" style="margin-top:3px">'+esc(ev.notes)+'</div>':'')+((ev.weather&&wxSummary(ev.weather))?'<div class="sub" style="margin-top:3px">🌦 '+esc(wxSummary(ev.weather))+'</div>':'')+'<div class="mediaGrid" data-ev="'+ev.id+'">'+(ev.media||[]).map(m=>thumbHTML(m,'')).join('')+'</div><div style="margin-top:6px;display:flex;gap:6px"><button class="sm" onclick="loadEvent(\''+ev.id+'\')">↺ Load / replay</button><button class="sm" style="background:#8a1f1f" onclick="delEvent(\''+ev.id+'\')">✕ Delete</button></div></div>').join('');
-  el.querySelectorAll('.mediaGrid').forEach(g=>{paintVideoThumbs(g); g.querySelectorAll('.th').forEach(t=>{t.onclick=()=>openMedia(t.dataset.k,t.dataset.url,t.dataset.type);});}); if(window.renderComparePicker)renderComparePicker(); }
+async function saveEvent(){ var nm=(document.getElementById('evName').value||'').trim()||('Event '+new Date().toLocaleDateString());
+  var notes=(document.getElementById('evNotes').value||'').trim();
+  var attachEl=document.getElementById('evAttachLive'); var live=attachEl?attachEl.checked:true;
+  var dEl=document.getElementById('evDate'); var when=(dEl&&dEl.value)?new Date(dEl.value+'T12:00:00').getTime():Date.now();
+  var cEl=document.getElementById('evCrest'); var crestM=(cEl&&cEl.value!=='')?parseFloat(cEl.value):null;
+  var crest=(crestM!=null&&!isNaN(crestM))?crestM:(live?(parseFloat(document.getElementById('crest').value)||null):null);
+  var tEl=document.getElementById('evTags'); var tags=(tEl?tEl.value:'').split(',').map(function(x){return x.trim();}).filter(Boolean);
+  var hs=document.getElementById('histStart'),he=document.getElementById('histEnd'); var owner=whoAmI();
+  var ev={id:'e'+Date.now(),name:nm,notes:notes,when:when,crest:crest,tags:tags,owner:owner,createdBy:owner,createdAt:Date.now(),deleted:false,histStart:(live&&hs)?hs.value:'',histEnd:(live&&he)?he.value:'',media:STAGED.slice(),reports:live?reports():[],hwm:live?hwm():[],weather:live?currentWxSnapshot():null};
+  var a=events_all();a.unshift(ev);saveEventsArr(a);
+  if(window.__cloudSaveEvent){ try{ var blobs={}; for(var i=0;i<ev.media.length;i++){ var b=await idbGet(ev.media[i].key); if(b)blobs[ev.media[i].key]=b; } window.__cloudSaveEvent(ev,blobs); }catch(e){} }
+  STAGED=[];document.getElementById('evName').value='';document.getElementById('evNotes').value=''; if(cEl)cEl.value=''; if(tEl)tEl.value=''; renderStaged();renderEvents(); }
+function delEvent(id){ var all=events_all(); var ev=all.find(function(e){return e.id===id;}); if(!ev)return; var me=whoCached(); if(!(ADMIN||(ev.owner&&ev.owner===me))){ alert('Only '+(ev.owner||'the person who added this')+' (or the admin) can remove this — prevents accidentally deleting someone else\'s entry.'); return; } if(!confirm('Move "'+ev.name+'" to Trash? It is kept and can be restored by the admin — nothing is permanently erased.'))return; ev.deleted=true; ev.deletedBy=me||'anon'; ev.deletedAt=Date.now(); saveEventsArr(all); if(window.__cloudDelEvent)window.__cloudDelEvent(id, me||'anon'); renderEvents(); }
+function restoreEvent(id){ var all=events_all(); var ev=all.find(function(e){return e.id===id;}); if(!ev)return; ev.deleted=false; delete ev.deletedBy; delete ev.deletedAt; saveEventsArr(all); if(window.__cloudRestoreEvent)window.__cloudRestoreEvent(id); renderEvents(); }
+function purgeEvent(id){ if(!ADMIN){alert('Admin only.');return;} if(!confirm('PERMANENTLY delete this event and its photos for everyone? This cannot be undone.'))return; var all=events_all(); var ev=all.find(function(e){return e.id===id;}); if(ev&&ev.media)ev.media.forEach(function(m){idbDel(m.key);}); saveEventsArr(all.filter(function(e){return e.id!==id;})); if(window.__cloudPurgeEvent)window.__cloudPurgeEvent(id); renderEvents(); }
+function editEvent(id){ var all=events_all(); var ev=all.find(function(e){return e.id===id;}); if(!ev)return; var me=whoCached(); if(!(ADMIN||(ev.owner&&ev.owner===me))){ alert('Only '+(ev.owner||'its owner')+' or the admin can edit this.'); return; } var nm=prompt('Event name:',ev.name); if(nm===null)return; if(nm.trim())ev.name=nm.trim(); var d=prompt('Date (YYYY-MM-DD):', new Date(ev.when).toISOString().slice(0,10)); if(d){var t=new Date(d+'T12:00:00').getTime(); if(!isNaN(t))ev.when=t;} var c=prompt('Peak crest ft (blank = none):', ev.crest!=null?ev.crest:''); if(c!==null){var cv=c.trim(); ev.crest=(cv===''?null:parseFloat(cv));} var tg=prompt('Tags (comma-separated):',(ev.tags||[]).join(', ')); if(tg!==null)ev.tags=tg.split(',').map(function(x){return x.trim();}).filter(Boolean); var no=prompt('Notes:',ev.notes||''); if(no!==null)ev.notes=no; ev.editedBy=me||'anon'; ev.editedAt=Date.now(); saveEventsArr(all); if(window.__cloudSaveEvent){ (async function(){ try{ var blobs={}; for(var i=0;i<(ev.media||[]).length;i++){ if(!ev.media[i].url){ var b=await idbGet(ev.media[i].key); if(b)blobs[ev.media[i].key]=b; } } window.__cloudSaveEvent(ev,blobs); }catch(e){} })(); } renderEvents(); }
+function loadEvent(id){ var ev=events_all().find(function(e){return e.id===id;}); if(!ev)return; if(ev.crest && !(ev.histStart&&ev.histEnd) && typeof enterHistFlood==='function'){ enterHistFlood(ev.name+' · '+new Date(ev.when).toLocaleDateString(), ev.crest); } else { enterHistReview(ev.name+' · '+new Date(ev.when).toLocaleDateString(), ev.crest||null, {histStart:ev.histStart,histEnd:ev.histEnd}); } }
+function renderEvents(){ var el=document.getElementById('eventList'); if(!el)return; fillPrefill(); updateWhoTag(); var me=whoCached();
+  var esc=function(x){return String(x==null?'':x).replace(/[<>&]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c];});};
+  var q=((document.getElementById('evSearch')||{}).value||'').toLowerCase().trim();
+  var a=events(); if(q){ a=a.filter(function(ev){ var hay=(ev.name+' '+(ev.notes||'')+' '+((ev.tags||[]).join(' '))+' '+new Date(ev.when).getFullYear()+' '+(ev.owner||'')).toLowerCase(); return hay.indexOf(q)>=0; }); }
+  if(!a.length){ el.innerHTML='<div class="sub">'+(q?'No events match "'+esc(q)+'".':'No saved events yet — set a crest or load a replay, add notes/photos, then "Save as event". For an OLD photo, set its Date and uncheck "attach current live…".')+'</div>'; }
+  else { el.innerHTML=a.map(function(ev){ var can=ADMIN||(ev.owner&&ev.owner===me);
+    var tagsH=(ev.tags&&ev.tags.length)?'<div class="sub" style="margin-top:2px">🏷 '+ev.tags.map(esc).join(', ')+'</div>':'';
+    var ownH=ev.owner?'<span class="sub"> · added by '+esc(ev.owner)+'</span>':'';
+    var btns='<button class="sm" onclick="loadEvent(\''+ev.id+'\')">↺ Load / replay</button>'+(can?'<button class="sm" onclick="editEvent(\''+ev.id+'\')">✎ Edit</button><button class="sm" style="background:#8a1f1f" onclick="delEvent(\''+ev.id+'\')">🗑 Remove</button>':'<span class="sub" style="align-self:center;color:#98a2ad">🔒 only '+(esc(ev.owner)||'owner')+' can change</span>');
+    return '<div class="evcard"><div class="evh"><b>'+esc(ev.name)+'</b><span class="sub">'+new Date(ev.when).toLocaleDateString()+(ev.crest?' · crest '+(+ev.crest).toFixed(1)+' ft':'')+' · '+((ev.media||[]).length)+' media · '+((ev.reports||[]).length)+' logs</span>'+ownH+'</div>'+(ev.notes?'<div class="sub" style="margin-top:3px">'+esc(ev.notes)+'</div>':'')+tagsH+((ev.weather&&wxSummary(ev.weather))?'<div class="sub" style="margin-top:3px">🌦 '+esc(wxSummary(ev.weather))+'</div>':'')+'<div class="mediaGrid" data-ev="'+ev.id+'">'+(ev.media||[]).map(function(m){return thumbHTML(m,'');}).join('')+'</div><div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">'+btns+'</div></div>';
+  }).join(''); }
+  el.querySelectorAll('.mediaGrid').forEach(function(g){paintVideoThumbs(g); g.querySelectorAll('.th').forEach(function(t){t.onclick=function(){openMedia(t.dataset.k,t.dataset.url,t.dataset.type);};});});
+  var tw=document.getElementById('trashWrap'); if(tw){ var tr=trashEvents(); if(ADMIN&&tr.length){ tw.style.display='block'; tw.innerHTML='<div class="sub" style="margin:6px 0;font-weight:700;color:#8a1f1f">🗑 Trash ('+tr.length+') — admin can restore or permanently delete</div>'+tr.map(function(ev){return '<div class="evcard" style="opacity:.85"><div class="evh"><b>'+esc(ev.name)+'</b><span class="sub"> · removed by '+esc(ev.deletedBy||'?')+'</span></div><div style="margin-top:6px;display:flex;gap:6px"><button class="sm" onclick="restoreEvent(\''+ev.id+'\')">♻ Restore</button><button class="sm" style="background:#8a1f1f" onclick="purgeEvent(\''+ev.id+'\')">✕ Delete forever</button></div></div>';}).join(''); } else { tw.style.display='none'; tw.innerHTML=''; } }
+  if(window.renderComparePicker)renderComparePicker(); }
 async function openMedia(k,url,type){ let src=url; if(!src){ const b=await idbGet(k); if(!b)return; src=URL.createObjectURL(b); type=(b.type||''); } const isVid=(type||'').indexOf('video')>=0; const w=window.open('','_blank'); if(w){ w.document.write(isVid?'<body style="margin:0;background:#000"><video src="'+src+'" controls autoplay playsinline style="width:100%;height:100vh;object-fit:contain"></video>':'<body style="margin:0;background:#000"><img src="'+src+'" style="width:100%;height:100vh;object-fit:contain">'); } }
 function blobToB64(b){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b);});}
 function b64ToBlob(d){const p=d.split(',');const mime=(p[0].match(/:(.*?);/)||[])[1]||'application/octet-stream';const bin=atob(p[1]);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
-async function exportAll(){ const ls=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}}; const data={app:'NuecesReachModel',version:30,exported:new Date().toISOString(),events:events(),reports:reports(),hwm:hwm(),locations:ls('nueces_v2_loc'),scen:ls('nueces_v2_scen'),hist:ls('nueces_v2_hist'),rain:rainReports(),media:{}};
+async function exportAll(){ const ls=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}}; const data={app:'NuecesReachModel',version:30,exported:new Date().toISOString(),events:events_all(),reports:reports(),hwm:hwm(),locations:ls('nueces_v2_loc'),scen:ls('nueces_v2_scen'),hist:ls('nueces_v2_hist'),rain:rainReports(),media:{}};
   const keys=[]; data.events.forEach(ev=>(ev.media||[]).forEach(m=>keys.push(m.key)));
   for(const k of keys){ const b=await idbGet(k); if(b) data.media[k]=await blobToB64(b); }
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='NuecesRanch_archive_'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); }
@@ -1963,8 +2041,25 @@ function initMapResize(){
   handle.addEventListener('touchstart',down,{passive:false}); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
   handle.addEventListener('dblclick',function(){ mapEl.style.height='340px'; if(MAP){try{MAP.invalidateSize();}catch(e){}} try{localStorage.removeItem('nueces_map_h');}catch(e){} });
 }
+/* ================= AUTH + login gate (Phase 2) ================= */
+function realUser(){ var u=window.__user; return !!(u && !u.isAnonymous); }
+function updateAuthChip(){ var el=document.getElementById('authChip'); if(!el)return; if(realUser()){ var nm=(window.__user.displayName||window.__user.email||'signed in'); el.innerHTML='👤 '+nm+' · <a onclick="doLogout()">sign out</a>'; } else { el.innerHTML='<a onclick="openAuth()">🔑 Log in / Register</a>'; } }
+function applyGate(){ var need=!!(window.__settings&&window.__settings.requireLogin); document.body.classList.toggle('gated', need && !realUser()); }
+window.onAuthChange=function(u){ updateAuthChip(); applyGate(); };
+window.onSettings=function(s){ applyGate(); };
+function openAuth(){ var m=document.getElementById('authModal'); if(m){ authTab('login'); m.style.display='flex'; } }
+function closeAuth(){ var m=document.getElementById('authModal'); if(m)m.style.display='none'; var msg=document.getElementById('authMsg'); if(msg)msg.textContent=''; }
+var AUTH_MODE='login';
+function authTab(w){ AUTH_MODE=w; var nw=document.getElementById('regNameWrap'); if(nw)nw.style.display=(w==='register'?'block':'none'); var t=document.getElementById('authTitle'); if(t)t.textContent=(w==='register'?'Create a free account':'Log in'); var g=document.getElementById('authGo'); if(g)g.textContent=(w==='register'?'Register':'Log in'); var tl=document.getElementById('tabLogin'),tr=document.getElementById('tabReg'); if(tl){tl.style.background=(w==='login'?'#0f8a5f':'#e9eef3');tl.style.color=(w==='login'?'#fff':'#12202e');} if(tr){tr.style.background=(w==='register'?'#0f8a5f':'#e9eef3');tr.style.color=(w==='register'?'#fff':'#12202e');} }
+async function authSubmit(){ var msg=document.getElementById('authMsg'); var email=(document.getElementById('auEmail').value||'').trim(); var pass=document.getElementById('auPass').value||''; if(!email||!pass){ if(msg)msg.textContent='Enter email and password.'; return; } if(msg)msg.textContent='…';
+  try{ if(AUTH_MODE==='register'){ if(!window.__authRegister){ if(msg)msg.textContent='Sign-in unavailable (cloud is off in this copy).'; return;} var nm=(document.getElementById('auName').value||'').trim(); await window.__authRegister(email,pass,nm); } else { if(!window.__authLogin){ if(msg)msg.textContent='Sign-in unavailable (cloud is off in this copy).'; return;} await window.__authLogin(email,pass); } closeAuth(); }
+  catch(e){ if(msg)msg.textContent=(AUTH_MODE==='register'?'Could not register: ':'Could not log in: ')+((e&&(e.code||e.message))||'error').replace('auth/',''); } }
+async function doGoogle(){ var msg=document.getElementById('authMsg'); if(!window.__authGoogle){ if(msg)msg.textContent='Google sign-in unavailable.'; return;} try{ await window.__authGoogle(); closeAuth(); }catch(e){ if(msg)msg.textContent='Google sign-in failed: '+((e&&(e.code||e.message))||''); } }
+async function doLogout(){ try{ if(window.__authLogout)await window.__authLogout(); }catch(e){} updateAuthChip(); applyGate(); }
+
 function boot(){
   step(function(){ if(window.initRasters) initRasters(); });
+  step(function(){ if(window.updateAuthChip)updateAuthChip(); if(window.applyGate)applyGate(); });
   step(function(){ initMapResize(); });
   step(initDefaults);
   step(addHelpIcons);
@@ -2004,6 +2099,8 @@ import { getFirestore, collection, addDoc, setDoc, deleteDoc, doc, onSnapshot, q
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
+import { getAuth, onAuthStateChanged, signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, updateProfile }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const firebaseConfig = {
   apiKey:            "AIzaSyBsXL_nH9YB0gfQV8XYkw_JcnZEL_0b_E8",
@@ -2019,6 +2116,19 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const storage = getStorage(app);
+  /* ---------- AUTH + SETTINGS (Phase 2) ---------- */
+  const auth = getAuth(app);
+  window.__auth = auth;
+  window.__settings = { requireLogin:false };
+  function __maybeAnon(){ if(!window.__settings.requireLogin && !auth.currentUser){ signInAnonymously(auth).catch(function(){}); } }
+  onSnapshot(doc(db,'config','settings'), function(s){ window.__settings = Object.assign({requireLogin:false}, (s.exists()? s.data():{})); if(window.onSettings)window.onSettings(window.__settings); __maybeAnon(); });
+  onAuthStateChanged(auth, async function(user){ window.__user = user||null; if(user && !user.isAnonymous){ try{ await setDoc(doc(db,'users',user.uid), {uid:user.uid,name:user.displayName||'',email:user.email||'',lastSeen:serverTimestamp()}, {merge:true}); }catch(e){} } if(window.onAuthChange)window.onAuthChange(window.__user); __maybeAnon(); });
+  window.__authRegister = async function(email,pass,name){ const c=await createUserWithEmailAndPassword(auth,email,pass); if(name){ try{ await updateProfile(c.user,{displayName:name}); }catch(e){} } try{ await setDoc(doc(db,'users',c.user.uid),{uid:c.user.uid,name:name||'',email:email,createdAt:serverTimestamp()},{merge:true}); }catch(e){} return c.user; };
+  window.__authLogin = async function(email,pass){ return (await signInWithEmailAndPassword(auth,email,pass)).user; };
+  window.__authGoogle = async function(){ return (await signInWithPopup(auth,new GoogleAuthProvider())).user; };
+  window.__authLogout = async function(){ await signOut(auth); window.__user=null; if(window.onAuthChange)window.onAuthChange(null); __maybeAnon(); };
+  window.__saveSettings = async function(obj){ try{ await setDoc(doc(db,'config','settings'),obj,{merge:true}); return true; }catch(e){ return false; } };
+  window.__authReady = true;
   const badge = document.createElement('div');
   badge.style.cssText='position:fixed;bottom:8px;right:8px;background:#0f8a5f;color:#fff;font:600 11px sans-serif;padding:4px 9px;border-radius:20px;z-index:9998;opacity:.9';
   badge.textContent='\u{1F517} shared mode'; document.body.appendChild(badge);
@@ -2096,10 +2206,13 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
         if (b) { const r = ref(storage, 'events/' + ev.id + '/' + m.key); await uploadBytes(r, b); media.push({ key:m.key, type:m.type, url: await getDownloadURL(r), name:m.name||'' }); }
         else if (m.url) { media.push(m); }
       }
-      await setDoc(doc(db,'events',ev.id), { id:ev.id, name:ev.name, notes:ev.notes||'', when:ev.when, crest:ev.crest||null, histStart:ev.histStart||'', histEnd:ev.histEnd||'', weather:ev.weather||null, media:media, reports:ev.reports||[], hwm:ev.hwm||[] });
+      await setDoc(doc(db,'events',ev.id), { id:ev.id, name:ev.name, notes:ev.notes||'', when:ev.when, crest:ev.crest||null, tags:ev.tags||[], owner:ev.owner||'', createdBy:ev.createdBy||ev.owner||'', createdAt:ev.createdAt||ev.when||Date.now(), editedBy:ev.editedBy||'', editedAt:ev.editedAt||null, deleted:!!ev.deleted, deletedBy:ev.deletedBy||'', histStart:ev.histStart||'', histEnd:ev.histEnd||'', weather:ev.weather||null, media:media, reports:ev.reports||[], hwm:ev.hwm||[] }, { merge:true });
     } catch(e){ console.warn('cloud event', e); alert('Could not upload the event to the cloud ('+(e.code||e.message)+') — it is still saved on this device and in your backup.'); }
   };
-  window.__cloudDelEvent = function (id) { try{ deleteDoc(doc(db,'events',id)); }catch(e){} };
+  /* SOFT delete: mark hidden but keep the data + photos so nothing is permanently wiped; admin can restore */
+  window.__cloudDelEvent = function (id, who) { try{ setDoc(doc(db,'events',id), { deleted:true, deletedBy:who||'', deletedAt:Date.now() }, { merge:true }); }catch(e){} };
+  window.__cloudRestoreEvent = function (id) { try{ setDoc(doc(db,'events',id), { deleted:false, deletedBy:'', deletedAt:null }, { merge:true }); }catch(e){} };
+  window.__cloudPurgeEvent = function (id) { try{ deleteDoc(doc(db,'events',id)); }catch(e){} };
   window.__cloudReady = true;
   const _sb = document.createElement('span'); _sb.textContent=' · archive synced'; badge.appendChild(_sb);
   onSnapshot(collection(db,'events'), snap => {
