@@ -157,7 +157,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v55 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v56 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -188,7 +188,8 @@ window.addEventListener('error',function(e){
     <input id="auPass" type="password" placeholder="password" autocomplete="current-password">
     <div id="authMsg" class="sub" style="margin:6px 0;min-height:16px;color:#8a1f1f"></div>
     <button class="sm" id="authGo" onclick="authSubmit()" style="width:100%;background:#0f8a5f;color:#fff">Log in</button>
-    <button class="sm" onclick="doGoogle()" style="width:100%;margin-top:8px;background:#fff;border:1px solid var(--rule)">Continue with Google</button>
+    <div style="text-align:center;margin-top:7px"><a onclick="doReset()" style="color:#2f8fd0;cursor:pointer;font-size:12px;font-weight:600">Forgot password? Email me a reset link</a></div>
+    <button class="sm" onclick="doGoogle()" style="width:100%;margin-top:8px;background:#fff;color:#12202e;border:1px solid var(--rule)">Continue with Google</button>
     <button class="sm" onclick="closeAuth()" style="width:100%;margin-top:8px;background:#12202e;color:#fff">Close</button>
     <div class="sub" style="margin-top:8px;font-size:11px;color:#98a2ad">Free. Your email is used only for sign-in and (if you opt in later) flood alerts.</div>
   </div></div>
@@ -1581,6 +1582,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v56','2026-07-29','Login polish: fixed the invisible \u201cContinue with Google\u201d button, added a \u201cForgot password? Email me a reset link\u201d option, and made sign-in errors helpful \u2014 \u201cemail already in use\u201d switches you to Log in, unknown email switches to Register.'],
   ['v55','2026-07-29','Phase 2 — accounts. Added free login / register (email + Google) with a sign-in chip in the header. When the admin turns on \u201crequire login\u201d (from the moderation page), signed-out visitors see only Section 1 with a members-only teaser; a login unlocks the full tool. When it\u2019s off, the tool works for everyone as before. Foundation for flood-alert sign-ups.'],
   ['v54','2026-07-29','Event archive: (1) fixed old-photo dating — set the flood Date, optional peak crest, and Tags, and uncheck \u201cattach current live\u201d so a 1935 photo is not tagged with today\u2019s numbers; prefill from a known flood. (2) Added a search box in the archive header (name/notes/tags/year). (3) Ownership + safety: entries record who added them, only that person (or the admin PIN) can edit/remove, and Remove is a soft-delete to a Trash that the admin can restore \u2014 nothing is permanently wiped by others.'],
   ['v53','2026-07-29','Added a drag bar under the Section 4 map (desktop): grab the \u201cdrag to resize\u201d strip and pull down to make the map taller (or up to shrink it). Double-click it to reset. Your chosen height is remembered.'],
@@ -2053,9 +2055,15 @@ var AUTH_MODE='login';
 function authTab(w){ AUTH_MODE=w; var nw=document.getElementById('regNameWrap'); if(nw)nw.style.display=(w==='register'?'block':'none'); var t=document.getElementById('authTitle'); if(t)t.textContent=(w==='register'?'Create a free account':'Log in'); var g=document.getElementById('authGo'); if(g)g.textContent=(w==='register'?'Register':'Log in'); var tl=document.getElementById('tabLogin'),tr=document.getElementById('tabReg'); if(tl){tl.style.background=(w==='login'?'#0f8a5f':'#e9eef3');tl.style.color=(w==='login'?'#fff':'#12202e');} if(tr){tr.style.background=(w==='register'?'#0f8a5f':'#e9eef3');tr.style.color=(w==='register'?'#fff':'#12202e');} }
 async function authSubmit(){ var msg=document.getElementById('authMsg'); var email=(document.getElementById('auEmail').value||'').trim(); var pass=document.getElementById('auPass').value||''; if(!email||!pass){ if(msg)msg.textContent='Enter email and password.'; return; } if(msg)msg.textContent='…';
   try{ if(AUTH_MODE==='register'){ if(!window.__authRegister){ if(msg)msg.textContent='Sign-in unavailable (cloud is off in this copy).'; return;} var nm=(document.getElementById('auName').value||'').trim(); await window.__authRegister(email,pass,nm); } else { if(!window.__authLogin){ if(msg)msg.textContent='Sign-in unavailable (cloud is off in this copy).'; return;} await window.__authLogin(email,pass); } closeAuth(); }
-  catch(e){ if(msg)msg.textContent=(AUTH_MODE==='register'?'Could not register: ':'Could not log in: ')+((e&&(e.code||e.message))||'error').replace('auth/',''); } }
+  catch(e){ var code=((e&&(e.code||e.message))||'error');
+    if(code.indexOf('email-already-in-use')>=0){ authTab('login'); document.getElementById('auPass').value=''; if(msg){msg.style.color='#0f6b45';msg.textContent='That email is already registered — I switched you to Log in. Enter your password and tap Log in.';} return; }
+    if(code.indexOf('invalid-credential')>=0||code.indexOf('wrong-password')>=0||code.indexOf('invalid-login')>=0){ if(msg){msg.style.color='#8a1f1f';msg.textContent='Email or password not recognized. New here? Tap Register.';} return; }
+    if(code.indexOf('user-not-found')>=0){ authTab('register'); if(msg){msg.style.color='#8a1f1f';msg.textContent='No account for that email yet — I switched you to Register.';} return; }
+    if(code.indexOf('weak-password')>=0){ if(msg){msg.style.color='#8a1f1f';msg.textContent='Password too weak — use at least 6 characters.';} return; }
+    if(msg){msg.style.color='#8a1f1f';msg.textContent=(AUTH_MODE==='register'?'Could not register: ':'Could not log in: ')+code.replace('auth/','');} } }
 async function doGoogle(){ var msg=document.getElementById('authMsg'); if(!window.__authGoogle){ if(msg)msg.textContent='Google sign-in unavailable.'; return;} try{ await window.__authGoogle(); closeAuth(); }catch(e){ if(msg)msg.textContent='Google sign-in failed: '+((e&&(e.code||e.message))||''); } }
 async function doLogout(){ try{ if(window.__authLogout)await window.__authLogout(); }catch(e){} updateAuthChip(); applyGate(); }
+async function doReset(){ var msg=document.getElementById('authMsg'); var email=(document.getElementById('auEmail').value||'').trim(); if(!email){ if(msg){msg.style.color='#8a1f1f';msg.textContent='Type your email in the box above first, then tap this.'; } return; } if(!window.__authReset){ if(msg){msg.style.color='#8a1f1f';msg.textContent='Password reset unavailable (cloud off in this copy).';} return; } if(msg){msg.style.color='#38414d';msg.textContent='Sending reset link…';} try{ await window.__authReset(email); if(msg){msg.style.color='#0f6b45';msg.textContent='Reset link sent to '+email+'. Check your inbox (and spam), set a new password, then come back and Log in.';} }catch(e){ var code=((e&&(e.code||e.message))||'').replace('auth/',''); if(msg){msg.style.color='#8a1f1f';msg.textContent=(code.indexOf('user-not-found')>=0?'No account for that email yet — tap Register instead.':'Could not send reset: '+code);} } }
 
 function boot(){
   step(function(){ if(window.initRasters) initRasters(); });
@@ -2099,7 +2107,7 @@ import { getFirestore, collection, addDoc, setDoc, deleteDoc, doc, onSnapshot, q
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
-import { getAuth, onAuthStateChanged, signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, updateProfile }
+import { getAuth, onAuthStateChanged, signInAnonymously, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, updateProfile, sendPasswordResetEmail }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const firebaseConfig = {
@@ -2127,6 +2135,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   window.__authLogin = async function(email,pass){ return (await signInWithEmailAndPassword(auth,email,pass)).user; };
   window.__authGoogle = async function(){ return (await signInWithPopup(auth,new GoogleAuthProvider())).user; };
   window.__authLogout = async function(){ await signOut(auth); window.__user=null; if(window.onAuthChange)window.onAuthChange(null); __maybeAnon(); };
+  window.__authReset = async function(email){ await sendPasswordResetEmail(auth,email); };
   window.__saveSettings = async function(obj){ try{ await setDoc(doc(db,'config','settings'),obj,{merge:true}); return true; }catch(e){ return false; } };
   window.__authReady = true;
   const badge = document.createElement('div');
