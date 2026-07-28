@@ -158,7 +158,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v61 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v63 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -386,6 +386,10 @@ window.addEventListener('error',function(e){
       <select id="econInt" onchange="reContour('elev')" style="display:none;font-size:12px;padding:5px;border-radius:8px" title="Ground-elevation contour interval"><option value="auto">Auto · by zoom</option><option value="20">20 ft</option><option value="10">10 ft</option><option value="5">5 ft</option><option value="2">2 ft</option><option value="1">1 ft</option></select>
       <button class="sm" id="fconBtn" onclick="toggleFContours()">〰 Flood-stage lines</button>
       <select id="fconInt" onchange="reContour('flood')" style="display:none;font-size:12px;padding:5px;border-radius:8px" title="Flood-stage contour interval"><option value="auto">Auto · by zoom</option><option value="5">5 ft</option><option value="2">2 ft</option><option value="1">1 ft</option><option value="0.5">0.5 ft</option></select>
+      <span class="sub" style="width:100%;display:block;margin-top:4px">🧪 Compare model inundations:
+        <button class="sm" id="mdl_cal" onclick="toggleModelLayer('cal')" style="filter:grayscale(1) opacity(.55)">🟦 Calibrated</button>
+        <button class="sm" id="mdl_seed" onclick="toggleModelLayer('seed')" style="filter:grayscale(1) opacity(.55)">🟪 Baseline</button>
+        <button class="sm" id="mdl_lidar" onclick="toggleModelLayer('lidar')" style="filter:grayscale(1) opacity(.55)">🟧 LiDAR</button></span>
       <span class="sub" id="animClock"></span>
     </div>
     <div style="margin-top:8px">
@@ -464,9 +468,14 @@ window.addEventListener('error',function(e){
         <button class="sm" onclick="autoPeak()">⤓ Fill this flood's peak crest</button>
         <span class="sub" id="peakNote" style="margin-left:6px"></span>
       </div>
+      <div class="row" style="margin-top:6px">
+        <div><label>Seed from a past flood <span class="help">fills the peak from the NWPS record</span></label>
+          <select id="hKnown" onchange="fillKnownPeak()"><option value="">— pick a documented flood —</option></select></div>
+        <div><label>Flood label / year <span class="help">tags this mark</span></label><input id="hFloodTag" placeholder="e.g. 2018, Harvey, Beulah"></div>
+      </div>
       <div class="row" style="margin-top:8px">
         <div><button class="add sm" style="width:100%" onclick="addHWM()">＋ Add high-water mark &amp; re-fit</button></div>
-        <div><button class="sm" style="width:100%" onclick="resetHWM()">↺ Reset to seed (2013)</button></div>
+        <div><button class="sm" style="width:100%" onclick="resetHWM()">↺ Reset calibration to baseline</button></div>
       </div>
       <div style="margin-top:8px">
         <button class="sm" style="width:100%;background:#eef6f0;border-color:#0f8a5f;color:#0f6a4a" onclick="harvestReports()">🔄 Build marks from ALL reports (peak per spot)</button>
@@ -547,6 +556,8 @@ window.addEventListener('error',function(e){
     <label>Surface elevation (ft NAVD88)</label>
     <input id="mElev" type="number" step="0.1" placeholder="auto-calculated from USGS">
     <div class="help">Leave blank and tap “Auto” to pull it from USGS LiDAR, or type a known value to override.</div>
+    <label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-weight:600;color:#0f6b45"><input type="checkbox" id="mSurvey" style="width:auto"> 📐 Surveyed marker — this elevation is a known/surveyed value</label>
+    <div class="help">Check this when the elevation above is real survey data (not the LiDAR estimate). Surveyed markers give the sharpest calibration and are flagged 📐 in the pick-lists.</div>
     <div class="row" style="margin-top:12px">
       <div><button class="sm" style="width:100%" onclick="autoElev()">⛰ Auto elevation</button></div>
       <div><button class="add" style="width:100%" onclick="saveLoc()">Save</button></div>
@@ -816,7 +827,7 @@ function hwm(){try{return JSON.parse(localStorage.getItem('nueces_v2_hwm')||'[]'
 function saveHWM(a){localStorage.setItem('nueces_v2_hwm',JSON.stringify(a));}
 function reports(){try{return JSON.parse(localStorage.getItem('nueces_v2_reports')||'[]')}catch(e){return[]}}
 function saveReports(a){localStorage.setItem('nueces_v2_reports',JSON.stringify(a));}
-function anchors(){return [RANCH_SEED,...hwm().map(s=>({rm:s.rm,off:s.off,w:2.0}))];}
+function anchors(){return [RANCH_SEED,...hwm().map(s=>({rm:s.rm,off:s.off,w:(s.surveyed?4.0:2.0)}))];}
 function slope(){let n=0,d=0;for(const a of anchors()){n+=a.w*a.off*a.rm;d+=a.w*a.rm*a.rm;}return d>0?n/d:1.356;}
 function offsetAt(rm){return slope()*rm;}
 function wseAt(loc,crest){return TIL_ZERO+crest+offsetAt(riverMi(loc));}
@@ -918,6 +929,9 @@ function alertFor(t){
   if(t<15)return{lvl:'URGENT — GET OUT',msg:'~2–4 h to the back pens; access closing.',c:'#c1272d'};
   return{lvl:'FLOODPLAIN CUT OFF',msg:'Nueces, Winn Lake Slue, and Elm Creek all flooded.',c:'#7a1220'};
 }
+/* Official NOAA/NWS per-stage flood impacts for TILT2 (Nueces at Tilden) */
+const IMPACTS=[[31,'The Highway 16 bridge floor floods.'],[28,'Flow is to the top of the recorder shelf.'],[20,'Major flooding below Cotulla to below Tilden — extensive floodplain cut off, requiring wholesale evacuation of livestock. Hunting cabins, pump jacks, tank batteries, irrigation pumps and any low-lying equipment near the river flood.'],[19,'Major lowland flooding of livestock, roads, irrigation pumps and tank batteries. Fencing and hunting cabins are damaged.'],[18,'Flooding of livestock, roads, irrigation pumps and tank batteries. Fences and hunting cabins are damaged.'],[16,'Moderate lowland flooding. Hunting cabins, oil-field tanks and pumps are affected; livestock become isolated.'],[15,'Much of the floodplain below Cotulla to below Tilden is cut off as sloughs and side channels fill. Cabins, pump jacks and tank batteries flood well away from the channel; livestock cut off and can drown.'],[14,'Minor lowland flooding — sloughs and side channels cut off floodplain, isolating livestock and damaging equipment in low areas. Oil-field tanks and pump jacks flood.'],[11,'The main channel overflows its banks into side channels, isolating areas of the floodplain.']];
+function impactFor(st){ for(var i=0;i<IMPACTS.length;i++){ if(st>=IMPACTS[i][0]) return IMPACTS[i]; } return null; }
 /* Cotulla → Tilden transfer factor by mechanism (ft Tilden per ft Cotulla above 29) */
 const COTK={dry:0.35,wet:0.45,rain:0.6,tropic:0.7};
 function onCotulla(u){
@@ -960,8 +974,8 @@ function render(){
   const A=alertFor(crest);
   document.getElementById('alertBox').innerHTML=`<div id="alert" style="background:${A.c}">`+
     `<div style="font-size:11px;font-weight:700;opacity:.9;letter-spacing:.3px">PREDICTED IF TILDEN CRESTS AT ${crest.toFixed(1)} FT</div>`+
-    `<div class="lvl">${A.lvl}</div><div class="msg">${A.msg}</div></div>`;
-  drawLadder(crest);drawProfile(crest);renderLocs(crest);updateMap(crest);renderHist(crest);renderScen();renderReports();renderHWM();
+    `<div class="lvl">${A.lvl}</div><div class="msg">${A.msg}</div></div>`+(function(){var im=impactFor(crest);return im?('<div style="margin-top:6px;background:#fff6e6;border:1px solid #e2c37a;border-radius:8px;padding:8px 11px;font-size:12.5px;color:#5a4300"><b>🏛 NOAA official impact (≥'+im[0]+' ft):</b> '+im[1]+'</div>'):'';})();
+  drawLadder(crest);drawProfile(crest);renderLocs(crest);updateMap(crest);renderHist(crest);renderScen();renderReports();renderHWM();if(window.drawModelLayers)drawModelLayers();
   if(window.renderFusion)step(renderFusion);
 }
 
@@ -1231,7 +1245,7 @@ function openLoc(id){const m=document.getElementById('locModal');document.getEle
   const L=locs();const l=id?L.find(x=>x.id===id):null;
   document.getElementById('locModalTitle').textContent=l?'Edit location':'Add location';
   document.getElementById('mName').value=l?l.name:'';document.getElementById('mLat').value=l?l.lat:'';
-  document.getElementById('mLon').value=l?l.lon:'';document.getElementById('mElev').value=l?l.elev:'';
+  document.getElementById('mLon').value=l?l.lon:'';document.getElementById('mElev').value=l?l.elev:'';document.getElementById('mSurvey').checked=!!(l&&l.surveyed);
   m.style.display='flex';}
 function closeLoc(){document.getElementById('locModal').style.display='none';
   ['rWhere','hWhere'].forEach(id=>{const w=document.getElementById(id);if(w&&w.value==='__new')w.selectedIndex=0;});}
@@ -1248,9 +1262,10 @@ async function saveLoc(){
   if(isNaN(lat)||isNaN(lon)){alert('Enter valid coordinates.');return;}
   let elev=parseFloat(document.getElementById('mElev').value);
   if(isNaN(elev)){const v=await fetchElev(lat,lon);if(v!=null)elev=+v.toFixed(1);else{alert('Enter an elevation or connect to fetch it.');return;}}
+  const surveyed=document.getElementById('mSurvey').checked;
   const L=locs();
-  if(id){const l=L.find(x=>x.id===id);Object.assign(l,{name,lat,lon,elev});}
-  else {const nid='u'+Date.now(); L.push({id:nid,name,lat,lon,elev,seed:false}); window.__selectWhere=nid;}  // auto-select in Section 6
+  if(id){const l=L.find(x=>x.id===id);Object.assign(l,{name,lat,lon,elev,surveyed});}
+  else {const nid='u'+Date.now(); L.push({id:nid,name,lat,lon,elev,surveyed,seed:false}); window.__selectWhere=nid;}  // auto-select in Section 6
   saveLocs(L);closeLoc();render();
 }
 function delLoc(id){if(confirm('Delete this location?')){saveLocs(locs().filter(x=>x.id!==id));render();}}
@@ -1334,7 +1349,7 @@ function updateMap(crest){
 /* ================= reports + high-water marks ================= */
 async function fetchElev(lat,lon){try{const r=await fetch(`https://epqs.nationalmap.gov/v1/json?x=${lon}&y=${lat}&units=Feet&wkid=4326`).then(r=>r.json());return r.value;}catch(e){return null;}}
 function fillPicker(id){const s=document.getElementById(id);if(!s)return;const cur=s.value;s.innerHTML='';
-  locs().forEach(l=>{const o=document.createElement('option');o.value=l.id;o.textContent=l.name;s.appendChild(o);});
+  locs().forEach(l=>{const o=document.createElement('option');o.value=l.id;o.textContent=(l.surveyed?'📐 ':'')+l.name;s.appendChild(o);});
   const o=document.createElement('option');o.value='__new';o.textContent='➕ add a new location (map / coordinates)…';s.appendChild(o);
   if(window.__selectWhere&&window.__whichPicker===id){s.value=window.__selectWhere;}
   else if(cur)s.value=cur;}
@@ -1454,8 +1469,9 @@ async function addHWM(){
   const rm=riverMi(loc);
   const off=loc.elev+dep-TIL_ZERO-peak;                 // water rise above the gauge, at the PEAK
   if(!validCalib(off,rm,peak)) return;
+  const tag=((document.getElementById('hFloodTag')||{}).value||'').trim();
   const a=hwm();
-  a.unshift({id:'h'+Date.now(),t:new Date().toLocaleString(),event:'peak '+peak.toFixed(1)+' ft',where:loc.name,rm:+rm.toFixed(1),off:+off.toFixed(1),peak:+peak.toFixed(1)});
+  a.unshift({id:'h'+Date.now(),t:new Date().toLocaleString(),event:'peak '+peak.toFixed(1)+' ft'+(tag?' · '+tag:''),where:loc.name,rm:+rm.toFixed(1),off:+off.toFixed(1),peak:+peak.toFixed(1),surveyed:!!loc.surveyed,flood:tag});
   saveHWM(a);
   document.getElementById('hDep').value='';
   render();
@@ -1593,6 +1609,8 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v63','2026-07-29','Calibration Stage 2 + model compare. (1) In the map controls, \u201c🧪 Compare model inundations\u201d toggles overlay the same crest under three models in different colors \u2014 Calibrated (your marks), Baseline seed (2013), and LiDAR default \u2014 with a legend showing each model\u2019s slope, so you can see how the fit shifts the flood extent. (2) High-water marks can be seeded from a documented flood (a dropdown fills the peak crest from the NWPS record) and tagged by flood/year, so the least-squares fit spans multiple years; marks at 📐 surveyed markers are weighted more heavily.'],
+  ['v62','2026-07-29','Calibration Stage 1. Locations can now be flagged as 📐 surveyed markers (known/surveyed ground elevation) for the sharpest calibration — shown with a 📐 in the pick-lists. The forecast now shows the official NOAA/NWS per-stage impact statement for the predicted crest (e.g., at 20 ft: wholesale livestock evacuation, cabins/pumps/tanks flood). Verified the gauge datum is NAVD88 183.10 ft (matches the model). Reset button relabeled; multi-year seed marks come next.'],
   ['v61','2026-07-29','Promote to Section 7: admins get a \u2b50 Promote button on a saved flood so it appears in Section 7 as a documented flood with its full record (Load / Details). Quick Log app now has a 💧 Current water vs 🎯 High-water mark toggle so field crews can capture either in a couple taps (auto-GPS); field high-water marks arrive as provisional and the moderation page lets you set the flood\u2019s peak crest before approving (keeps calibration clean).'],
   ['v60','2026-07-29','Data export + housekeeping. Per-section CSV downloads (field logs, high-water marks, historic record, events), plus a \u201cDownload all data as ZIP\u201d (every CSV + the photos/videos + a re-importable JSON). Relabeled the archive backup button so it is clearly a full JSON backup. Event ownership is now tied to your LOGIN email (not the free-text name), so no one can accidentally take over or lose events by typing a name. Each saved flood now has a \u201c\ud83d\udccb Details\u201d button that opens all its captured data (notes, weather, logs, marks, photos) to review, with Close. Renamed the alert opt-in to \u201cEmail me Miles Ranch\u2013Nueces Reach Flood Notifications\u201d.'],
   ['v59','2026-07-29','Phase 4 foundation — email flood alerts. Logged-in users can opt in with a bell (\u201cEmail me Nueces River flood alerts\u201d). The moderation page has a Flood alerts composer that sends to all subscribers, plus gauge-threshold rules with a \u201ccheck gauges now\u201d that drafts an alert when a level is crossed, and a history of what was sent. Sending turns on once the Firebase email extension is connected (see the setup guide).'],
@@ -2135,9 +2153,32 @@ function eventDetail(id){ var ev=events_all().find(function(e){return e.id===id;
 function promoteEvent(id){ if(!ADMIN){ alert('Admins can promote a flood into Section 7 (Historical).'); return; } var all=events_all(); var ev=all.find(function(e){return e.id===id;}); if(!ev)return; ev.promoted=!ev.promoted; saveEventsArr(all); if(window.__cloudSaveEvent){ (async function(){ try{ window.__cloudSaveEvent(ev,{}); }catch(e){} })(); } renderEvents(); renderFeatured(); }
 function renderFeatured(){ var el=document.getElementById('featuredEvents'); if(!el)return; var f=events().filter(function(e){return e.promoted;}); var esc=function(x){return String(x==null?'':x).replace(/[<>&]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c];});}; if(!f.length){ el.innerHTML=''; return; }
   el.innerHTML='<div class="sub" style="font-weight:700;margin-bottom:4px">\u2605 Documented floods \u2014 full records</div>'+f.sort(function(a,b){return (b.when||0)-(a.when||0);}).map(function(ev){ return '<div class="evcard" style="padding:8px 10px;margin:4px 0"><div class="evh"><b>'+esc(ev.name)+'</b><span class="sub"> \u00b7 '+new Date(ev.when).toLocaleDateString()+(ev.crest!=null?' \u00b7 crest '+(+ev.crest).toFixed(1)+' ft':'')+' \u00b7 '+((ev.media||[]).length)+' media</span></div><div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap"><button class="sm" onclick="loadEvent(\''+ev.id+'\')">\u21ba Load / replay</button><button class="sm" onclick="eventDetail(\''+ev.id+'\')">\ud83d\udccb Details</button></div></div>'; }).join(''); }
+function floodURLslope(crest, S, rgb, alpha){
+  const on=floodBytes(), rmA=floodRM(); if(!on||!rmA)return '';
+  const base=FLOOD_RASTER.base0, step=FLOOD_RASTER.step, S0=FLOOD_RASTER.slope, rmsc=FLOOD_RASTER.rmscale||4;
+  const w=FLOOD_RASTER.w, hh=FLOOD_RASTER.h;
+  const cv=document.createElement('canvas');cv.width=w;cv.height=hh;const ctx=cv.getContext('2d');const im=ctx.createImageData(w,hh);const d=im.data;
+  for(let i=0;i<w*hh;i++){ const o=on[i]; if(o===255)continue; const onsetEff=(base+o*step)+(S0-S)*(rmA[i]/rmsc); if(onsetEff<=crest){ const j=i*4; d[j]=rgb[0];d[j+1]=rgb[1];d[j+2]=rgb[2];d[j+3]=(alpha||150);} }
+  ctx.putImageData(im,0,0); return cv.toDataURL();
+}
+const MODEL_DEFS=[
+  {key:'cal', name:'Calibrated (your marks)', rgb:[31,111,235], slope:function(){return slope();}},
+  {key:'seed', name:'Baseline seed (2013)', rgb:[224,85,158], slope:function(){return RANCH_SEED.off/RANCH_RM;}},
+  {key:'lidar', name:'LiDAR default', rgb:[240,150,60], slope:function(){return FLOOD_RASTER.slope;}}
+];
+var MODEL_ON={}, MODEL_LAYERS={}, MODELLEG=null;
+function toggleModelLayer(key){ if(!MAP)return; MODEL_ON[key]=!MODEL_ON[key]; var b=document.getElementById('mdl_'+key); if(b)b.style.filter=MODEL_ON[key]?'none':'grayscale(1) opacity(.55)'; drawModelLayers(); }
+function drawModelLayers(){ if(!MAP)return; var crest=parseFloat(document.getElementById('crest').value); var bounds=[[FLOOD_RASTER.south,FLOOD_RASTER.west],[FLOOD_RASTER.north,FLOOD_RASTER.east]];
+  MODEL_DEFS.forEach(function(m){ if(MODEL_ON[m.key]){ var url=floodURLslope(crest, m.slope(), m.rgb, 150); if(!url)return; if(MODEL_LAYERS[m.key]){MODEL_LAYERS[m.key].setUrl(url);} else {MODEL_LAYERS[m.key]=L.imageOverlay(url,bounds,{opacity:0.55,interactive:false}).addTo(MAP);} } else if(MODEL_LAYERS[m.key]){ try{MAP.removeLayer(MODEL_LAYERS[m.key]);}catch(e){} MODEL_LAYERS[m.key]=null; } });
+  var anyOn=MODEL_DEFS.some(function(m){return MODEL_ON[m.key];});
+  if(MODELLEG){try{MAP.removeControl(MODELLEG);}catch(e){}MODELLEG=null;}
+  if(anyOn){ MODELLEG=L.control({position:'bottomleft'}); MODELLEG.onAdd=function(){var dd=L.DomUtil.create('div');dd.style.cssText='background:rgba(18,32,46,.9);color:#fff;padding:6px 9px;border-radius:8px;font:600 11px sans-serif';dd.innerHTML='🧪 Models — slope ft/river-mi<br>'+MODEL_DEFS.filter(function(m){return MODEL_ON[m.key];}).map(function(m){return '<span style="display:inline-block;width:11px;height:11px;background:rgb('+m.rgb.join(',')+');margin-right:5px;border-radius:2px;vertical-align:middle"></span>'+m.name+' — <b>'+m.slope().toFixed(2)+'</b>';}).join('<br>');return dd;}; MODELLEG.addTo(MAP); }
+}
+function fillKnownPeak(){ var s=document.getElementById('hKnown'); if(!s||!s.value)return; var parts=s.value.split('|'); var pk=document.getElementById('hPeak'); if(pk)pk.value=parts[0]; var tg=document.getElementById('hFloodTag'); if(tg)tg.value=parts[1]||''; }
+function fillKnownFloods(){ var s=document.getElementById('hKnown'); if(!s)return; var KF=[['26.6','1967 Beulah'],['23.7','1935'],['23.5','2013'],['23.5','2002 Jul 19'],['22.9','2022'],['21.6','2007'],['21.2','2017'],['21.0','2018'],['20.0','1987'],['20.6','1980']]; s.innerHTML='<option value="">— pick a documented flood —</option>'+KF.map(function(k){return '<option value="'+k[0]+'|'+k[1]+'">'+k[1]+' — '+k[0]+' ft</option>';}).join(''); }
 function boot(){
   step(function(){ if(window.initRasters) initRasters(); });
-  step(function(){ if(window.updateAuthChip)updateAuthChip(); if(window.applyGate)applyGate(); if(window.refreshAdmin)refreshAdmin(); });
+  step(function(){ if(window.updateAuthChip)updateAuthChip(); if(window.applyGate)applyGate(); if(window.refreshAdmin)refreshAdmin(); if(window.fillKnownFloods)fillKnownFloods(); });
   step(function(){ initMapResize(); });
   step(initDefaults);
   step(addHelpIcons);
@@ -2248,16 +2289,17 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
     const rm = window.riverMi(loc);
     const off = loc.elev + dep - TILZ - peak;
     if (!window.validCalib(off, rm, peak)) return;
+    const tag = ((document.getElementById('hFloodTag')||{}).value||'').trim();
     try {
       await addDoc(collection(db,'hwm'),
-        { event:'peak '+peak.toFixed(1)+' ft', where:loc.name, rm:+rm.toFixed(1), off:+off.toFixed(1), peak:+peak.toFixed(1), status:'pending', t: serverTimestamp() });
+        { event:'peak '+peak.toFixed(1)+' ft'+(tag?' · '+tag:''), where:loc.name, rm:+rm.toFixed(1), off:+off.toFixed(1), peak:+peak.toFixed(1), surveyed:!!loc.surveyed, flood:tag, status:'pending', t: serverTimestamp() });
       document.getElementById('hDep').value='';
       alert('High-water mark sent for approval. It will re-fit the shared forecast once an admin approves it.');
     } catch(e){ alert('Could not send: '+(e.code||e.message)); }
   };
   onSnapshot(query(collection(db,'hwm'), where('status','==','approved')), snap => {
     const arr = snap.docs.map(d => { const s=d.data();
-      return { id:d.id, t:'(shared)', event:s.event, where:s.where, rm:s.rm, off:s.off, peak:s.peak }; })
+      return { id:d.id, t:'(shared)', event:s.event, where:s.where, rm:s.rm, off:s.off, peak:s.peak, surveyed:!!s.surveyed, flood:s.flood||'' }; })
       .filter(s => typeof s.off==='number' && typeof s.rm==='number');
     localStorage.setItem('nueces_v2_hwm', JSON.stringify(arr));
     if (window.render) window.render();
@@ -2265,13 +2307,13 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   window.delHWM = function(id){ try{ deleteDoc(doc(db,'hwm',id)); }catch(e){} };
 
   /* ---------- LOCATIONS: open shared map pins ---------- */
-  async function pushLoc(l){ try{ await setDoc(doc(db,'locations',l.id), {name:l.name,lat:l.lat,lon:l.lon,elev:l.elev}); }catch(e){} }
+  async function pushLoc(l){ try{ await setDoc(doc(db,'locations',l.id), {name:l.name,lat:l.lat,lon:l.lon,elev:l.elev,surveyed:!!l.surveyed}); }catch(e){} }
   const _saveLoc = window.saveLoc;
   window.saveLoc = async function(){ await _saveLoc(); for(const l of window.locs()){ if(!l.seed) await pushLoc(l); } };
   const _delLoc = window.delLoc;
   window.delLoc = function(id){ _delLoc(id); try{ deleteDoc(doc(db,'locations',id)); }catch(e){} };
   onSnapshot(collection(db,'locations'), snap => {
-    const remote = snap.docs.map(d => { const x=d.data(); return {id:d.id,name:x.name,lat:x.lat,lon:x.lon,elev:x.elev,seed:false}; });
+    const remote = snap.docs.map(d => { const x=d.data(); return {id:d.id,name:x.name,lat:x.lat,lon:x.lon,elev:x.elev,surveyed:!!x.surveyed,seed:false}; });
     const ids = new Set(remote.map(r=>r.id));
     const localExtra = window.locs().filter(l => !l.seed && !ids.has(l.id));
     localStorage.setItem('nueces_v2_loc', JSON.stringify((window.__seedLocs||[]).concat(remote, localExtra)));
