@@ -62,6 +62,11 @@ window.addEventListener('error',function(e){
   svg:not(.leaflet-zoom-animated){width:100%;height:auto;display:block}
   .leaflet-pane svg,.leaflet-container svg{width:auto;height:auto;max-width:none;display:block}
   #map{height:340px;border-radius:10px;border:1px solid var(--rule);margin-top:4px}
+  #mapResize{display:none}
+  @media (pointer:fine){ #mapResize{display:flex;align-items:center;justify-content:center;gap:8px;height:15px;margin-top:-2px;cursor:ns-resize;color:#8496a6;font-size:10.5px;font-weight:700;letter-spacing:3px;background:linear-gradient(#eef3f8,#dde6ef);border:1px solid var(--rule);border-top:none;border-radius:0 0 9px 9px;user-select:none;transition:background .12s,color .12s} }
+  #mapResize:hover{background:linear-gradient(#e2ebf4,#cfdbe8);color:#2f8fd0}
+  #mapResize:active{background:#cfdbe8}
+  body.mapbig #mapResize{display:none}
   body.mapbig #map{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;z-index:5000;border-radius:0;margin:0}
   body.mapbig #mapNote{font-size:12px}
   #mapExitBtn{position:fixed;top:12px;right:12px;z-index:5001;display:none;background:#12202e;color:#fff}
@@ -144,7 +149,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v52 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v53 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <button class="help-btn" onclick="openHelp('top')">📖 How&nbsp;to&nbsp;use</button>
@@ -324,6 +329,7 @@ window.addEventListener('error',function(e){
     <h2>4 · Satellite map</h2>
     <p class="sub">Markers turn <span style="color:var(--red)"><b>red</b></span> when the current scenario floods them, <span style="color:var(--grn)"><b>green</b></span> when dry. <b>Tap the map</b> to drop a new location (fills the Add form for you).</p>
     <div id="map"></div>
+    <div id="mapResize" title="Drag to make the map taller or shorter">⠿⠿⠿ drag to resize ⠿⠿⠿</div>
     <button id="mapExitBtn" class="sm" onclick="toggleMapSize()">✕ Close map</button>
     <div class="sub" id="mapNote" style="margin-top:6px"><b>Live reach map.</b> Channel: <span style="color:#1668e3;font-weight:700">blue</span> = at/above flood stage, <span style="color:#7a8794;font-weight:700">grey</span> = not yet · <span style="color:#00b3a4;font-weight:700">– – teal</span> Old Nueces oxbow · <span style="color:#6fbf2f;font-weight:700">– – green</span> Elm Creek · <span style="color:#b47fe0;font-weight:700">– – purple</span> Elm Slue · gauge dots turn <span style="color:#e01b1b;font-weight:700">red</span> above flood stage · 🌊 = flood front · translucent <span style="color:#2f7ff0;font-weight:700">blue fill</span> = predicted LiDAR inundation that fills continuously as you change the crest (toggle button). Esri imagery; tiles need internet.</div>
     <div id="histBar" style="margin:6px 0;padding:8px 11px;background:#7a1220;color:#fff;border-radius:8px;font-weight:700">📜 Reviewing historic flood: <span id="histBarName">—</span> <button class="sm" style="background:#12202e;margin-left:8px" onclick="resetLive()">↩ Reset to current conditions</button></div>
@@ -1532,6 +1538,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v53','2026-07-29','Added a drag bar under the Section 4 map (desktop): grab the \u201cdrag to resize\u201d strip and pull down to make the map taller (or up to shrink it). Double-click it to reset. Your chosen height is remembered.'],
   ['v52','2026-07-29','Historic floods now play as a TIME-LAPSE: pick one from Section 7 and the timeline slider scrubs the water rising, cresting, and receding (Play animates it too). Reset with Return to LIVE. The map now shows a bold HISTORICAL: <name> tag (top-right) that stays visible even when the map is expanded.'],
   ['v51','2026-07-29','The map now NEVER auto-moves on Play or on any layer toggle \u2014 your pan and zoom stay put no matter what. Only the initial load, Expand map, and the Reset-to-current button reposition it.'],
   ['v50','2026-07-29','Play flood advance (and the map layer toggles) no longer yank the map back to the ranch \u2014 they keep your current pan and zoom, only recentering if the ranch is not already on screen. Zoom into any spot and hit Play without losing your place.'],
@@ -1945,8 +1952,20 @@ function toggleContour(kind){ if(!MAP)return; var C=CONTOUR[kind]; C.on=!C.on;
 function toggleEContours(){ toggleContour('elev'); }
 function toggleFContours(){ toggleContour('flood'); }
 
+function initMapResize(){
+  var handle=document.getElementById('mapResize'), mapEl=document.getElementById('map'); if(!handle||!mapEl)return;
+  try{ var sv=localStorage.getItem('nueces_map_h'); if(sv){ mapEl.style.height=Math.max(220,Math.min(1600,+sv))+'px'; if(MAP){try{MAP.invalidateSize();}catch(e){}} } }catch(e){}
+  var drag=false,y0=0,h0=0;
+  function down(e){ if(document.body.classList.contains('mapbig'))return; drag=true; y0=(e.touches?e.touches[0].clientY:e.clientY); h0=mapEl.getBoundingClientRect().height; document.body.style.userSelect='none'; e.preventDefault(); }
+  function move(e){ if(!drag)return; var y=(e.touches?e.touches[0].clientY:e.clientY); mapEl.style.height=Math.max(220,Math.min(1600,h0+(y-y0)))+'px'; if(MAP){try{MAP.invalidateSize();}catch(_){}} }
+  function up(){ if(!drag)return; drag=false; document.body.style.userSelect=''; if(MAP){try{MAP.invalidateSize();}catch(_){}} try{localStorage.setItem('nueces_map_h',parseInt(mapEl.style.height,10)||340);}catch(e){} }
+  handle.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+  handle.addEventListener('touchstart',down,{passive:false}); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+  handle.addEventListener('dblclick',function(){ mapEl.style.height='340px'; if(MAP){try{MAP.invalidateSize();}catch(e){}} try{localStorage.removeItem('nueces_map_h');}catch(e){} });
+}
 function boot(){
   step(function(){ if(window.initRasters) initRasters(); });
+  step(function(){ initMapResize(); });
   step(initDefaults);
   step(addHelpIcons);
   step(function(){ if(AUTO){applyAuto();} });
