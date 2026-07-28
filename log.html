@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nueces — Quick Field Log</title>
+<title>Nueces River - Quick Field Log</title>
 <style>
   :root{--ink:#12202e;--mut:#6b7684;--rule:#d3d9e0;--grn:#0f8a5f;--blu:#1a6f8b;--red:#c1272d}
   *{box-sizing:border-box}
@@ -28,7 +28,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Nueces — Quick Field Log</h1>
+  <h1>Nueces River — Quick Field Log</h1>
   <p class="sub">See water? Log it in 10 seconds. Your phone grabs the location — you just add the depth.</p>
 
   <div class="card">
@@ -53,7 +53,7 @@
   </div>
 
   <p class="foot">Time is stamped automatically. This waits for approval before it moves the forecast.<br>
-  Full tracker: <a href="index.html">open the map & forecast →</a><br>
+  <a href="index.html" style="display:block;text-align:center;background:var(--blu);color:#fff;padding:15px;border-radius:12px;font-size:17px;font-weight:700;text-decoration:none;margin:6px 0 14px">🗺 Open the full tracker — map &amp; forecast →</a>
   Helper only — follow official NWS/NOAA warnings for anything dangerous.</p>
 </div>
 
@@ -116,10 +116,10 @@ window.submit = async function(){
     // A field log is a LIVE REPORT — shows on the shared map immediately.
     // It does NOT recalibrate the forecast (only high-water marks in the main tool do).
     await addDoc(collection(db,'reports'), {
-      who, where:nick, lat:LAT, lon:LON, depth:dep, tilden:TIL,
-      t:new Date().toLocaleString()+' (field)', ts:serverTimestamp()
+      who, where:nick, lat:LAT, lon:LON, depth:dep, tilden:TIL, status:'pending',
+      t:new Date().toLocaleString()+' (field)', epoch:Date.now(), ts:serverTimestamp()
     });
-    msg.innerHTML='<span class="ok">✓ Sent! It will show on the shared map. Thank you.</span>'+
+    msg.innerHTML='<span class="ok">✓ Sent! It will show on the shared map once an admin approves it. Thank you.</span>'+
       '<button class="gps" style="margin-top:12px" onclick="logAnother()">＋ Log another spot</button>';
     document.getElementById('dep').value='';document.getElementById('nick').value='';
     // require a fresh GPS grab before the next submit, so location/gauge/time are current

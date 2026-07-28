@@ -157,7 +157,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v56 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v58 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -1582,6 +1582,8 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v58','2026-07-29','Phase 3 — admin powers now tied to your login (no PIN). The archive \u201cAdmin\u201d lights up automatically when you sign in as an admin. The moderation page gates every control to admin emails, shows a \u201cnot an admin\u201d state otherwise, and has a new Admins & People section to add/remove admins and see registered accounts. Paired Firestore/Storage rules enforce it at the database.'],
+  ['v57','2026-07-29','Field logs are now moderated: a log submitted from the phone log page (or the tracker) is held as PENDING and only appears on the shared map after you approve it on the moderation page, which now has a Pending field logs queue (Approve / Reject). Reject is non-destructive.'],
   ['v56','2026-07-29','Login polish: fixed the invisible \u201cContinue with Google\u201d button, added a \u201cForgot password? Email me a reset link\u201d option, and made sign-in errors helpful \u2014 \u201cemail already in use\u201d switches you to Log in, unknown email switches to Register.'],
   ['v55','2026-07-29','Phase 2 — accounts. Added free login / register (email + Google) with a sign-in chip in the header. When the admin turns on \u201crequire login\u201d (from the moderation page), signed-out visitors see only Section 1 with a members-only teaser; a login unlocks the full tool. When it\u2019s off, the tool works for everyone as before. Foundation for flood-alert sign-ups.'],
   ['v54','2026-07-29','Event archive: (1) fixed old-photo dating — set the flood Date, optional peak crest, and Tags, and uncheck \u201cattach current live\u201d so a 1935 photo is not tagged with today\u2019s numbers; prefill from a known flood. (2) Added a search box in the archive header (name/notes/tags/year). (3) Ownership + safety: entries record who added them, only that person (or the admin PIN) can edit/remove, and Remove is a soft-delete to a Trash that the admin can restore \u2014 nothing is permanently wiped by others.'],
@@ -1759,8 +1761,11 @@ function whoCached(){try{return localStorage.getItem('nueces_who')||'';}catch(e)
 function whoAmI(){var w=whoCached(); if(!w){w=((prompt('Your name (so the shared archive knows who added or changed what):','')||'').trim()); if(w){try{localStorage.setItem('nueces_who',w);}catch(e){}}} return w||'anon';}
 function changeWho(){var w=((prompt('Your name for the shared archive:', whoCached())||'').trim()); if(w){try{localStorage.setItem('nueces_who',w);}catch(e){} updateWhoTag(); renderEvents();}}
 function updateWhoTag(){var t=document.getElementById('whoTag'); if(t)t.textContent=(whoCached()?'you: '+whoCached():'← set your name');}
-var ADMIN=false; var ADMIN_PIN='miles1935';
-function toggleAdmin(){ if(ADMIN){ADMIN=false;} else { var p=(prompt('Owner/admin PIN (to manage or restore ANY event):','')||''); if(p!==ADMIN_PIN){ if(p!=='')alert('Wrong PIN.'); return;} ADMIN=true;} var b=document.getElementById('adminBtn'); if(b){b.textContent=ADMIN?'🔓 Admin ON':'🔒 Admin'; b.style.background=ADMIN?'#0f8a5f':''; b.style.color=ADMIN?'#fff':'';} renderEvents(); }
+var ROOT_ADMIN='miles.george@yahoo.com';
+var ADMIN=false;
+function isAdminUser(){ var u=window.__user; if(!u||u.isAnonymous||!u.email)return false; var em=(''+u.email).toLowerCase(); if(em===ROOT_ADMIN)return true; var list=(window.__settings&&window.__settings.adminEmails)||[]; for(var i=0;i<list.length;i++){ if((''+list[i]).toLowerCase()===em)return true; } return false; }
+function refreshAdmin(){ ADMIN=isAdminUser(); var b=document.getElementById('adminBtn'); if(b){ if(ADMIN){ b.textContent='🔓 Admin (you)'; b.style.background='#0f8a5f'; b.style.color='#fff'; } else { b.textContent='🔒 Admin'; b.style.background=''; b.style.color=''; } } }
+function toggleAdmin(){ if(ADMIN)return; if(!realUser()){ openAuth(); return; } alert('Your account ('+((window.__user&&window.__user.email)||'')+') is not an admin. Ask George to add you as an admin on the moderation page.'); }
 function knownFloodRows(){try{return (typeof HISTX!=='undefined'?HISTX:HIST);}catch(e){return [];}}
 function fillPrefill(){var s=document.getElementById('evPrefill'); if(!s)return; var cur=s.value; var rows=knownFloodRows().slice().sort(function(a,b){return b[0]-a[0];}); s.innerHTML='<option value="">prefill from a known flood…</option>'+rows.map(function(r,i){return '<option value="'+i+'">'+((r[2]||r[1]))+' · '+(+r[0]).toFixed(1)+' ft</option>';}).join(''); s.value=cur;}
 function prefillEvent(i){ if(i===''||i==null)return; var rows=knownFloodRows().slice().sort(function(a,b){return b[0]-a[0];}); var r=rows[+i]; if(!r)return; var yrM=(''+(r[1]||'')).match(/\d{4}/); var nm=(r[2]||('Flood '+(r[1]||''))); var ev=document.getElementById('evName'); if(ev)ev.value=nm+(yrM&&(''+nm).indexOf(yrM[0])<0?' '+yrM[0]:''); var d=document.getElementById('evDate'); if(d&&yrM)d.value=yrM[0]+'-06-01'; var c=document.getElementById('evCrest'); if(c)c.value=(+r[0]).toFixed(1); var tg=document.getElementById('evTags'); if(tg)tg.value=(yrM?yrM[0]+', ':'')+'historic'; var al=document.getElementById('evAttachLive'); if(al)al.checked=false; }
@@ -2047,8 +2052,8 @@ function initMapResize(){
 function realUser(){ var u=window.__user; return !!(u && !u.isAnonymous); }
 function updateAuthChip(){ var el=document.getElementById('authChip'); if(!el)return; if(realUser()){ var nm=(window.__user.displayName||window.__user.email||'signed in'); el.innerHTML='👤 '+nm+' · <a onclick="doLogout()">sign out</a>'; } else { el.innerHTML='<a onclick="openAuth()">🔑 Log in / Register</a>'; } }
 function applyGate(){ var need=!!(window.__settings&&window.__settings.requireLogin); document.body.classList.toggle('gated', need && !realUser()); }
-window.onAuthChange=function(u){ updateAuthChip(); applyGate(); };
-window.onSettings=function(s){ applyGate(); };
+window.onAuthChange=function(u){ updateAuthChip(); applyGate(); if(window.refreshAdmin)refreshAdmin(); if(window.renderEvents)renderEvents(); };
+window.onSettings=function(s){ applyGate(); if(window.refreshAdmin)refreshAdmin(); if(window.renderEvents)renderEvents(); };
 function openAuth(){ var m=document.getElementById('authModal'); if(m){ authTab('login'); m.style.display='flex'; } }
 function closeAuth(){ var m=document.getElementById('authModal'); if(m)m.style.display='none'; var msg=document.getElementById('authMsg'); if(msg)msg.textContent=''; }
 var AUTH_MODE='login';
@@ -2067,7 +2072,7 @@ async function doReset(){ var msg=document.getElementById('authMsg'); var email=
 
 function boot(){
   step(function(){ if(window.initRasters) initRasters(); });
-  step(function(){ if(window.updateAuthChip)updateAuthChip(); if(window.applyGate)applyGate(); });
+  step(function(){ if(window.updateAuthChip)updateAuthChip(); if(window.applyGate)applyGate(); if(window.refreshAdmin)refreshAdmin(); });
   step(function(){ initMapResize(); });
   step(initDefaults);
   step(addHelpIcons);
@@ -2152,12 +2157,12 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
     const whenVal = document.getElementById('rWhen').value;
     const t = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : new Date().toLocaleString();
     try {
-      await addDoc(collection(db,'reports'), { who, where:loc.name, lat:loc.lat, lon:loc.lon, depth:dep, t, ts: serverTimestamp() });
-      document.getElementById('reportMsg').innerHTML = '<span style="color:#1a6f8b">\u2713 Added to the shared map.</span>';
+      await addDoc(collection(db,'reports'), { who, where:loc.name, lat:loc.lat, lon:loc.lon, depth:dep, t, status:'pending', ts: serverTimestamp() });
+      document.getElementById('reportMsg').innerHTML = '<span style="color:#1a6f8b">\u2713 Sent for approval \u2014 it appears on the shared map once an admin approves it.</span>';
       document.getElementById('rDep').value=''; document.getElementById('rWhen').value='';
     } catch(e){ alert('Could not send: '+(e.code||e.message)); }
   };
-  onSnapshot(collection(db,'reports'), snap => {
+  onSnapshot(query(collection(db,'reports'), where('status','==','approved')), snap => {
     const arr = snap.docs.map(d => ({ id:d.id, ...d.data() }))
       .sort((a,b)=> (b.ts?.seconds||0)-(a.ts?.seconds||0));
     localStorage.setItem('nueces_v2_reports', JSON.stringify(arr));

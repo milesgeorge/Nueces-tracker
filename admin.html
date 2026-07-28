@@ -21,7 +21,7 @@
 <body>
 <div class="wrap">
   <h1>Nueces Tracker — Moderation</h1>
-  <p class="muted">Approve or reject incoming <b>high-water marks</b>. Only approved ones re-calibrate the shared forecast. (Live map reports don't need approval.)</p>
+  <p class="muted">Approve or reject incoming <b>field logs</b> and <b>high-water marks</b>. Field logs only appear on the shared map after you approve them; high-water marks only re-calibrate the forecast after you approve them.</p>
 
   <div class="card" id="loginCard">
     <b>Admin sign-in</b>
@@ -29,6 +29,12 @@
     <input id="pass" type="password" placeholder="password">
     <button onclick="doLogin()">Sign in</button>
     <div class="muted" id="loginMsg" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card hide" id="notAdminCard">
+    <b>Signed in — but not an admin</b>
+    <p class="muted">This account (<span id="waEmail"></span>) doesn't have admin access. Ask George to add you, or sign out and use a different account.</p>
+    <button class="no" onclick="doLogout()">Sign out</button>
   </div>
 
   <div class="card hide" id="modCard">
@@ -43,10 +49,24 @@
     <div class="muted" id="empty" style="margin-top:8px">Nothing pending. 👍</div>
   </div>
 
+  <div class="card hide" id="logCard">
+    <b>Pending field logs (<span id="logCnt">0</span>)</b>
+    <div id="logList" style="margin-top:8px"></div>
+    <div class="muted" id="logEmpty" style="margin-top:8px">No field logs waiting. 👍</div>
+  </div>
+
   <div class="card hide" id="setCard">
     <b>⚙ Settings</b>
     <label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="reqLogin" onchange="saveReqLogin()" style="width:auto"> <span>Require login to use the tracker <span class="muted">— signed-out visitors see only Section 1 (the gauge ladder)</span></span></label>
     <div class="muted" id="setMsg" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card hide" id="peopleCard">
+    <b>Admins &amp; registered people</b>
+    <div style="display:flex;gap:8px;margin-top:8px"><input id="newAdmin" type="email" placeholder="add an admin by email" style="flex:1"> <button class="ok" onclick="addAdmin()">Add admin</button></div>
+    <div class="muted" id="adminMsg" style="margin-top:4px"></div>
+    <div id="adminList"></div>
+    <div style="margin-top:12px"><b>Registered accounts</b><div id="peopleList" class="muted" style="margin-top:6px">—</div></div>
   </div>
 
   <p class="muted">Config below must match the one in your tracker. A mark whose implied water-surface slope is outside ~0.6–2.0 ft/river-mile is auto-flagged <span class="flag">⚠ check</span> — that usually means the depth or the peak crest value is off.</p>
@@ -56,7 +76,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc }
+import { getFirestore, collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc, arrayUnion, arrayRemove }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 /* ▼▼▼ PASTE THE SAME firebaseConfig YOU PUT IN THE TRACKER ▼▼▼ */
@@ -84,7 +104,7 @@ window.doLogin = async () => {
 window.doLogout = () => signOut(auth);
 
 let unsubSet = null;
-function watchSettings(){ if(unsubSet) return; unsubSet = onSnapshot(doc(db,'config','settings'), s => { const v = s.exists()? s.data():{}; const cb=document.getElementById('reqLogin'); if(cb) cb.checked = !!v.requireLogin; }); }
+function watchSettings(){ if(unsubSet) return; unsubSet = onSnapshot(doc(db,'config','settings'), s => { const v = s.exists()? s.data():{}; ADMIN_EMAILS = v.adminEmails||[]; const cb=document.getElementById('reqLogin'); if(cb) cb.checked = !!v.requireLogin; renderAdmins(); applyAdminUI(); }); }
 window.saveReqLogin = async () => {
   const on = document.getElementById('reqLogin').checked;
   document.getElementById('setMsg').textContent = 'Saving…';
@@ -92,12 +112,26 @@ window.saveReqLogin = async () => {
     document.getElementById('setMsg').textContent = on ? 'Login now REQUIRED — signed-out visitors see only Section 1.' : 'Login not required — the tool is open to everyone.';
   } catch(e){ document.getElementById('setMsg').textContent = 'Could not save: ' + (e.code||e.message); }
 };
-onAuthStateChanged(auth, user => {
-  document.getElementById('loginCard').classList.toggle('hide', !!user);
-  document.getElementById('modCard').classList.toggle('hide', !user);
-  document.getElementById('setCard').classList.toggle('hide', !user);
-  if (user) { watchPending(); watchSettings(); } else if (unsub) unsub();
-});
+const ROOT_ADMIN = 'miles.george@yahoo.com';
+let CURRENT_USER = null, ADMIN_EMAILS = [], unsubPeople = null;
+function computeAdmin(){ if(!CURRENT_USER || !CURRENT_USER.email) return false; const em = CURRENT_USER.email.toLowerCase(); if(em===ROOT_ADMIN) return true; return ADMIN_EMAILS.map(x=>(''+x).toLowerCase()).includes(em); }
+function applyAdminUI(){
+  const signedIn = !!CURRENT_USER, admin = computeAdmin();
+  document.getElementById('loginCard').classList.toggle('hide', signedIn);
+  document.getElementById('notAdminCard').classList.toggle('hide', !(signedIn && !admin));
+  ['modCard','logCard','setCard','peopleCard'].forEach(id => { const el=document.getElementById(id); if(el) el.classList.toggle('hide', !admin); });
+  const wa=document.getElementById('waEmail'); if(wa && CURRENT_USER) wa.textContent = CURRENT_USER.email||'';
+  if(admin){ watchPending(); watchLogs(); watchPeople(); }
+  else { if(unsub){unsub();unsub=null;} if(unsubLogs){unsubLogs();unsubLogs=null;} if(unsubPeople){unsubPeople();unsubPeople=null;} }
+}
+function renderAdmins(){ const el=document.getElementById('adminList'); if(!el) return;
+  const all=[ROOT_ADMIN].concat(ADMIN_EMAILS.filter(e=>(''+e).toLowerCase()!==ROOT_ADMIN));
+  el.innerHTML='<div class="muted" style="margin-top:6px">Current admins:</div>'+all.map(e=>{const root=(''+e).toLowerCase()===ROOT_ADMIN; return '<div class="row"><span>'+esc(e)+(root?' <span class="muted">(owner)</span>':'')+'</span>'+(root?'':'<button class="sm no" onclick="removeAdmin(\''+esc(e)+'\')">Remove</button>')+'</div>';}).join(''); }
+window.addAdmin = async () => { const em=(document.getElementById('newAdmin').value||'').trim().toLowerCase(); const msg=document.getElementById('adminMsg'); if(!em){ msg.textContent='Enter an email.'; return; } try{ await setDoc(doc(db,'config','settings'), { adminEmails: arrayUnion(em) }, {merge:true}); msg.textContent='Added '+em+' as an admin.'; document.getElementById('newAdmin').value=''; }catch(e){ msg.textContent='Could not add: '+(e.code||e.message); } };
+window.removeAdmin = async (em) => { try{ await setDoc(doc(db,'config','settings'), { adminEmails: arrayRemove(em) }, {merge:true}); }catch(e){} };
+function watchPeople(){ if(unsubPeople) return; unsubPeople = onSnapshot(collection(db,'users'), snap => { const el=document.getElementById('peopleList'); if(!el) return; if(!snap.size){ el.textContent='No registered accounts yet.'; return; } el.innerHTML=snap.docs.map(d=>{ const u=d.data(); return '<div class="row"><span><b>'+esc(u.name||'\u2014')+'</b> '+esc(u.email||'')+'</span><button class="sm" onclick="makeAdmin(\''+esc(u.email||'')+'\')">Make admin</button></div>'; }).join(''); }); }
+window.makeAdmin = (em) => { if(em){ document.getElementById('newAdmin').value=em; window.addAdmin(); } };
+onAuthStateChanged(auth, user => { CURRENT_USER = user||null; watchSettings(); applyAdminUI(); });
 
 let PENDING = [];
 window.approveAll = async () => {
@@ -106,6 +140,7 @@ window.approveAll = async () => {
   for (const id of PENDING.slice()) { try { await updateDoc(doc(db,'hwm',id), { status:'approved' }); } catch(e){} }
 };
 function watchPending(){
+  if(unsub) return;
   const q = query(collection(db,'hwm'), where('status','==','pending'));
   unsub = onSnapshot(q, snap => {
     const list = document.getElementById('list'); list.innerHTML = '';
@@ -126,6 +161,31 @@ function watchPending(){
     });
     list.querySelectorAll('button').forEach(b => b.onclick = () => act(b.dataset.a, b.dataset.id));
   });
+}
+let unsubLogs = null;
+function watchLogs(){
+  if(unsubLogs) return;
+  const q = query(collection(db,'reports'), where('status','==','pending'));
+  unsubLogs = onSnapshot(q, snap => {
+    const list = document.getElementById('logList'); list.innerHTML = '';
+    document.getElementById('logCnt').textContent = snap.size;
+    document.getElementById('logEmpty').style.display = snap.size ? 'none' : 'block';
+    snap.forEach(d => { const s = d.data();
+      const dep = (typeof s.depth==='number') ? s.depth.toFixed(1) : s.depth;
+      const el = document.createElement('div'); el.className = 'row';
+      el.innerHTML = `<div><b>${esc(s.who||'\u2014')}</b> \u2014 ${esc(s.where||'')}<br>
+        <span class="muted">water depth ${dep} ft \u00b7 ${esc(s.t||'')}${s.tilden?(' \u00b7 Tilden '+(+s.tilden).toFixed(1)+' ft'):''}</span></div>
+        <div style="white-space:nowrap">
+          <button class="sm ok" data-la="ok" data-id="${d.id}">Approve</button>
+          <button class="sm no" data-la="no" data-id="${d.id}">Reject</button></div>`;
+      list.appendChild(el);
+    });
+    list.querySelectorAll('button').forEach(b => b.onclick = () => actLog(b.dataset.la, b.dataset.id));
+  });
+}
+async function actLog(a, id){ const ref = doc(db,'reports',id);
+  if (a === 'ok') await updateDoc(ref, { status:'approved' });
+  else await updateDoc(ref, { status:'rejected' });   // soft: kept, just off the map
 }
 async function act(a, id){
   const ref = doc(db,'hwm',id);
