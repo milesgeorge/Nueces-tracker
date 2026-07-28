@@ -71,7 +71,15 @@
 
   <div class="card hide" id="alertCard">
     <b>📣 Flood alerts (email)</b>
-    <p class="muted">Compose and send to everyone who opted in. Needs the email extension set up (see the Phase 4 guide) — until then, messages queue in the <code>mail</code> collection and go out once it's connected.</p>
+    <p class="muted">Compose and send to everyone who opted in. Sends via EmailJS straight from this page — set it up once below (see the guide).</p>
+    <details style="margin:4px 0 10px"><summary class="muted" style="cursor:pointer">✉ Email sending setup (EmailJS) — one time</summary>
+      <div style="margin-top:8px">
+        <input id="ejsService" placeholder="EmailJS Service ID (e.g. service_xxx)">
+        <input id="ejsTemplate" placeholder="EmailJS Template ID (e.g. template_xxx)">
+        <input id="ejsKey" placeholder="EmailJS Public Key">
+        <button class="sm ok" onclick="saveEjs()">Save sending setup</button> <span class="muted" id="ejsMsg"></span>
+      </div>
+    </details>
     <input id="alSubject" placeholder="Subject — e.g., Nueces River: rise expected at the ranch reach">
     <textarea id="alBody" rows="4" style="width:100%;padding:9px 10px;border:1px solid #d3d9e0;border-radius:8px;font:inherit;margin:4px 0" placeholder="Your message… (Cotulla crested at X ft — expect the ranch reach to rise in ~5 days. Move stock off the low ground.)"></textarea>
     <button class="ok" onclick="sendAlert()">Send to subscribers</button><span class="muted" id="alSubCount"></span>
@@ -95,6 +103,7 @@
   <p class="muted">Config below must match the one in your tracker. A mark whose implied water-surface slope is outside ~0.6–2.0 ft/river-mile is auto-flagged <span class="flag">⚠ check</span> — that usually means the depth or the peak crest value is off.</p>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
@@ -144,8 +153,8 @@ function applyAdminUI(){
   document.getElementById('notAdminCard').classList.toggle('hide', !(signedIn && !admin));
   ['modCard','logCard','setCard','peopleCard','alertCard'].forEach(id => { const el=document.getElementById(id); if(el) el.classList.toggle('hide', !admin); });
   const wa=document.getElementById('waEmail'); if(wa && CURRENT_USER) wa.textContent = CURRENT_USER.email||'';
-  if(admin){ watchPending(); watchLogs(); watchPeople(); watchAlerts(); }
-  else { if(unsub){unsub();unsub=null;} if(unsubLogs){unsubLogs();unsubLogs=null;} if(unsubPeople){unsubPeople();unsubPeople=null;} if(unsubRules){unsubRules();unsubRules=null;} if(unsubHist){unsubHist();unsubHist=null;} }
+  if(admin){ watchPending(); watchLogs(); watchPeople(); watchAlerts(); watchSecret(); }
+  else { if(unsub){unsub();unsub=null;} if(unsubLogs){unsubLogs();unsubLogs=null;} if(unsubPeople){unsubPeople();unsubPeople=null;} if(unsubRules){unsubRules();unsubRules=null;} if(unsubHist){unsubHist();unsubHist=null;} if(unsubSecret){unsubSecret();unsubSecret=null;} }
 }
 function renderAdmins(){ const el=document.getElementById('adminList'); if(!el) return;
   const all=[ROOT_ADMIN].concat(ADMIN_EMAILS.filter(e=>(''+e).toLowerCase()!==ROOT_ADMIN));
@@ -210,7 +219,9 @@ async function actLog(a, id){ const ref = doc(db,'reports',id);
   if (a === 'ok') await updateDoc(ref, { status:'approved' });
   else await updateDoc(ref, { status:'rejected' });   // soft: kept, just off the map
 }
-let unsubRules=null, unsubHist=null;
+let unsubRules=null, unsubHist=null, unsubSecret=null, EJS={};
+function watchSecret(){ if(unsubSecret) return; unsubSecret = onSnapshot(doc(db,"secrets","emailjs"), s => { EJS = s.exists()? s.data():{}; [["ejsService","serviceId"],["ejsTemplate","templateId"],["ejsKey","publicKey"]].forEach(p=>{ const el=document.getElementById(p[0]); if(el && !el.value && EJS[p[1]]) el.value=EJS[p[1]]; }); }); }
+window.saveEjs = async () => { const cfg={ serviceId:(document.getElementById("ejsService").value||"").trim(), templateId:(document.getElementById("ejsTemplate").value||"").trim(), publicKey:(document.getElementById("ejsKey").value||"").trim() }; const m=document.getElementById("ejsMsg"); try{ await setDoc(doc(db,"secrets","emailjs"),cfg,{merge:true}); EJS=cfg; m.textContent="Saved."; }catch(e){ m.textContent="Could not save: "+(e.code||e.message); } };
 async function updateSubCount(){ try{ const snap=await getDocs(query(collection(db,'users'), where('notifyEmail','==',true))); const el=document.getElementById('alSubCount'); if(el) el.textContent=' · '+snap.size+' subscriber'+(snap.size===1?'':'s'); }catch(e){} }
 function watchAlerts(){
   if(!unsubRules){ unsubRules = onSnapshot(collection(db,'alertRules'), snap => { const el=document.getElementById('rlList'); if(!el) return; if(!snap.size){ el.innerHTML='<span class="muted">No rules yet.</span>'; return; } el.innerHTML=snap.docs.map(d=>{ const r=d.data(); return '<div class="row"><span>'+esc(r.gauge)+' \u2265 '+r.thr+' ft \u2192 \u201c'+esc(r.msg||'')+'\u201d</span><button class="sm no" onclick="delRule(\''+d.id+'\')">Remove</button></div>'; }).join(''); }); }
@@ -226,12 +237,14 @@ window.sendAlert = async () => {
     const emails=snap.docs.map(d=>d.data().email).filter(Boolean);
     if(!emails.length){ msg.textContent='No one has opted in to alerts yet.'; return; }
     if(!confirm('Send this alert to '+emails.length+' subscriber(s)?')) { msg.textContent=''; return; }
-    const html='<div style="font-family:sans-serif;font-size:15px;line-height:1.5;color:#1d2430"><h2 style="color:#12324f;margin:0 0 8px">\ud83c\udf0a Nueces River Flood Alert</h2><p>'+esc(body).replace(/\n/g,'<br>')+'</p><hr style="border:none;border-top:1px solid #ddd"><p style="color:#888;font-size:12px">Miles Ranch \u2014 Nueces reach tracker. You opted in to alerts; reply to be removed.</p></div>';
-    await addDoc(collection(db,'mail'), { to:[CURRENT_USER.email], bcc:emails, message:{ subject:subj, text:body, html:html } });
+    if(!EJS.serviceId||!EJS.templateId||!EJS.publicKey){ msg.textContent='Set up EmailJS first (the "Email sending setup" box above).'; return; }
+    if(typeof emailjs==='undefined'){ msg.textContent='Email library did not load — refresh the page and try again.'; return; }
+    try{ emailjs.init({ publicKey: EJS.publicKey }); }catch(e){}
+    await emailjs.send(EJS.serviceId, EJS.templateId, { to_email: CURRENT_USER.email, bcc: emails.join(','), subject: subj, message: body });
     await addDoc(collection(db,'alerts'), { subject:subj, body:body, count:emails.length, by:(CURRENT_USER.email||''), ts:serverTimestamp() });
-    msg.textContent='Queued to '+emails.length+' subscriber(s). If the email extension is connected it sends now; otherwise it waits in the mail queue.';
+    msg.textContent='Sent to '+emails.length+' subscriber(s) via EmailJS.';
     document.getElementById('alSubject').value=''; document.getElementById('alBody').value='';
-  }catch(e){ msg.textContent='Could not send: '+(e.code||e.message); }
+  }catch(e){ msg.textContent='Send failed: '+((e&&(e.text||e.message||e.code))||'error'); }
 };
 window.addRule = async () => { const g=document.getElementById('rlGauge').value, thr=parseFloat(document.getElementById('rlThr').value), m=(document.getElementById('rlMsg').value||'').trim(); if(isNaN(thr)){ document.getElementById('rlMsg2').textContent='Enter a threshold in feet.'; return; } try{ await addDoc(collection(db,'alertRules'), { gauge:g, thr:thr, msg:m }); document.getElementById('rlThr').value=''; document.getElementById('rlMsg').value=''; }catch(e){ document.getElementById('rlMsg2').textContent='Could not add: '+(e.code||e.message); } };
 window.delRule = async (id) => { try{ await deleteDoc(doc(db,'alertRules',id)); }catch(e){} };
