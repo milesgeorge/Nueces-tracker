@@ -130,16 +130,11 @@ window.submit = async function(){
   msg.innerHTML='Sending…';
   try{
     if(MODE==='hwm'){
-      const rm = riverMi(LAT,LON);
-      const peak = (TIL!=null? TIL : null);
-      const off = (ELEV!=null && peak!=null) ? +(ELEV + dep - TIL_ZERO - peak).toFixed(2) : null;
-      await addDoc(collection(db,'hwm'), {
-        event:'field HWM'+(peak!=null?(' · prov. peak '+peak.toFixed(1)+' ft'):''),
-        where:nick, lat:LAT, lon:LON, elev:(ELEV!=null?ELEV:null), depth:dep,
-        rm:+rm.toFixed(2), peak:peak, off:off, provisional:true, who,
-        status:'pending', t:new Date().toLocaleString()+' (field)', epoch:Date.now(), ts:serverTimestamp()
+      await addDoc(collection(db,'reports'), {
+        who, where:nick, lat:LAT, lon:LON, depth:dep, kind:'highwater', tilden:TIL, status:'pending',
+        t:new Date().toLocaleString()+' (field)', epoch:Date.now(), ts:serverTimestamp()
       });
-      msg.innerHTML='<span class="ok">✓ High-water mark sent for approval. The admin confirms the flood\'s peak crest, then it sharpens the forecast. Thank you.</span>'+
+      msg.innerHTML='<span class="ok">✓ High-water line sent for approval. Once approved it shows in the log table as a 🎯 High-water entry, ready to become a crest anchor. Thank you.</span>'+
         '<button class="gps" style="margin-top:12px" onclick="logAnother()">＋ Log another spot</button>';
     } else {
       await addDoc(collection(db,'reports'), {
