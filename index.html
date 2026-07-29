@@ -158,7 +158,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v70 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v71 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -1302,7 +1302,7 @@ async function saveLoc(){
   else {const nid='u'+Date.now(); L.push({id:nid,name,lat,lon,elev,surveyed,seed:false}); window.__selectWhere=nid;}  // auto-select in Section 6
   saveLocs(L);closeLoc();render();
 }
-function delLoc(id){if(confirm('Delete this location?')){saveLocs(locs().filter(x=>x.id!==id));render();}}
+function delLoc(id,skip){if(!skip&&!confirm('Delete this location?'))return false;saveLocs(locs().filter(x=>x.id!==id));render();return true;}
 
 /* ================= satellite map ================= */
 let MAP=null, MARKERS=[], FRONTLAYER=[];
@@ -1403,6 +1403,7 @@ function updateMap(crest){
 async function fetchElev(lat,lon){try{const r=await fetch(`https://epqs.nationalmap.gov/v1/json?x=${lon}&y=${lat}&units=Feet&wkid=4326`).then(r=>r.json());return r.value;}catch(e){return null;}}
 function fillPicker(id){const s=document.getElementById(id);if(!s)return;const cur=s.value;s.innerHTML='';
   locs().forEach(l=>{const o=document.createElement('option');o.value=l.id;o.textContent=(l.surveyed?'📐 ':'')+l.name;s.appendChild(o);});
+  if(id==='hWhere'&&window.PENDING_LOC){const p=document.createElement('option');p.value='__pending';p.textContent='📍 '+window.PENDING_LOC.name+' (from log — saves when you press Add)';s.appendChild(p);}
   const o=document.createElement('option');o.value='__new';o.textContent='➕ add a new location (map / coordinates)…';s.appendChild(o);
   if(window.__selectWhere&&window.__whichPicker===id){s.value=window.__selectWhere;}
   else if(cur)s.value=cur;}
@@ -1458,7 +1459,7 @@ function renderReports(){
   });
 }
 function confirmDelReport(id){ if(confirm('Delete this log entry? This cannot be undone.')) delReport(id); }
-function untrackReport(id){ var r=reports().find(function(x){return x.id===id;}); if(!r)return; if(!confirm('Stop tracking the location "'+r.where+'"?'))return; locs().filter(function(l){return l.name===r.where && !l.seed;}).forEach(function(l){ delLoc(l.id); }); render(); }
+function untrackReport(id){ var r=reports().find(function(x){return x.id===id;}); if(!r)return; var mine=locs().filter(function(l){return l.name===r.where && !l.seed;}); if(!mine.length){render();return;} if(!confirm('Stop tracking the location "'+r.where+'"? This just removes the map pin \u2014 any crest anchor at this spot stays.'))return; mine.forEach(function(l){ delLoc(l.id,true); }); render(); }
 function unanchorReport(id){ var r=reports().find(function(x){return x.id===id;}); if(!r)return; var marks=hwm().filter(function(m){return m.where===r.where;}); if(!marks.length){render();return;} if(!confirm('Remove '+marks.length+' crest anchor(s) at "'+r.where+'"? The forecast will re-fit.'))return; marks.forEach(function(m){ delHWM(m.id); }); render(); }
 function setReportKind(id,kind){ var a=reports(); var r=a.find(function(x){return x.id===id;}); if(!r)return; r.kind=kind; saveReports(a); if(window.__updateReport)window.__updateReport(id,{kind:kind}); render(); }
 function openLogHelp(){ document.getElementById('logHelpModal').style.display='flex'; }
@@ -1493,18 +1494,21 @@ function reportToLocation(id){ var r=reports().find(function(x){return x.id===id
 async function promoteReport(id){
   const r=reports().find(x=>x.id===id); if(!r){return;}
   let loc=locs().find(l=>l.name===r.where);
-  if(!loc){
-    let elev=(r.lat!=null&&r.lon!=null)?await fetchElev(r.lat,r.lon):null;
-    if(elev==null){alert('Could not get a ground elevation for this spot. Add it as a location first, then promote.');return;}
-    loc={id:'u'+Date.now(),name:r.where,lat:r.lat,lon:r.lon,elev:+(+elev).toFixed(1),seed:false};
-    const L=locs();L.push(loc);saveLocs(L);
+  if(loc){ window.PENDING_LOC=null; refreshWhere(); document.getElementById('hWhere').value=loc.id; }
+  else {
+    if(r.lat==null||r.lon==null){alert('This log has no GPS coordinates, so it can’t be anchored directly. Add it as a location first, then anchor.');return;}
+    let elev=await fetchElev(r.lat,r.lon);
+    if(elev==null){alert('Could not get a ground elevation for this spot (offline?). Try again, or add it as a location first.');return;}
+    window.PENDING_LOC={name:r.where,lat:r.lat,lon:r.lon,elev:+(+elev).toFixed(1)};
+    refreshWhere();
+    document.getElementById('hWhere').value='__pending';
   }
-  refreshWhere();
-  document.getElementById('hWhere').value=loc.id;
   document.getElementById('hDep').value=(r.depth!=null?r.depth:0);
   await autoPeak();   // fill this flood's peak crest
-  document.getElementById('hWhere').scrollIntoView({behavior:'smooth',block:'center'});
-  document.getElementById('peakNote').textContent='Prefilled from "'+r.where+'". Confirm the flood’s PEAK crest above is right, then press ＋ Add high-water mark.';
+  var sel=document.getElementById('hWhere');
+  sel.scrollIntoView({behavior:'smooth',block:'center'});
+  try{ sel.style.boxShadow='0 0 0 3px #0f8a5f'; setTimeout(function(){sel.style.boxShadow='';},1800); }catch(e){}
+  document.getElementById('peakNote').textContent='Finishing the crest anchor for "'+r.where+'". Confirm the flood’s PEAK crest above, then press the green ＋ Add crest anchor button. Nothing is saved — and the location is NOT tracked — until you press it.';
 }
 /* HARVEST: turn ALL reports into calibration at once. For each location it takes the
    HIGHEST water-surface elevation reported (the envelope peak — random samples converge
@@ -1564,7 +1568,8 @@ async function autoPeak(){
   }catch(e){note.textContent='could not fetch — look up the crest on water.noaa.gov/gauges/TILT2 and type it.';}
 }
 async function addHWM(){
-  const loc=locs().find(x=>x.id===document.getElementById('hWhere').value);
+  var _sel=document.getElementById('hWhere').value;
+  const loc=(_sel==='__pending'&&window.PENDING_LOC)?window.PENDING_LOC:locs().find(x=>x.id===_sel);
   if(!loc){alert('Pick or add a location for the high-water line.');return;}
   const dep=parseFloat(document.getElementById('hDep').value);
   const peak=parseFloat(document.getElementById('hPeak').value);
@@ -1575,9 +1580,11 @@ async function addHWM(){
   if(!validCalib(off,rm,peak)) return;
   const tag=((document.getElementById('hFloodTag')||{}).value||'').trim();
   const a=hwm();
-  a.unshift({id:'h'+Date.now(),t:new Date().toLocaleString(),event:'peak '+peak.toFixed(1)+' ft'+(tag?' · '+tag:''),where:loc.name,rm:+rm.toFixed(1),off:+off.toFixed(1),peak:+peak.toFixed(1),surveyed:!!loc.surveyed,flood:tag});
+  a.unshift({id:'h'+Date.now(),t:new Date().toLocaleString(),event:'peak '+peak.toFixed(1)+' ft'+(tag?' · '+tag:''),where:loc.name,rm:+rm.toFixed(1),off:+off.toFixed(1),peak:+peak.toFixed(1),surveyed:!!loc.surveyed,flood:tag,lat:(loc.lat!=null?loc.lat:null),lon:(loc.lon!=null?loc.lon:null),elev:(loc.elev!=null?loc.elev:null)});
   saveHWM(a);
+  window.PENDING_LOC=null;
   document.getElementById('hDep').value='';
+  refreshWhere();
   render();
 }
 function delHWM(id){saveHWM(hwm().filter(x=>x.id!==id));render();}
@@ -1723,7 +1730,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
-  ["v70","2026-07-29","River-mile / slope reconciliation (verification). Checked the point model against the LiDAR/NHD raster: the ranch sits 11.7 river-miles above Tilden in BOTH, so the seed water-surface slope is ~2.09 ft per river-mile in both — they already agree, no reconciliation needed. The old 1.356 was only a dead fallback constant that was never actually used; replaced it with a value derived from the seed so it can never drift from the raster. Corrected the crest-anchor helper text to note the reach sits near 2.0 ft per river-mile."],["v69","2026-07-29","Owner edit for field logs. Every log now records who posted it (owner). The person who submitted a log — not just the admin — can Edit or Delete their OWN log; no one can touch someone else's. Crest-anchor / track-location and type changes stay admin-only. Enforced in the database rules, not just the UI."],['v68','2026-07-29','Log workflow polish + calibration fix. Once a log is anchored/tracked its button flips to ⚓ Unanchor ✓ / 🔖 Untrack ✓ so you can see it is done and undo it. Added a 🔔 pending-approval banner on the main page (admin only) so you know logs are waiting without checking the moderation page. Put an OR divider between the phone-logger button and the report box. Fixed the false Large-shift warning: it compared to the 1.356 seed so every real mark tripped it; now it flags only true OUTLIER marks (far from the others), and the crest-anchor table shows each mark rise, river-mile, and its own implied slope for transparency.'],
+  ["v71","2026-07-29","Fixed the Section-6 management buttons. Make crest anchor no longer silently creates a tracked location (that was why the Track button flipped instead of the anchor button). It now opens and highlights the green Confirm-the-peak form; the crest anchor — and only the anchor — is created when you press the green Add button, so the correct button flips to Unanchor. Untrack no longer double-asks (it asked once itself and again via the delete-location prompt); now a single confirm. Crest anchors now store their own GPS + elevation so they stay on the map even if the spot is later untracked."],["v70","2026-07-29","River-mile / slope reconciliation (verification). Checked the point model against the LiDAR/NHD raster: the ranch sits 11.7 river-miles above Tilden in BOTH, so the seed water-surface slope is ~2.09 ft per river-mile in both — they already agree, no reconciliation needed. The old 1.356 was only a dead fallback constant that was never actually used; replaced it with a value derived from the seed so it can never drift from the raster. Corrected the crest-anchor helper text to note the reach sits near 2.0 ft per river-mile."],["v69","2026-07-29","Owner edit for field logs. Every log now records who posted it (owner). The person who submitted a log — not just the admin — can Edit or Delete their OWN log; no one can touch someone else's. Crest-anchor / track-location and type changes stay admin-only. Enforced in the database rules, not just the UI."],['v68','2026-07-29','Log workflow polish + calibration fix. Once a log is anchored/tracked its button flips to ⚓ Unanchor ✓ / 🔖 Untrack ✓ so you can see it is done and undo it. Added a 🔔 pending-approval banner on the main page (admin only) so you know logs are waiting without checking the moderation page. Put an OR divider between the phone-logger button and the report box. Fixed the false Large-shift warning: it compared to the 1.356 seed so every real mark tripped it; now it flags only true OUTLIER marks (far from the others), and the crest-anchor table shows each mark rise, river-mile, and its own implied slope for transparency.'],
   ['v67','2026-07-29','Log workflow overhaul. Renamed to ⚓ Make crest anchor and 🔖 Track location; added a ? explainer covering the whole flow. Edit is now a full modal (type, who, where, GPS lat/lon, depth, time, notes) instead of just the name. When YOU (admin) add a crest anchor it now applies immediately and shows in the green section with a ✕ remove (before it was stuck pending/invisible). Delete on marks now confirms; the reset button is relabeled ↺ Clear all anchors (reset to seed). The phone logger’s 🎯 High-water now lands in the log table as a High-water type (ready to promote), instead of a separate hidden pending mark.'],
   ['v66','2026-07-29','Section 6 log system rebuilt. Each log is now typed 💧 Water report or 🎯 High-water, shown as a Type column. The old \u201c\u2192 mark\u201d button is renamed \u26d3 Make anchor mark (turns a log into a calibration anchor) with a tooltip; plus per-row \u270e Edit (review/fix captured data), \ud83d\udccd Location (save the spot as a tracked Section-3 location), and \ud83d\uddd1 Delete with an \u201care you sure\u201d confirm. The map now distinguishes them: blue = water report, amber = high-water log, red \u25c6 = anchor mark, with a \ud83d\udccd Field logs toggle. Managing/editing logs is admin-gated for now (owner-edit is the next step).'],
   ['v65','2026-07-29','Stage 3 finished. 📊 Model vs marks overlay drops a dot at each high-water mark colored by how far the calibrated model is from the measured value (green ≤0.5 ft, amber ≤1.5, red beyond) with an over/under tooltip — shows exactly where the single-slope model fits well or poorly. 🛰 NOAA FIM button is stubbed and greyed (their flood-inundation maps are not enabled for the Tilden gauge yet); it auto-checks each visit and lights up/works automatically if NOAA turns it on.'],
@@ -2424,7 +2431,8 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
 
   /* ---------- HIGH-WATER MARKS: moderated; only approved ones re-fit the model ---------- */
   window.addHWM = async function () {
-    const loc = window.locs().find(x => x.id === document.getElementById('hWhere').value);
+    const _sel = document.getElementById('hWhere').value;
+    const loc = (_sel==='__pending' && window.PENDING_LOC) ? window.PENDING_LOC : window.locs().find(x => x.id === _sel);
     if (!loc) { alert('Pick or add a location for the high-water line.'); return; }
     const dep = parseFloat(document.getElementById('hDep').value);
     const peak = parseFloat(document.getElementById('hPeak').value);
@@ -2437,8 +2445,8 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
     const admin = (typeof window.isAdminUser==='function') && window.isAdminUser();
     try {
       await addDoc(collection(db,'hwm'),
-        { event:'peak '+peak.toFixed(1)+' ft'+(tag?' · '+tag:''), where:loc.name, rm:+rm.toFixed(1), off:+off.toFixed(1), peak:+peak.toFixed(1), surveyed:!!loc.surveyed, flood:tag, status: admin?'approved':'pending', t: serverTimestamp() });
-      document.getElementById('hDep').value='';
+        { event:'peak '+peak.toFixed(1)+' ft'+(tag?' · '+tag:''), where:loc.name, rm:+rm.toFixed(1), off:+off.toFixed(1), peak:+peak.toFixed(1), surveyed:!!loc.surveyed, flood:tag, lat:(loc.lat!=null?loc.lat:null), lon:(loc.lon!=null?loc.lon:null), elev:(loc.elev!=null?loc.elev:null), status: admin?'approved':'pending', t: serverTimestamp() });
+      window.PENDING_LOC=null; document.getElementById('hDep').value=''; if(window.refreshWhere)window.refreshWhere();
       alert(admin ? 'Crest anchor added — the forecast re-fits with it now.' : 'Crest anchor sent for approval. It re-fits the shared forecast once an admin approves it.');
     } catch(e){ alert('Could not send: '+(e.code||e.message)); }
   };
@@ -2456,7 +2464,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   const _saveLoc = window.saveLoc;
   window.saveLoc = async function(){ await _saveLoc(); for(const l of window.locs()){ if(!l.seed) await pushLoc(l); } };
   const _delLoc = window.delLoc;
-  window.delLoc = function(id){ _delLoc(id); try{ deleteDoc(doc(db,'locations',id)); }catch(e){} };
+  window.delLoc = function(id,skip){ if(_delLoc(id,skip)!==false){ try{ deleteDoc(doc(db,'locations',id)); }catch(e){} } };
   onSnapshot(collection(db,'locations'), snap => {
     const remote = snap.docs.map(d => { const x=d.data(); return {id:d.id,name:x.name,lat:x.lat,lon:x.lon,elev:x.elev,surveyed:!!x.surveyed,seed:false}; });
     const ids = new Set(remote.map(r=>r.id));
