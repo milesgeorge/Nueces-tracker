@@ -158,7 +158,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v65 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v66 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -389,6 +389,7 @@ window.addEventListener('error',function(e){
       <span class="sub" style="width:100%;display:block;margin-top:6px">🌊 <b>Flood-extent model</b> (the blue fill):
         <button class="sm" id="fmCal" onclick="setFillModel('cal')">🟦 Calibrated (your marks)</button>
         <button class="sm" id="fmLidar" onclick="setFillModel('lidar')">🟧 Raw LiDAR</button>
+        <button class="sm" id="logsMapBtn" onclick="toggleLogsMap()">📍 Field logs</button>
         <span class="sub" id="fillNote"></span></span>
       <span class="sub" style="width:100%;display:block;margin-top:4px">🧪 Compare model inundations:
         <button class="sm" id="mdl_cal" onclick="toggleModelLayer('cal')" style="filter:grayscale(1) opacity(.55)">🟦 Calibrated</button>
@@ -446,7 +447,8 @@ window.addEventListener('error',function(e){
       </div>
       <button class="add sm" style="width:100%;margin-top:8px" onclick="addReport()">＋ Add report to the map</button>
       <div id="reportMsg" style="font-size:12.5px;margin-top:6px"></div>
-      <table id="reportTable"><thead><tr><th>time</th><th>who</th><th>where</th><th>depth</th><th></th></tr></thead><tbody></tbody></table>
+      <table id="reportTable"><thead><tr><th>type</th><th>when</th><th>who</th><th>where</th><th>depth</th><th>manage</th></tr></thead><tbody></tbody></table>
+      <div class="sub" style="margin-top:4px">Each log is a <b>💧 water report</b> (current/receding line) or a <b>🎯 high-water</b> observation. <b>⚓ Make anchor mark</b> turns one into a calibration anchor (feeds the forecast). On the map: blue = water report · amber = high-water log · red ◆ = anchor mark.</div>
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap"><button class="sm" onclick="dlReports()">⬇ Field logs (CSV)</button><button class="sm" onclick="dlHWM()">⬇ High-water marks (CSV)</button></div>
     </div>
 
@@ -1302,6 +1304,8 @@ function drawFloodAt(crest,frontRm){ if(!MAP)return;
   const bounds=[[FLOOD_RASTER.south,FLOOD_RASTER.west],[FLOOD_RASTER.north,FLOOD_RASTER.east]];
   if(FLOODIMG){ FLOODIMG.setUrl(url); } else { FLOODIMG=L.imageOverlay(url,bounds,{opacity:0.82,interactive:false}).addTo(MAP); }
   const b=document.getElementById('floodBtn'); if(b)b.textContent='🌊 Flood extent: '+crest.toFixed(1)+' ft'; }
+var LOGS_ON=true;
+function toggleLogsMap(){ LOGS_ON=!LOGS_ON; var b=document.getElementById('logsMapBtn'); if(b)b.style.filter=LOGS_ON?'none':'grayscale(1) opacity(.55)'; if(window.updateMap)updateMap(parseFloat(document.getElementById('crest').value)); }
 function drawFlood(){ if(!MAP||!FLOOD_ON)return; drawFloodAt(parseFloat(document.getElementById('crest').value)); }
 /* never auto-move the map — the user's pan/zoom is sacred. (Initial load + Expand + Reset still position it.) */
 function ensureReach(z){ /* intentionally a no-op */ }
@@ -1347,11 +1351,18 @@ function updateMap(crest){
     mk.bindTooltip(l.name,{direction:'top',className:'locLabel'});
     mk.addTo(MAP);MARKERS.push(mk);
   });
-  reports().forEach(r=>{ if(r.lat==null||r.lon==null)return;
-    const mk=L.circleMarker([r.lat,r.lon],{radius:6,color:'#fff',weight:1.5,fillColor:'#2f8fd0',fillOpacity:.9});
-    mk.bindPopup(`<b>report:</b> ${r.depth} ft<br>${r.where}<br>${r.t} — ${r.who}`);
-    mk.addTo(MAP);MARKERS.push(mk);
-  });
+  if(LOGS_ON){
+    reports().forEach(r=>{ if(r.lat==null||r.lon==null)return; var k=r.kind||'water'; var col=(k==='highwater')?'#e0a020':'#2f8fd0';
+      const mk=L.circleMarker([r.lat,r.lon],{radius:(k==='highwater'?7:6),color:'#fff',weight:1.5,fillColor:col,fillOpacity:.9});
+      mk.bindPopup('<b>'+(k==='highwater'?'high-water log':'water report')+':</b> '+(r.depth!=null?r.depth+' ft':'')+'<br>'+(r.where||'')+'<br>'+(r.t||'')+' — '+(r.who||''));
+      mk.addTo(MAP);MARKERS.push(mk);
+    });
+    hwm().forEach(function(m){ var ll=(m.lat!=null&&m.lon!=null)?[m.lat,m.lon]:(function(){var l=locs().find(function(x){return x.name===m.where;});return l?[l.lat,l.lon]:null;})(); if(!ll)return;
+      var mk=L.marker(ll,{icon:L.divIcon({className:'',html:'<div style=\'width:12px;height:12px;background:#c1272d;border:2px solid #fff;transform:rotate(45deg);box-shadow:0 0 2px rgba(0,0,0,.6)\'></div>',iconSize:[12,12],iconAnchor:[6,6]})});
+      mk.bindPopup('<b>⚓ anchor mark:</b> '+(m.where||'')+'<br>peak '+(m.peak!=null?(+m.peak).toFixed(1)+' ft':'?')+' · rise '+(m.off!=null?(+m.off).toFixed(1)+' ft':'?'));
+      mk.addTo(MAP);MARKERS.push(mk);
+    });
+  }
   const cS=gval('nCot'), tS=gval('nTil');
   [['Cotulla (COTT2)',28.42611,-99.23972,cS,15],['Tilden (TILT2)',28.30889,-98.55724,tS,14]].forEach(g=>{
     const fl=g[4],st=g[3], col=st==null?'#8aa0b4':(st>=fl?'#e01b1b':(st>=fl-3?'#e08a00':'#11b866'));
@@ -1394,10 +1405,37 @@ async function addReport(){
 function delReport(id){saveReports(reports().filter(x=>x.id!==id));render();}
 function renderReports(){
   const b=document.querySelector('#reportTable tbody');if(!b)return;b.innerHTML='';
-  reports().slice(0,25).forEach(r=>{const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${r.t}</td><td>${r.who}</td><td>${r.where}</td><td>${r.depth} ft</td>`+
-      `<td style="white-space:nowrap"><button class="sm" style="padding:3px 7px" title="Promote to a high-water mark (calibrates the model)" onclick="promoteReport('${r.id}')">→ mark</button> <button class="sm" style="padding:3px 7px;background:#8a1f1f" onclick="delReport('${r.id}')">✕</button></td>`;
-    b.appendChild(tr);});
+  const esc=function(x){return String(x==null?'':x).replace(/[<>&]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c];});};
+  reports().slice(0,60).forEach(function(r){ var tr=document.createElement('tr'); var k=r.kind||'water';
+    var typeCell = ADMIN
+      ? '<select onchange="setReportKind(\''+r.id+'\',this.value)" style="font-size:12px;padding:2px 4px"><option value="water"'+(k==='water'?' selected':'')+'>💧 Water</option><option value="highwater"'+(k==='highwater'?' selected':'')+'>🎯 High-water</option></select>'
+      : (k==='highwater'?'🎯 High-water':'💧 Water');
+    var actions = ADMIN
+      ? '<button class="sm" style="padding:3px 7px" title="Turn this into a high-water mark that CALIBRATES the model (an anchor)" onclick="promoteReport(\''+r.id+'\')">⚓ Make anchor mark</button> '
+        +'<button class="sm" style="padding:3px 7px" title="Edit this log’s captured data" onclick="editReport(\''+r.id+'\')">✎ Edit</button> '
+        +'<button class="sm" style="padding:3px 7px" title="Save this spot as a tracked location (Section 3)" onclick="reportToLocation(\''+r.id+'\')">📍 Location</button> '
+        +'<button class="sm" style="padding:3px 7px;background:#8a1f1f" title="Delete this log" onclick="confirmDelReport(\''+r.id+'\')">🗑</button>'
+      : '<span class="sub">view only</span>';
+    tr.innerHTML='<td>'+typeCell+'</td><td>'+esc(r.t)+'</td><td>'+esc(r.who)+'</td><td>'+esc(r.where)+'</td><td>'+(r.depth!=null?esc(r.depth)+' ft':'')+'</td><td style="white-space:nowrap">'+actions+'</td>';
+    b.appendChild(tr);
+  });
+}
+function confirmDelReport(id){ if(confirm('Delete this log entry? This cannot be undone.')) delReport(id); }
+function setReportKind(id,kind){ var a=reports(); var r=a.find(function(x){return x.id===id;}); if(!r)return; r.kind=kind; saveReports(a); if(window.__updateReport)window.__updateReport(id,{kind:kind}); render(); }
+function editReport(id){ var a=reports(); var r=a.find(function(x){return x.id===id;}); if(!r)return;
+  var who=prompt('Who reported:', r.who||''); if(who===null)return; if(who.trim())r.who=who.trim();
+  var where=prompt('Where (spot name):', r.where||''); if(where!==null&&where.trim())r.where=where.trim();
+  var dep=prompt('Water depth / high-water height (ft):', r.depth!=null?r.depth:''); if(dep!==null){var dv=parseFloat(dep); if(!isNaN(dv))r.depth=dv;}
+  var kind=prompt('Type — type "water" or "highwater":', r.kind||'water'); if(kind!==null){kind=kind.trim().toLowerCase(); r.kind=(kind.indexOf('high')>=0)?'highwater':'water';}
+  r.editedBy=((realUser()&&window.__user)?window.__user.email:(whoCached()||'anon')); r.editedAt=Date.now();
+  saveReports(a); if(window.__updateReport)window.__updateReport(id,{who:r.who,where:r.where,depth:r.depth,kind:r.kind,editedBy:r.editedBy,editedAt:r.editedAt}); render();
+}
+function reportToLocation(id){ var r=reports().find(function(x){return x.id===id;}); if(!r)return; if(r.lat==null||r.lon==null){alert('This log has no GPS coordinates to build a location from.');return;}
+  var L=locs(); if(L.find(function(l){return l.name===r.where;})){alert('A location named "'+r.where+'" already exists — this spot is already tracked.');return;}
+  (async function(){ var elev=await fetchElev(r.lat,r.lon); if(elev==null){alert('Could not fetch a ground elevation for this spot (offline?). Add it via Section 3 instead.');return;}
+    var nl={id:'u'+Date.now(),name:(r.where||('log '+new Date(r.epoch||Date.now()).toLocaleDateString())),lat:r.lat,lon:r.lon,elev:+(+elev).toFixed(1),seed:false};
+    L.push(nl); saveLocs(L); if(window.__pushLoc)window.__pushLoc(nl); render(); alert('Saved "'+nl.name+'" as a tracked location. It now appears in the Section 3 / calibration pick-lists.');
+  })();
 }
 /* Turn a live report (usually the farthest/deepest one at a spot) into a high-water
    mark: prefill the calibration form with its location + depth and this flood's peak,
@@ -1625,6 +1663,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ['v66','2026-07-29','Section 6 log system rebuilt. Each log is now typed 💧 Water report or 🎯 High-water, shown as a Type column. The old \u201c\u2192 mark\u201d button is renamed \u26d3 Make anchor mark (turns a log into a calibration anchor) with a tooltip; plus per-row \u270e Edit (review/fix captured data), \ud83d\udccd Location (save the spot as a tracked Section-3 location), and \ud83d\uddd1 Delete with an \u201care you sure\u201d confirm. The map now distinguishes them: blue = water report, amber = high-water log, red \u25c6 = anchor mark, with a \ud83d\udccd Field logs toggle. Managing/editing logs is admin-gated for now (owner-edit is the next step).'],
   ['v65','2026-07-29','Stage 3 finished. 📊 Model vs marks overlay drops a dot at each high-water mark colored by how far the calibrated model is from the measured value (green ≤0.5 ft, amber ≤1.5, red beyond) with an over/under tooltip — shows exactly where the single-slope model fits well or poorly. 🛰 NOAA FIM button is stubbed and greyed (their flood-inundation maps are not enabled for the Tilden gauge yet); it auto-checks each visit and lights up/works automatically if NOAA turns it on.'],
   ['v64','2026-07-29','The main blue flood fill now follows your calibration. A new 🌊 Flood-extent model toggle flips the primary inundation between 🟦 Calibrated (bends the LiDAR bathtub toward your approved high-water marks) and 🟧 Raw LiDAR (the untouched survey). A note shows which model is active, its slope, and how many marks feed it. With zero marks the two are identical (the calibration is anchored to the raster in its own river-mile units), then they diverge as marks are added — so the map now reflects the marks, not just the compare overlay.'],
   ['v63','2026-07-29','Calibration Stage 2 + model compare. (1) In the map controls, \u201c🧪 Compare model inundations\u201d toggles overlay the same crest under three models in different colors \u2014 Calibrated (your marks), Baseline seed (2013), and LiDAR default \u2014 with a legend showing each model\u2019s slope, so you can see how the fit shifts the flood extent. (2) High-water marks can be seeded from a documented flood (a dropdown fills the peak crest from the NWPS record) and tagged by flood/year, so the least-squares fit spans multiple years; marks at 📐 surveyed markers are weighted more heavily.'],
@@ -2251,7 +2290,7 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
 <!-- ============================================================= -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getFirestore, collection, addDoc, setDoc, deleteDoc, doc, getDoc, onSnapshot, query, where, serverTimestamp }
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, onSnapshot, query, where, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js';
@@ -2302,7 +2341,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
     const whenVal = document.getElementById('rWhen').value;
     const t = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : new Date().toLocaleString();
     try {
-      await addDoc(collection(db,'reports'), { who, where:loc.name, lat:loc.lat, lon:loc.lon, depth:dep, t, status:'pending', ts: serverTimestamp() });
+      await addDoc(collection(db,'reports'), { who, where:loc.name, lat:loc.lat, lon:loc.lon, depth:dep, kind:'water', t, status:'pending', ts: serverTimestamp() });
       document.getElementById('reportMsg').innerHTML = '<span style="color:#1a6f8b">\u2713 Sent for approval \u2014 it appears on the shared map once an admin approves it.</span>';
       document.getElementById('rDep').value=''; document.getElementById('rWhen').value='';
     } catch(e){ alert('Could not send: '+(e.code||e.message)); }
@@ -2314,6 +2353,8 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
     if (window.render) window.render();
   });
   window.delReport = function(id){ try{ deleteDoc(doc(db,'reports',id)); }catch(e){} };
+  window.__updateReport = async function(id,obj){ try{ await updateDoc(doc(db,'reports',id),obj); }catch(e){ if(window.__user && !window.__user.isAnonymous){} } };
+  window.__pushLoc = async function(l){ try{ await setDoc(doc(db,'locations',l.id), {name:l.name,lat:l.lat,lon:l.lon,elev:l.elev,surveyed:!!l.surveyed}); }catch(e){} };
 
   /* ---------- HIGH-WATER MARKS: moderated; only approved ones re-fit the model ---------- */
   window.addHWM = async function () {
