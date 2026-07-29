@@ -158,7 +158,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v67 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v69 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -176,6 +176,7 @@ window.addEventListener('error',function(e){
     <button class="help-btn" style="margin-top:11px;background:#fff;color:#12324f;font-weight:800;border-color:#fff" onclick="openAuth()">🔑 Log in / Register (free)</button>
   </div>
   <div id="alertBanner" style="margin-bottom:4px"></div>
+  <div id="pendingBar" style="display:none;background:#7a4a12;color:#fff;border-radius:10px;padding:9px 13px;margin-bottom:8px;font-size:13px"></div>
   <div id="alertOptIn" style="display:none;background:#eef4fa;border:1px solid #cfe0ee;border-radius:10px;padding:10px 13px;margin-bottom:10px;font-size:13px">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0"><input type="checkbox" id="notifyChk" onchange="toggleNotify()" style="width:auto"> <span>🔔 <b>Email me Miles Ranch–Nueces Reach Flood Notifications</b> <span style="color:#8aa0b4">(uses your login email)</span></span></label>
   </div>
@@ -456,6 +457,7 @@ window.addEventListener('error',function(e){
     <h2>6 · Report water &amp; teach the model <button class="sm" onclick="openLogHelp()" title="How the logging &amp; calibration workflow works" style="padding:2px 9px;font-weight:800">?</button></h2>
     <p class="sub">Two different jobs. A <b>live report</b> shows where the water is right now on the shared map. A <b>high-water mark</b> — the peak line, after a flood crests — is the only thing that re-calibrates the forecast, because the ranch floods a day <i>ahead</i> of the gauge.</p>
     <a href="log.html" style="display:block;text-align:center;background:#1a6f8b;color:#fff;font-weight:700;text-decoration:none;padding:12px;border-radius:10px;margin:6px 0 12px">📍 In the field on a phone? Use the Quick Field Log — GPS, one screen →</a>
+    <div style="text-align:center;color:var(--mut);font-weight:700;margin:6px 0 8px;letter-spacing:2px">— OR —</div>
 
     <!-- Part A: LIVE REPORT (map only) -->
     <div style="border:1px solid var(--rule);border-radius:10px;padding:11px">
@@ -514,7 +516,7 @@ window.addEventListener('error',function(e){
         <div class="sub" style="margin-top:4px">Uses every “Report water now” pin at once: for each spot it takes the <b>highest</b> water reported there (random samples converge on the true high-water line) and pairs it with this flood’s peak crest. Do it near/after the crest. In shared mode the built marks wait for your approval on the admin page.</div>
       </div>
       <div class="learn" id="learnBox"></div>
-      <table id="hwmTable"><thead><tr><th>event</th><th>where</th><th>peak gauge</th><th>rise / river-mi</th><th></th></tr></thead><tbody></tbody></table>
+      <table id="hwmTable"><thead><tr><th>flood peak</th><th>where</th><th>rise (ft)</th><th>river-mi</th><th>slope</th><th></th></tr></thead><tbody></tbody></table>
     </div>
   </div>
 
@@ -1434,17 +1436,30 @@ function renderReports(){
     var typeCell = ADMIN
       ? '<select onchange="setReportKind(\''+r.id+'\',this.value)" style="font-size:12px;padding:2px 4px"><option value="water"'+(k==='water'?' selected':'')+'>💧 Water</option><option value="highwater"'+(k==='highwater'?' selected':'')+'>🎯 High-water</option></select>'
       : (k==='highwater'?'🎯 High-water':'💧 Water');
-    var actions = ADMIN
-      ? '<button class="sm" style="padding:3px 7px" title="Promote this high-water log into a CREST ANCHOR that calibrates the forecast" onclick="promoteReport(\''+r.id+'\')">⚓ Make crest anchor</button> '
-        +'<button class="sm" style="padding:3px 7px" title="Edit this log’s captured data" onclick="editReport(\''+r.id+'\')">✎ Edit</button> '
-        +'<button class="sm" style="padding:3px 7px" title="Save this spot as a tracked location that appears in the Section-3 / calibration pick-lists" onclick="reportToLocation(\''+r.id+'\')">🔖 Track location</button> '
+    var isTracked=locs().some(function(l){return !l.seed && l.name===r.where;});
+    var isAnchored=hwm().some(function(m){return m.where===r.where;});
+    var myuid=(window.__user?window.__user.uid:null);
+    var canEdit = ADMIN || (r.owner && myuid && r.owner===myuid);
+    var mgmt = ADMIN ? (
+        (isAnchored
+          ? '<button class="sm" style="padding:3px 7px;background:#0f6b45" title="Remove the crest anchor(s) at this spot" onclick="unanchorReport(\''+r.id+'\')">⚓ Unanchor ✓</button> '
+          : '<button class="sm" style="padding:3px 7px" title="Promote this high-water log into a CREST ANCHOR that calibrates the forecast" onclick="promoteReport(\''+r.id+'\')">⚓ Make crest anchor</button> ')
+        +(isTracked
+          ? '<button class="sm" style="padding:3px 7px;background:#0f6b45" title="Stop tracking this spot as a location" onclick="untrackReport(\''+r.id+'\')">🔖 Untrack ✓</button> '
+          : '<button class="sm" style="padding:3px 7px" title="Save this spot as a tracked location that appears in the Section-3 / calibration pick-lists" onclick="reportToLocation(\''+r.id+'\')">🔖 Track location</button> ')
+      ) : '';
+    var own = canEdit ? (
+        '<button class="sm" style="padding:3px 7px" title="Edit this log’s captured data" onclick="editReport(\''+r.id+'\')">✎ Edit</button> '
         +'<button class="sm" style="padding:3px 7px;background:#8a1f1f" title="Delete this log" onclick="confirmDelReport(\''+r.id+'\')">🗑</button>'
-      : '<span class="sub">view only</span>';
+      ) : '';
+    var actions = (mgmt+own) || '<span class="sub">view only</span>';
     tr.innerHTML='<td>'+typeCell+'</td><td>'+esc(r.t)+'</td><td>'+esc(r.who)+'</td><td>'+esc(r.where)+'</td><td>'+(r.depth!=null?esc(r.depth)+' ft':'')+'</td><td style="white-space:nowrap">'+actions+'</td>';
     b.appendChild(tr);
   });
 }
 function confirmDelReport(id){ if(confirm('Delete this log entry? This cannot be undone.')) delReport(id); }
+function untrackReport(id){ var r=reports().find(function(x){return x.id===id;}); if(!r)return; if(!confirm('Stop tracking the location "'+r.where+'"?'))return; locs().filter(function(l){return l.name===r.where && !l.seed;}).forEach(function(l){ delLoc(l.id); }); render(); }
+function unanchorReport(id){ var r=reports().find(function(x){return x.id===id;}); if(!r)return; var marks=hwm().filter(function(m){return m.where===r.where;}); if(!marks.length){render();return;} if(!confirm('Remove '+marks.length+' crest anchor(s) at "'+r.where+'"? The forecast will re-fit.'))return; marks.forEach(function(m){ delHWM(m.id); }); render(); }
 function setReportKind(id,kind){ var a=reports(); var r=a.find(function(x){return x.id===id;}); if(!r)return; r.kind=kind; saveReports(a); if(window.__updateReport)window.__updateReport(id,{kind:kind}); render(); }
 function openLogHelp(){ document.getElementById('logHelpModal').style.display='flex'; }
 function closeLogHelp(){ document.getElementById('logHelpModal').style.display='none'; }
@@ -1569,16 +1584,25 @@ function delHWM(id){saveHWM(hwm().filter(x=>x.id!==id));render();}
 function confirmDelHWM(id){ if(confirm('Remove this crest anchor? The forecast will re-fit without it.')) delHWM(id); }
 function resetHWM(){if(confirm('Clear all high-water marks and return to the seed (2013) calibration?')){localStorage.removeItem('nueces_v2_hwm');render();}}
 function renderHWM(){
-  const b=document.querySelector('#hwmTable tbody');if(!b)return;b.innerHTML='';
-  hwm().forEach(s=>{const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${s.event||''}</td><td>${s.where}</td><td>${s.peak?s.peak.toFixed(1)+' ft':'—'}</td><td>${(s.off/s.rm).toFixed(2)}</td>`+
-      `<td><button class="sm" style="padding:3px 7px;background:#8a1f1f" onclick="confirmDelHWM('${s.id}')">✕ remove</button></td>`;
-    b.appendChild(tr);});
-  const sl=slope(),n=hwm().length,moved=((sl-1.356)/1.356*100);
-  document.getElementById('learnBox').innerHTML= n===0?
-    `<b>Model:</b> water-surface slope <b>1.356 ft/river-mile</b> — the seed, from the confirmed 2013 high-water line (peak Tilden 23.5 ft). Add a high-water mark to refine it.`:
-    `<b>Calibrated from ${n} high-water mark(s):</b> slope now <b>${sl.toFixed(3)} ft/river-mile</b> (${moved>=0?'+':''}${moved.toFixed(0)}% vs seed).`+
-    (Math.abs(moved)>12?' <span style="color:#c1272d">Large shift — double-check the marks and their peak crest values.</span>':'');
+  var b=document.querySelector('#hwmTable tbody'); if(!b)return; b.innerHTML='';
+  var esc=function(x){return String(x==null?'':x).replace(/[<>&]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c];});};
+  var arr=hwm();
+  var imps=arr.map(function(s){return (s.rm>0)?(s.off/s.rm):NaN;}).filter(function(x){return isFinite(x);});
+  var med=imps.length?imps.slice().sort(function(a,b){return a-b;})[Math.floor(imps.length/2)]:null;
+  arr.forEach(function(s){ var imp=(s.rm>0)?(s.off/s.rm):NaN; var out=(med&&imps.length>=2&&isFinite(imp)&&Math.abs(imp-med)/Math.abs(med)>0.5);
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td>'+(s.peak!=null?(+s.peak).toFixed(1)+' ft':'—')+'</td><td>'+esc(s.where)+'</td><td>'+(s.off!=null?(+s.off).toFixed(1):'—')+'</td><td>'+(s.rm!=null?(+s.rm).toFixed(1):'—')+'</td><td'+(out?' style="color:#c1272d;font-weight:700"':'')+'>'+(isFinite(imp)?imp.toFixed(2):'—')+(out?' \u26a0':'')+'</td>'+
+      '<td><button class="sm" style="padding:3px 7px;background:#8a1f1f" onclick="confirmDelHWM(\''+s.id+'\')">\u2715 remove</button></td>';
+    b.appendChild(tr);
+  });
+  var sl=slope(), n=arr.length, lb=document.getElementById('learnBox');
+  if(n===0){ lb.innerHTML='<b>Model:</b> water-surface slope <b>'+sl.toFixed(3)+' ft/river-mile</b> \u2014 the 2013 seed (confirmed high-water line at the ranch, peak Tilden 23.5 ft). Add a crest anchor to refine it.'; }
+  else {
+    var outliers=arr.filter(function(s){ var i=(s.rm>0)?(s.off/s.rm):NaN; return med&&imps.length>=2&&isFinite(i)&&Math.abs(i-med)/Math.abs(med)>0.5; });
+    var html='<b>Calibrated from '+n+' crest anchor'+(n===1?'':'s')+':</b> fitted slope <b>'+sl.toFixed(3)+' ft/river-mile</b>. (A single mark just sets the line; each column above shows that mark\u2019s own rise\u00f7river-mile.) Typical for this reach is roughly <b>1.3\u20132.1</b>.';
+    if(outliers.length){ html+=' <span style="color:#c1272d">\u26a0 '+outliers.length+' mark'+(outliers.length===1?'':'s')+' sit far from the rest ('+outliers.map(function(s){return esc(s.where)+' @ '+(s.off/s.rm).toFixed(2)+' ft/mi';}).join(', ')+') \u2014 re-check its ground elevation, debris height, and that flood\u2019s peak crest.</span>'; }
+    lb.innerHTML=html;
+  }
 }
 
 /* ================= help ================= */
@@ -1699,6 +1723,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v69","2026-07-29","Owner edit for field logs. Every log now records who posted it (owner). The person who submitted a log — not just the admin — can Edit or Delete their OWN log; no one can touch someone else's. Crest-anchor / track-location and type changes stay admin-only. Enforced in the database rules, not just the UI."],['v68','2026-07-29','Log workflow polish + calibration fix. Once a log is anchored/tracked its button flips to ⚓ Unanchor ✓ / 🔖 Untrack ✓ so you can see it is done and undo it. Added a 🔔 pending-approval banner on the main page (admin only) so you know logs are waiting without checking the moderation page. Put an OR divider between the phone-logger button and the report box. Fixed the false Large-shift warning: it compared to the 1.356 seed so every real mark tripped it; now it flags only true OUTLIER marks (far from the others), and the crest-anchor table shows each mark rise, river-mile, and its own implied slope for transparency.'],
   ['v67','2026-07-29','Log workflow overhaul. Renamed to ⚓ Make crest anchor and 🔖 Track location; added a ? explainer covering the whole flow. Edit is now a full modal (type, who, where, GPS lat/lon, depth, time, notes) instead of just the name. When YOU (admin) add a crest anchor it now applies immediately and shows in the green section with a ✕ remove (before it was stuck pending/invisible). Delete on marks now confirms; the reset button is relabeled ↺ Clear all anchors (reset to seed). The phone logger’s 🎯 High-water now lands in the log table as a High-water type (ready to promote), instead of a separate hidden pending mark.'],
   ['v66','2026-07-29','Section 6 log system rebuilt. Each log is now typed 💧 Water report or 🎯 High-water, shown as a Type column. The old \u201c\u2192 mark\u201d button is renamed \u26d3 Make anchor mark (turns a log into a calibration anchor) with a tooltip; plus per-row \u270e Edit (review/fix captured data), \ud83d\udccd Location (save the spot as a tracked Section-3 location), and \ud83d\uddd1 Delete with an \u201care you sure\u201d confirm. The map now distinguishes them: blue = water report, amber = high-water log, red \u25c6 = anchor mark, with a \ud83d\udccd Field logs toggle. Managing/editing logs is admin-gated for now (owner-edit is the next step).'],
   ['v65','2026-07-29','Stage 3 finished. 📊 Model vs marks overlay drops a dot at each high-water mark colored by how far the calibrated model is from the measured value (green ≤0.5 ft, amber ≤1.5, red beyond) with an over/under tooltip — shows exactly where the single-slope model fits well or poorly. 🛰 NOAA FIM button is stubbed and greyed (their flood-inundation maps are not enabled for the Tilden gauge yet); it auto-checks each visit and lights up/works automatically if NOAA turns it on.'],
@@ -2178,7 +2203,8 @@ function initMapResize(){
 function realUser(){ var u=window.__user; return !!(u && !u.isAnonymous); }
 function updateAuthChip(){ var el=document.getElementById('authChip'); if(!el)return; if(realUser()){ var nm=(window.__user.displayName||window.__user.email||'signed in'); el.innerHTML='👤 '+nm+' · <a onclick="doLogout()">sign out</a>'; } else { el.innerHTML='<a onclick="openAuth()">🔑 Log in / Register</a>'; } }
 function applyGate(){ var need=!!(window.__settings&&window.__settings.requireLogin); document.body.classList.toggle('gated', need && !realUser()); }
-window.onAuthChange=function(u){ updateAuthChip(); applyGate(); if(window.refreshAdmin)refreshAdmin(); if(window.renderEvents)renderEvents(); if(window.refreshNotify)refreshNotify(); };
+window.onPending=function(){ var el=document.getElementById("pendingBar"); if(!el)return; var admin=(typeof isAdminUser==="function")&&isAdminUser(); var pr=window.__pendReports||0, ph=window.__pendHWM||0; if(admin&&(pr+ph)>0){ el.style.display="block"; el.innerHTML="🔔 <b>"+(pr+ph)+"</b> item"+((pr+ph)===1?"":"s")+" awaiting your approval"+(pr?" · "+pr+" field log"+(pr===1?"":"s"):"")+(ph?" · "+ph+" crest mark"+(ph===1?"":"s"):"")+" — <a href=\"admin.html\" target=\"_blank\" style=\"color:#ffd98a;font-weight:700\">open moderation page \u2197</a>"; } else { el.style.display="none"; } };
+window.onAuthChange=function(u){ updateAuthChip(); applyGate(); if(window.refreshAdmin)refreshAdmin(); if(window.renderEvents)renderEvents(); if(window.refreshNotify)refreshNotify(); if(window.onPending)window.onPending(); };
 window.onSettings=function(s){ applyGate(); if(window.refreshAdmin)refreshAdmin(); if(window.renderEvents)renderEvents(); };
 function openAuth(){ var m=document.getElementById('authModal'); if(m){ authTab('login'); m.style.display='flex'; } }
 function closeAuth(){ var m=document.getElementById('authModal'); if(m)m.style.display='none'; var msg=document.getElementById('authMsg'); if(msg)msg.textContent=''; }
@@ -2378,7 +2404,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
     const whenVal = document.getElementById('rWhen').value;
     const t = whenVal ? new Date(whenVal).toLocaleString()+' (obs.)' : new Date().toLocaleString();
     try {
-      await addDoc(collection(db,'reports'), { who, where:loc.name, lat:loc.lat, lon:loc.lon, depth:dep, kind:'water', t, status:'pending', ts: serverTimestamp() });
+      const u=auth.currentUser; await addDoc(collection(db,'reports'), { who, where:loc.name, lat:loc.lat, lon:loc.lon, depth:dep, kind:'water', owner:(u?u.uid:''), ownerName:((u&&!u.isAnonymous)?(u.displayName||u.email):who), t, status:'pending', ts: serverTimestamp() });
       document.getElementById('reportMsg').innerHTML = '<span style="color:#1a6f8b">\u2713 Sent for approval \u2014 it appears on the shared map once an admin approves it.</span>';
       document.getElementById('rDep').value=''; document.getElementById('rWhen').value='';
     } catch(e){ alert('Could not send: '+(e.code||e.message)); }
@@ -2392,6 +2418,9 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   window.delReport = function(id){ try{ deleteDoc(doc(db,'reports',id)); }catch(e){} };
   window.__updateReport = async function(id,obj){ try{ await updateDoc(doc(db,'reports',id),obj); }catch(e){ if(window.__user && !window.__user.isAnonymous){} } };
   window.__pushLoc = async function(l){ try{ await setDoc(doc(db,'locations',l.id), {name:l.name,lat:l.lat,lon:l.lon,elev:l.elev,surveyed:!!l.surveyed}); }catch(e){} };
+  /* pending-approval counters for the owner banner on the main page */
+  onSnapshot(query(collection(db,'reports'), where('status','==','pending')), snap => { window.__pendReports = snap.size; if(window.onPending) window.onPending(); });
+  onSnapshot(query(collection(db,'hwm'), where('status','==','pending')), snap => { window.__pendHWM = snap.size; if(window.onPending) window.onPending(); });
 
   /* ---------- HIGH-WATER MARKS: moderated; only approved ones re-fit the model ---------- */
   window.addHWM = async function () {
