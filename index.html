@@ -158,7 +158,7 @@ window.addEventListener('error',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v71 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v73 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -310,12 +310,12 @@ window.addEventListener('error',function(e){
     </div>
     <div id="scenList" style="margin-top:6px"></div>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+    <div id="oldLocBlock" style="display:none"><div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
       <b style="font-size:13px">Locations</b>
       <button class="add sm" onclick="openLoc()">＋ Add location</button>
     </div>
     <table id="locTable"><thead><tr><th>name</th><th>ground</th><th>now <span style="font-weight:400;color:var(--mut)">(observed, else est.)</span></th><th>at crest <span style="font-weight:400;color:var(--mut)">(forecast)</span></th><th></th></tr></thead><tbody></tbody></table>
-    <div class="sub" style="margin-top:6px;line-height:1.45"><b>“now” priority (best first):</b> ① <span style="color:#1a6f8b;font-weight:700">💧 blue observed</span> = someone logged water there, with how long ago — ground truth. ② <b>“NWM est.”</b> = modeled at the ranch's <i>own</i> reach (lag-free). ③ plain <b>“est.”</b> = only the Tilden gauge, which sits ~a day <i>downstream</i>, so on a rising river an “est. dry” spot may already be wet. Trust eyes first — and log it so it turns blue.<br><b>Geometry:</b> each spot's <b>river-mile</b> is measured along the <i>authentic USGS Nueces channel trace</i> (NHD, HUC 1211 — reach sinuosity 1.91), and its sideways distance out to a slue/floodplain (shown as “off-channel”) is projected onto the channel rather than inflating its depth.</div>
+    <div class="sub" style="margin-top:6px;line-height:1.45"><b>“now” priority (best first):</b> ① <span style="color:#1a6f8b;font-weight:700">💧 blue observed</span> = someone logged water there, with how long ago — ground truth. ② <b>“NWM est.”</b> = modeled at the ranch's <i>own</i> reach (lag-free). ③ plain <b>“est.”</b> = only the Tilden gauge, which sits ~a day <i>downstream</i>, so on a rising river an “est. dry” spot may already be wet. Trust eyes first — and log it so it turns blue.<br><b>Geometry:</b> each spot's <b>river-mile</b> is measured along the <i>authentic USGS Nueces channel trace</i> (NHD, HUC 1211 — reach sinuosity 1.91), and its sideways distance out to a slue/floodplain (shown as “off-channel”) is projected onto the channel rather than inflating its depth.</div></div>
   </div>
 
   <!-- 3B OFFICIAL FORECAST + FUSION + SATELLITE -->
@@ -443,6 +443,19 @@ window.addEventListener('error',function(e){
       <div class="sub" style="margin-top:2px">Choose from the on-record historic floods (Section 7) or your saved events; each overlays its LiDAR footprint so you can compare how far different floods reached. Live/current = <b style="color:#2f7ff0">blue</b> (🌊 Flood extent).</div>
     </div>
     </div>
+  </div>
+
+  <!-- HUB · PLACES & MARKS -->
+  <div class="card" id="hubCard">
+    <h2>📍 Your places &amp; marks <button class="sm" onclick="openLogHelp()" title="How this works" style="padding:2px 8px">?</button></h2>
+    <p class="sub" style="margin:2px 0 8px">Every spot on the river in one list, matched to the pins on the map above. Badges: <span style="color:#1a6f8b">📍 tracked</span> · <span style="color:#1a9e75">💧 water observed now</span> · <span style="color:#c1272d">⚓ crest anchor</span> (tunes the forecast). Delete a row and it clears from the map, the list, and the calibration.</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0">
+      <input id="hubSearch" placeholder="search places…" oninput="renderHub()" style="flex:1;min-width:150px;padding:8px 10px;border:1px solid var(--rule);border-radius:8px">
+      <button class="add sm" onclick="openHubLogger()">＋ Log water / crest here</button>
+      <button class="sm" onclick="openLoc()">＋ Add place</button>
+    </div>
+    <table id="hubTable"><thead><tr><th>place</th><th>now <span style="font-weight:400;color:var(--mut)">(observed, else est.)</span></th><th>at crest <span style="font-weight:400;color:var(--mut)">(forecast)</span></th><th></th></tr></thead><tbody></tbody></table>
+    <div class="sub" id="hubEmpty" style="margin-top:6px"></div>
   </div>
 
   <!-- 5 REACH PROFILE -->
@@ -1008,8 +1021,8 @@ function render(){
   const A=alertFor(crest);
   document.getElementById('alertBox').innerHTML=`<div id="alert" style="background:${A.c}">`+
     `<div style="font-size:11px;font-weight:700;opacity:.9;letter-spacing:.3px">PREDICTED IF TILDEN CRESTS AT ${crest.toFixed(1)} FT</div>`+
-    `<div class="lvl">${A.lvl}</div><div class="msg">${A.msg}</div></div>`+(function(){var im=impactFor(crest);return im?('<div style="margin-top:6px;background:#fff6e6;border:1px solid #e2c37a;border-radius:8px;padding:8px 11px;font-size:12.5px;color:#5a4300"><b>🏛 NOAA official impact (≥'+im[0]+' ft):</b> '+im[1]+'</div>'):'';})();
-  drawLadder(crest);drawProfile(crest);renderLocs(crest);updateMap(crest);renderHist(crest);renderScen();renderReports();renderHWM();if(window.drawModelLayers)drawModelLayers(); if(window.updateFillNote)updateFillNote(); if(window.drawResiduals)drawResiduals();
+    `<div class="lvl">${A.lvl}</div><div class="msg">${A.msg}</div></div>`+(function(){var im=impactFor(crest);if(!im)return '';var stg=(im.stage!=null?im.stage:im[0]);var txt=(im.txt!=null?im.txt:(im.impact!=null?im.impact:im[1]));if(stg==null||txt==null||txt==='')return '';return '<div style="margin-top:6px;background:#fff6e6;border:1px solid #e2c37a;border-radius:8px;padding:8px 11px;font-size:12.5px;color:#5a4300"><b>🏛 NOAA official impact (≥'+(+stg).toFixed(1)+' ft):</b> '+txt+'</div>';})();
+  drawLadder(crest);drawProfile(crest);renderLocs(crest);if(window.renderHub)renderHub();updateMap(crest);renderHist(crest);renderScen();renderReports();renderHWM();if(window.drawModelLayers)drawModelLayers(); if(window.updateFillNote)updateFillNote(); if(window.drawResiduals)drawResiduals();
   if(window.renderFusion)step(renderFusion);
 }
 
@@ -1274,6 +1287,82 @@ function renderLocs(crest){
   refreshWhere();
 }
 
+
+/* ================= UNIFIED PLACES & MARKS HUB ================= */
+function hubKey(n){ return (n||'').trim().toLowerCase(); }
+function hubPlaces(){
+  var map={};
+  locs().forEach(function(l){ map[hubKey(l.name)]={name:l.name,lat:(l.lat!=null?l.lat:null),lon:(l.lon!=null?l.lon:null),elev:(l.elev!=null?l.elev:null),seed:!!l.seed,surveyed:!!l.surveyed,locId:l.id,tracked:true,anchors:[],reports:[]}; });
+  hwm().forEach(function(m){ var k=hubKey(m.where); if(!map[k])map[k]={name:m.where||'(unnamed)',lat:(m.lat!=null?m.lat:null),lon:(m.lon!=null?m.lon:null),elev:(m.elev!=null?m.elev:null),seed:false,surveyed:!!m.surveyed,locId:null,tracked:false,anchors:[],reports:[]}; if(map[k].elev==null&&m.elev!=null)map[k].elev=m.elev; if(map[k].lat==null&&m.lat!=null){map[k].lat=m.lat;map[k].lon=m.lon;} map[k].anchors.push(m); });
+  reports().forEach(function(r){ var k=hubKey(r.where); if(!map[k])map[k]={name:r.where||'(unnamed)',lat:(r.lat!=null?r.lat:null),lon:(r.lon!=null?r.lon:null),elev:null,seed:false,surveyed:false,locId:null,tracked:false,anchors:[],reports:[]}; if(map[k].lat==null&&r.lat!=null){map[k].lat=r.lat;map[k].lon=r.lon;} map[k].reports.push(r); });
+  return Object.keys(map).map(function(k){return map[k];});
+}
+function renderHub(){
+  var body=document.querySelector('#hubTable tbody'); if(!body)return;
+  var crest=parseFloat((document.getElementById('crest')||{}).value); if(isNaN(crest))crest=0;
+  var q=(((document.getElementById('hubSearch')||{}).value)||'').trim().toLowerCase();
+  var nt=(typeof nowTilEq==='function')?nowTilEq():null;
+  function dtag(d){ return d>0?('<span class="tag" style="background:#c1272d">'+d.toFixed(1)+'′ under</span>'):('<span class="tag" style="background:#0f8a5f">'+(-d).toFixed(1)+'′ dry</span>'); }
+  var places=hubPlaces().filter(function(p){return !q||(p.name||'').toLowerCase().indexOf(q)>=0;});
+  places.sort(function(a,b){ var ea=(a.elev==null?1e9:a.elev), eb=(b.elev==null?1e9:b.elev); if(ea!==eb)return ea-eb; return (a.name||'').localeCompare(b.name||''); });
+  body.innerHTML='';
+  places.forEach(function(p){
+    var hasCoords=(p.lat!=null&&p.lon!=null);
+    var isAnchor=p.anchors.length>0;
+    var best=null; p.reports.forEach(function(r){ if(best==null||(+r.depth||0)>(+best.depth||0))best=r; });
+    /* badges */
+    var badges='';
+    if(p.tracked) badges+=' <span title="tracked place" style="color:#1a6f8b">\U0001F4CD</span>';
+    if(best) badges+=' <span title="water observed" style="color:#1a9e75">\U0001F4A7</span>';
+    if(isAnchor) badges+=' <span title="crest anchor — tunes the forecast" style="color:#c1272d">⚓</span>';
+    if(p.surveyed) badges+=' <span title="surveyed" style="color:#6a5acd">\U0001F4D0</span>';
+    /* now */
+    var nowCell;
+    if(best){ var od=+best.depth||0, ag=(typeof agoStr==='function'&&typeof repTime==='function')?agoStr(repTime(best)):''; nowCell='<span class="tag" style="background:#1a6f8b">\U0001F4A7 '+(od>0?od.toFixed(1)+'′ deep':'water here')+'</span>'+(ag?' <span class="sub">'+ag+'</span>':''); }
+    else if(nt && p.elev!=null && hasCoords){ nowCell=dtag((TIL_ZERO+nt.stage+offsetAt(riverMi(p)))-p.elev)+' <span class="sub">est</span>'; }
+    else nowCell='<span class="sub">—</span>';
+    /* at crest */
+    var crestCell;
+    if(p.elev!=null && hasCoords){ crestCell=dtag(wseAt(p,crest)-p.elev); }
+    else if(p.elev==null && hasCoords) crestCell='<span class="sub">add elevation</span>';
+    else crestCell='<span class="sub">—</span>';
+    /* geo line */
+    var geo='';
+    if(hasCoords){ var rmL=riverMi(p), off=(typeof latOff==='function')?latOff(p):0; geo='<br><span class="sub">rm '+rmL.toFixed(1)+(off>0.3?' · '+off.toFixed(1)+' mi off-channel':'')+(p.elev!=null?' · elev '+(+p.elev).toFixed(1):'')+(isAnchor?' · ⚓ peak '+(+p.anchors[0].peak).toFixed(1)+' ft':'')+'</span>'; }
+    else if(p.elev!=null) geo='<br><span class="sub">elev '+(+p.elev).toFixed(1)+'</span>';
+    /* actions */
+    var enc=encodeURIComponent(p.name);
+    var acts='<button class="sm" style="padding:4px 8px" onclick="hubEdit(\''+enc+'\')">edit</button> '
+            +'<button class="sm" style="padding:4px 8px;background:#8a1f1f" onclick="hubDelete(\''+enc+'\')">\U0001F5D1</button>';
+    var tr=document.createElement('tr'); tr.className='locrow';
+    tr.innerHTML='<td>'+esc(p.name)+badges+geo+'</td><td>'+nowCell+'</td><td>'+crestCell+'</td><td style="white-space:nowrap">'+acts+'</td>';
+    body.appendChild(tr);
+  });
+  var empt=document.getElementById('hubEmpty');
+  if(empt) empt.textContent=places.length?'':(q?'No places match “'+q+'”.':'No places yet — press “Log water / crest here” or “Add place”.');
+}
+function hubEdit(enc){
+  var name=decodeURIComponent(enc);
+  var p=hubPlaces().find(function(x){return x.name===name;}); if(!p)return;
+  if(p.locId){ openLoc(p.locId); return; }
+  alert('“'+name+'” comes from a log or crest mark and isn’t a saved place yet. Use “＋ Add place” (or anchor/track it in Section 6) to make it an editable, tracked place.');
+}
+function hubDelete(enc){
+  var name=decodeURIComponent(enc);
+  var p=hubPlaces().find(function(x){return x.name===name;}); if(!p)return;
+  var parts=[]; if(p.locId)parts.push('the tracked place'); if(p.reports.length)parts.push(p.reports.length+' water/field log'+(p.reports.length>1?'s':'')); if(p.anchors.length)parts.push(p.anchors.length+' crest anchor'+(p.anchors.length>1?'s':''));
+  if(!parts.length){ return; }
+  if(!confirm('Delete “'+name+'” and everything at this spot?\n\nThis removes: '+parts.join(', ')+'.\nThe forecast re-fits without any removed anchor. This cannot be undone.')) return;
+  p.reports.forEach(function(r){ if(window.delReport)delReport(r.id); });
+  p.anchors.forEach(function(m){ if(window.delHWM)delHWM(m.id); });
+  if(p.locId && window.delLoc) delLoc(p.locId,true);
+  if(window.render)render();
+}
+function openHubLogger(){
+  /* Stage 1: route to the existing Section 6 logging form; Stage 2 replaces this with an inline modal */
+  var s=document.getElementById('sec6'); if(s){ s.scrollIntoView({behavior:'smooth',block:'start'}); var w=document.getElementById('rWho'); if(w){ try{ w.focus(); }catch(e){} } }
+}
+
 /* ================= location modal ================= */
 function openLoc(id){const m=document.getElementById('locModal');document.getElementById('mId').value=id||'';
   const L=locs();const l=id?L.find(x=>x.id===id):null;
@@ -1349,7 +1438,7 @@ function initMap(){
   try{
     MAP=L.map('map',{zoomControl:true});
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      {maxZoom:19,attribution:'Imagery © Esri'}).addTo(MAP);
+      {maxZoom:22,maxNativeZoom:19,attribution:'Imagery © Esri'}).addTo(MAP);
     MAP.on('click',e=>{ // drop a new location
       openLoc();document.getElementById('mLat').value=e.latlng.lat.toFixed(6);
       document.getElementById('mLon').value=e.latlng.lng.toFixed(6);autoElev();
@@ -1730,7 +1819,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
-  ["v71","2026-07-29","Fixed the Section-6 management buttons. Make crest anchor no longer silently creates a tracked location (that was why the Track button flipped instead of the anchor button). It now opens and highlights the green Confirm-the-peak form; the crest anchor — and only the anchor — is created when you press the green Add button, so the correct button flips to Unanchor. Untrack no longer double-asks (it asked once itself and again via the delete-location prompt); now a single confirm. Crest anchors now store their own GPS + elevation so they stay on the map even if the spot is later untracked."],["v70","2026-07-29","River-mile / slope reconciliation (verification). Checked the point model against the LiDAR/NHD raster: the ranch sits 11.7 river-miles above Tilden in BOTH, so the seed water-surface slope is ~2.09 ft per river-mile in both — they already agree, no reconciliation needed. The old 1.356 was only a dead fallback constant that was never actually used; replaced it with a value derived from the seed so it can never drift from the raster. Corrected the crest-anchor helper text to note the reach sits near 2.0 ft per river-mile."],["v69","2026-07-29","Owner edit for field logs. Every log now records who posted it (owner). The person who submitted a log — not just the admin — can Edit or Delete their OWN log; no one can touch someone else's. Crest-anchor / track-location and type changes stay admin-only. Enforced in the database rules, not just the UI."],['v68','2026-07-29','Log workflow polish + calibration fix. Once a log is anchored/tracked its button flips to ⚓ Unanchor ✓ / 🔖 Untrack ✓ so you can see it is done and undo it. Added a 🔔 pending-approval banner on the main page (admin only) so you know logs are waiting without checking the moderation page. Put an OR divider between the phone-logger button and the report box. Fixed the false Large-shift warning: it compared to the 1.356 seed so every real mark tripped it; now it flags only true OUTLIER marks (far from the others), and the crest-anchor table shows each mark rise, river-mile, and its own implied slope for transparency.'],
+  ["v73","2026-07-29","Workflow rebuild, stage 1 of 3: new unified \u2018Your places & marks\u2019 hub directly under the map. Every spot on the river is now ONE row with badges (\U0001F4CD tracked \u00b7 \U0001F4A7 water observed now \u00b7 \u2693 crest anchor), its Now and At-crest depths, and a search box. Deleting a row cascades \u2014 it clears the place, its water/field logs, and its crest anchors from the map, the list, and the calibration in one step, fixing the old-iron-bridge orphan problem. The old Section-3 locations table is retired (hidden). Next stages: in-hub logger, then move map+hub up and tuck calibration under Advanced."],["v72","2026-07-29","Fixed the NOAA impact line under the Section-3 alert that read \u2018\u2265undefined ft): undefined\u2019. The live-NOAA impact lookup returns a {stage, statement} object, but the alert box was still reading the old array format, so both values came out undefined. It now reads the object and shows the real NOAA per-stage impact statement (e.g. the Highway-16 bridge / floodplain-cutoff wording) for the predicted crest."],["v71","2026-07-29","Fixed the Section-6 management buttons. Make crest anchor no longer silently creates a tracked location (that was why the Track button flipped instead of the anchor button). It now opens and highlights the green Confirm-the-peak form; the crest anchor — and only the anchor — is created when you press the green Add button, so the correct button flips to Unanchor. Untrack no longer double-asks (it asked once itself and again via the delete-location prompt); now a single confirm. Crest anchors now store their own GPS + elevation so they stay on the map even if the spot is later untracked."],["v70","2026-07-29","River-mile / slope reconciliation (verification). Checked the point model against the LiDAR/NHD raster: the ranch sits 11.7 river-miles above Tilden in BOTH, so the seed water-surface slope is ~2.09 ft per river-mile in both — they already agree, no reconciliation needed. The old 1.356 was only a dead fallback constant that was never actually used; replaced it with a value derived from the seed so it can never drift from the raster. Corrected the crest-anchor helper text to note the reach sits near 2.0 ft per river-mile."],["v69","2026-07-29","Owner edit for field logs. Every log now records who posted it (owner). The person who submitted a log — not just the admin — can Edit or Delete their OWN log; no one can touch someone else's. Crest-anchor / track-location and type changes stay admin-only. Enforced in the database rules, not just the UI."],['v68','2026-07-29','Log workflow polish + calibration fix. Once a log is anchored/tracked its button flips to ⚓ Unanchor ✓ / 🔖 Untrack ✓ so you can see it is done and undo it. Added a 🔔 pending-approval banner on the main page (admin only) so you know logs are waiting without checking the moderation page. Put an OR divider between the phone-logger button and the report box. Fixed the false Large-shift warning: it compared to the 1.356 seed so every real mark tripped it; now it flags only true OUTLIER marks (far from the others), and the crest-anchor table shows each mark rise, river-mile, and its own implied slope for transparency.'],
   ['v67','2026-07-29','Log workflow overhaul. Renamed to ⚓ Make crest anchor and 🔖 Track location; added a ? explainer covering the whole flow. Edit is now a full modal (type, who, where, GPS lat/lon, depth, time, notes) instead of just the name. When YOU (admin) add a crest anchor it now applies immediately and shows in the green section with a ✕ remove (before it was stuck pending/invisible). Delete on marks now confirms; the reset button is relabeled ↺ Clear all anchors (reset to seed). The phone logger’s 🎯 High-water now lands in the log table as a High-water type (ready to promote), instead of a separate hidden pending mark.'],
   ['v66','2026-07-29','Section 6 log system rebuilt. Each log is now typed 💧 Water report or 🎯 High-water, shown as a Type column. The old \u201c\u2192 mark\u201d button is renamed \u26d3 Make anchor mark (turns a log into a calibration anchor) with a tooltip; plus per-row \u270e Edit (review/fix captured data), \ud83d\udccd Location (save the spot as a tracked Section-3 location), and \ud83d\uddd1 Delete with an \u201care you sure\u201d confirm. The map now distinguishes them: blue = water report, amber = high-water log, red \u25c6 = anchor mark, with a \ud83d\udccd Field logs toggle. Managing/editing logs is admin-gated for now (owner-edit is the next step).'],
   ['v65','2026-07-29','Stage 3 finished. 📊 Model vs marks overlay drops a dot at each high-water mark colored by how far the calibrated model is from the measured value (green ≤0.5 ft, amber ≤1.5, red beyond) with an over/under tooltip — shows exactly where the single-slope model fits well or poorly. 🛰 NOAA FIM button is stubbed and greyed (their flood-inundation maps are not enabled for the Tilden gauge yet); it auto-checks each visit and lights up/works automatically if NOAA turns it on.'],
