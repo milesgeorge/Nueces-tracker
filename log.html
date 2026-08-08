@@ -50,10 +50,15 @@
       <button type="button" id="modeCur" onclick="setMode('cur')" style="flex:1;padding:12px;font-size:15px;background:var(--blu)">💧 Current water</button>
       <button type="button" id="modeHwm" onclick="setMode('hwm')" style="flex:1;padding:12px;font-size:15px;background:#39505f">🎯 High-water mark</button>
     </div>
+    <div id="modeBanner" style="text-align:center;font-weight:800;font-size:14px;padding:8px;border-radius:9px;margin:2px 0 6px;background:var(--blu);color:#fff">Logging: 💧 CURRENT WATER (not a high-water mark)</div>
 
     <label id="depLbl">Water depth here (feet · 0 = just reaching the ground)</label>
     <input id="dep" class="big" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 1.5">
-    <div id="hwmHint" class="sub" style="display:none;margin-top:6px">Measure the <b>debris / mud line</b> — the highest the water reached — above the ground at this exact spot. The flood's peak Tilden crest is added for you and confirmed by the admin.</div>
+    <div id="hwmHint" class="sub" style="display:none;margin-top:6px">Measure the <b>debris / mud line</b> — the highest the water reached — above the ground at this exact spot.</div>
+    <div id="peakWrap" style="display:none">
+      <label>That flood's PEAK Tilden crest (ft) <span class="sub">— pre-filled from the gauge; adjust if you know the true peak</span></label>
+      <input id="peak" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 23.1">
+    </div>
 
     <label>Spot nickname (optional)</label>
     <input id="nick" placeholder="e.g. river pump, low crossing">
@@ -88,7 +93,11 @@ window.setMode=function(m){ MODE=m;
   document.getElementById('modeHwm').style.background=(m==='hwm'?'var(--grn)':'#39505f');
   document.getElementById('depLbl').textContent=(m==='hwm'?'Height of the high-water / debris line above the ground here (feet · 0 = mud line at the ground)':'Water depth here (feet · 0 = just reaching the ground)');
   document.getElementById('hwmHint').style.display=(m==='hwm'?'block':'none');
+  document.getElementById('peakWrap').style.display=(m==='hwm'?'block':'none');
   document.getElementById('dep').placeholder=(m==='hwm'?'e.g. 3.2':'e.g. 1.5');
+  var mb=document.getElementById('modeBanner');
+  if(mb){ if(m==='hwm'){ mb.textContent='Logging: 🎯 HIGH-WATER MARK'; mb.style.background=getComputedStyle(document.documentElement).getPropertyValue('--grn')||'#0f8a5f'; }
+    else { mb.textContent='Logging: 💧 CURRENT WATER (not a high-water mark)'; mb.style.background='#1a6f8b'; } }
 };
 
 function riverMi(lat,lon){const dy=(lat-TILG.lat)*69.05, dx=(lon-TILG.lon)*69.05*Math.cos(lat*Math.PI/180); return Math.hypot(dx,dy)*SIN;}
@@ -99,7 +108,7 @@ window.getLoc = function(){
   box('Locating…');
   if(!navigator.geolocation){box('<span class="err">No GPS on this device — enter coordinates below.</span>');document.getElementById('manual').style.display='block';return;}
   navigator.geolocation.getCurrentPosition(
-    async p=>{ await capture(p.coords.latitude, p.coords.longitude); },
+    async p=>{ await capture(p.coords.latitude, p.coords.longitude, p.coords.accuracy); },
     e=>{ box('<span class="err">GPS blocked ('+e.message+'). Enter coordinates below, or allow location in Settings → Safari.</span>');document.getElementById('manual').style.display='block'; },
     {enableHighAccuracy:true, timeout:12000}
   );
@@ -109,14 +118,18 @@ window.useManual = function(){
   if(isNaN(la)||isNaN(lo)){alert('Enter both latitude and longitude.');return;}
   capture(la,lo);
 };
-async function capture(lat,lon){
+async function capture(lat,lon,acc){
   LAT=lat;LON=lon;
-  box('📍 <b>'+lat.toFixed(5)+', '+lon.toFixed(5)+'</b><br>fetching ground elevation & river gauge…');
+  var accTxt=(acc!=null&&!isNaN(acc))?(' · GPS ±'+Math.round(acc)+' m'):'';
+  box('📍 <b>'+lat.toFixed(5)+', '+lon.toFixed(5)+'</b>'+accTxt+'<br>fetching ground elevation & river gauge…');
   try{const r=await fetch(`https://epqs.nationalmap.gov/v1/json?x=${lon}&y=${lat}&units=Feet&wkid=4326`).then(r=>r.json());ELEV=+r.value;}catch(e){ELEV=null;}
   try{const g=await fetch('https://api.water.noaa.gov/nwps/v1/gauges/TILT2').then(r=>r.json());TIL=+g.status.observed.primary;}catch(e){TIL=null;}
-  box('📍 <b>'+lat.toFixed(5)+', '+lon.toFixed(5)+'</b>'+
+  var lowAcc=(acc!=null&&!isNaN(acc)&&acc>25);
+  box('📍 <b>'+lat.toFixed(5)+', '+lon.toFixed(5)+'</b>'+accTxt+(lowAcc?' <span class="err">⚠ low</span>':'')+
+      (lowAcc?'<br><span class="err">Low GPS accuracy — move to open sky (away from buildings/trees) and tap “Use my GPS location” again for a better fix.</span>':'')+
       '<br>ground: <b>'+(ELEV!=null?ELEV.toFixed(1)+' ft':'—')+'</b> · Tilden gauge: <b>'+(TIL!=null?TIL.toFixed(1)+' ft':'—')+'</b>'+
       (ELEV==null||TIL==null?'<br><span class="err">(some auto-data missing — you can still submit; we\'ll fill it in)</span>':''));
+  if(TIL!=null){ var pk=document.getElementById('peak'); if(pk && !pk.value) pk.value=TIL.toFixed(1); }
   const b=document.getElementById('submitBtn');b.disabled=false;b.textContent='✓ Submit this sighting';
 }
 
@@ -130,15 +143,16 @@ window.submit = async function(){
   msg.innerHTML='Sending…';
   try{
     if(MODE==='hwm'){
+      const peak=parseFloat(document.getElementById('peak').value);
       await addDoc(collection(db,'reports'), {
-        who, where:nick, lat:LAT, lon:LON, depth:dep, kind:'highwater', tilden:TIL, status:'pending',
+        who, where:nick, lat:LAT, lon:LON, depth:dep, elev:(ELEV!=null?+ELEV.toFixed(1):null), kind:'highwater', tilden:TIL, peak:(isNaN(peak)?null:peak), status:'pending',
         t:new Date().toLocaleString()+' (field)', epoch:Date.now(), ts:serverTimestamp()
       });
       msg.innerHTML='<span class="ok">✓ High-water line sent for approval. Once approved it shows in the log table as a 🎯 High-water entry, ready to become a crest anchor. Thank you.</span>'+
         '<button class="gps" style="margin-top:12px" onclick="logAnother()">＋ Log another spot</button>';
     } else {
       await addDoc(collection(db,'reports'), {
-        who, where:nick, lat:LAT, lon:LON, depth:dep, tilden:TIL, status:'pending',
+        who, where:nick, lat:LAT, lon:LON, depth:dep, elev:(ELEV!=null?+ELEV.toFixed(1):null), kind:'water', tilden:TIL, status:'pending',
         t:new Date().toLocaleString()+' (field)', epoch:Date.now(), ts:serverTimestamp()
       });
       msg.innerHTML='<span class="ok">✓ Sent! It will show on the shared map once an admin approves it. Thank you.</span>'+
