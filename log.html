@@ -50,7 +50,8 @@
       <button type="button" id="modeCur" onclick="setMode('cur')" style="flex:1;padding:12px;font-size:15px;background:var(--blu)">💧 Current water</button>
       <button type="button" id="modeHwm" onclick="setMode('hwm')" style="flex:1;padding:12px;font-size:15px;background:#39505f">🎯 High-water mark</button>
     </div>
-    <div id="modeBanner" style="text-align:center;font-weight:800;font-size:14px;padding:8px;border-radius:9px;margin:2px 0 6px;background:var(--blu);color:#fff">Logging: 💧 CURRENT WATER (not a high-water mark)</div>
+    <button type="button" id="modePlace" onclick="setMode('place')" style="width:100%;padding:10px;font-size:14px;background:#2c3f52;color:#cfe0ee;margin:2px 0 0;font-weight:600">📍 Just marking a spot — no water</button>
+    <div id="modeBanner" style="text-align:center;font-weight:800;font-size:14px;padding:8px;border-radius:9px;margin:6px 0;background:var(--blu);color:#fff">Logging: 💧 CURRENT WATER (not a high-water mark)</div>
 
     <label id="depLbl">Water depth here (feet · 0 = just reaching the ground)</label>
     <input id="dep" class="big" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 1.5">
@@ -88,15 +89,20 @@ const db = getFirestore(initializeApp(firebaseConfig));
 
 const TIL_ZERO=183.10, SIN=2.2, TILG={lat:28.30889,lon:-98.55724};
 let LAT=null, LON=null, ELEV=null, TIL=null, MODE='cur';
-window.setMode=function(m){ MODE=m;
+window.setMode=function(m){ MODE=m; var isPlace=(m==='place');
   document.getElementById('modeCur').style.background=(m==='cur'?'var(--blu)':'#39505f');
   document.getElementById('modeHwm').style.background=(m==='hwm'?'var(--grn)':'#39505f');
+  var mp=document.getElementById('modePlace'); if(mp){ mp.style.background=(isPlace?'#5b6ee1':'#2c3f52'); mp.style.color=(isPlace?'#fff':'#cfe0ee'); }
   document.getElementById('depLbl').textContent=(m==='hwm'?'Height of the high-water / debris line above the ground here (feet · 0 = mud line at the ground)':'Water depth here (feet · 0 = just reaching the ground)');
+  document.getElementById('depLbl').style.display=isPlace?'none':'block';
+  document.getElementById('dep').style.display=isPlace?'none':'block';
   document.getElementById('hwmHint').style.display=(m==='hwm'?'block':'none');
   document.getElementById('peakWrap').style.display=(m==='hwm'?'block':'none');
   document.getElementById('dep').placeholder=(m==='hwm'?'e.g. 3.2':'e.g. 1.5');
+  var sb=document.getElementById('submitBtn'); if(sb && !sb.disabled) sb.textContent=(isPlace?'✓ Save this place':'✓ Submit this sighting');
   var mb=document.getElementById('modeBanner');
-  if(mb){ if(m==='hwm'){ mb.textContent='Logging: 🎯 HIGH-WATER MARK'; mb.style.background=getComputedStyle(document.documentElement).getPropertyValue('--grn')||'#0f8a5f'; }
+  if(mb){ if(m==='hwm'){ mb.textContent='Logging: 🎯 HIGH-WATER MARK'; mb.style.background='#0f8a5f'; }
+    else if(isPlace){ mb.textContent='Logging: 📍 A PLACE ONLY (no water)'; mb.style.background='#5b6ee1'; }
     else { mb.textContent='Logging: 💧 CURRENT WATER (not a high-water mark)'; mb.style.background='#1a6f8b'; } }
 };
 
@@ -136,10 +142,19 @@ async function capture(lat,lon,acc){
 window.submit = async function(){
   if(LAT==null){alert('Tap "Use my GPS location" first.');return;}
   const who=document.getElementById('who').value.trim()||'—';
-  const dep=parseFloat(document.getElementById('dep').value);
-  if(isNaN(dep)){alert('Enter the water depth (0 if it is just reaching the ground).');return;}
   const nick=document.getElementById('nick').value.trim() || (LAT.toFixed(4)+', '+LON.toFixed(4));
   const msg=document.getElementById('msg');
+  if(MODE==='place'){
+    msg.innerHTML='Saving place…';
+    try{
+      await addDoc(collection(db,'locations'), { name:nick, lat:LAT, lon:LON, elev:(ELEV!=null?+ELEV.toFixed(1):null), surveyed:false });
+      msg.innerHTML='<span class="ok">✓ Place saved to the map. Thank you.</span><button class="gps" style="margin-top:12px" onclick="logAnother()">＋ Mark another spot</button>';
+      document.getElementById('nick').value=''; LAT=null; const b=document.getElementById('submitBtn'); b.disabled=true; b.textContent='Get location first ↑';
+    }catch(e){ msg.innerHTML='<span class="err">Could not save: '+(e.code||e.message)+'. Check your signal and try again.</span>'; }
+    return;
+  }
+  const dep=parseFloat(document.getElementById('dep').value);
+  if(isNaN(dep)){alert('Enter the water depth (0 if it is just reaching the ground).');return;}
   msg.innerHTML='Sending…';
   try{
     if(MODE==='hwm'){
