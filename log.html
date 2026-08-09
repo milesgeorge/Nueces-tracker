@@ -56,6 +56,7 @@
     <label id="depLbl">Water depth here (feet · 0 = just reaching the ground)</label>
     <input id="dep" class="big" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 1.5">
     <div id="hwmHint" class="sub" style="display:none;margin-top:6px">Measure the <b>debris / mud line</b> — the highest the water reached — above the ground at this exact spot.</div>
+    <label id="isoWrap" style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-size:14px;color:#cfe0ee"><input id="iso" type="checkbox" style="width:auto;margin-top:3px"> <span>Isolated pocket — this water is <b>cut off</b> from the river/creek/slough (a trapped low spot). <span class="sub">Check this so it’s logged but kept out of slope calibration.</span></span></label>
     <div id="peakWrap" style="display:none">
       <label>That flood's PEAK Tilden crest (ft) <span class="sub">— pre-filled from the gauge; adjust if you know the true peak</span></label>
       <input id="peak" type="number" step="0.1" inputmode="decimal" placeholder="e.g. 23.1">
@@ -98,6 +99,7 @@ window.setMode=function(m){ MODE=m; var isPlace=(m==='place');
   document.getElementById('dep').style.display=isPlace?'none':'block';
   document.getElementById('hwmHint').style.display=(m==='hwm'?'block':'none');
   document.getElementById('peakWrap').style.display=(m==='hwm'?'block':'none');
+  var iw=document.getElementById('isoWrap'); if(iw)iw.style.display=(m==='cur'?'flex':'none');
   document.getElementById('dep').placeholder=(m==='hwm'?'e.g. 3.2':'e.g. 1.5');
   var sb=document.getElementById('submitBtn'); if(sb && !sb.disabled) sb.textContent=(isPlace?'✓ Save this place':'✓ Submit this sighting');
   var mb=document.getElementById('modeBanner');
@@ -167,7 +169,7 @@ window.submit = async function(){
         '<button class="gps" style="margin-top:12px" onclick="logAnother()">＋ Log another spot</button>';
     } else {
       await addDoc(collection(db,'reports'), {
-        who, where:nick, lat:LAT, lon:LON, depth:dep, elev:(ELEV!=null?+ELEV.toFixed(1):null), kind:'water', tilden:TIL, status:'pending', lid:'L'+Date.now().toString(36).slice(-5).toUpperCase(),
+        who, where:nick, lat:LAT, lon:LON, depth:dep, elev:(ELEV!=null?+ELEV.toFixed(1):null), kind:'water', tilden:TIL, isolated:!!document.getElementById('iso').checked, status:'pending', lid:'L'+Date.now().toString(36).slice(-5).toUpperCase(),
         t:new Date().toLocaleString()+' (field)', epoch:Date.now(), ts:serverTimestamp()
       });
       msg.innerHTML='<span class="ok">✓ Sent! It will show on the shared map once an admin approves it. Thank you.</span>'+
