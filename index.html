@@ -195,7 +195,7 @@ window.addEventListener('unhandledrejection',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v170 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v172 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -482,7 +482,7 @@ window.addEventListener('unhandledrejection',function(e){
         <button class="sm" id="mdl_lidar" onclick="toggleModelLayer('lidar')" style="filter:grayscale(1) opacity(.55)">🟧 LiDAR</button>
         <button class="sm" id="residBtn" onclick="toggleResiduals()" style="filter:grayscale(1) opacity(.55)">📊 Model vs marks</button>
         <button class="sm" onclick="openResidReport()" style="background:#eef4fb;color:#1f6feb;border:1px solid #bcd6f5" title="open the model-vs-marks comparison table">📋 Open comparison table ↗</button>
-        <button class="sm" id="edgeBtn" onclick="toggleEdgeMarks()" style="filter:grayscale(1) opacity(.55)" title="At the current crest, does the modeled flood edge actually reach each of your marks?">🌊 Edge vs marks</button>
+        <button class="sm" id="markDocBtn" onclick="openMarkDoctor()" style="background:#fff4e6;color:#a2560a;border:1px solid #f0cf9c" title="Scan every calibration mark for problems — off-channel, out-of-range slope, missing data — with the reason for each, so you can fix or delete them">🩺 Check my marks</button>
         <button class="sm" id="fimBtn" onclick="toggleFim()" style="filter:grayscale(1) opacity(.55)">🛰 NOAA FIM (n/a)</button>
         <button class="sm" onclick="openModelsHelp()" style="background:#1a6f8b;color:#fff;font-weight:700">📖 Models explained</button>
       </div></details></details>
@@ -1176,7 +1176,7 @@ function renderSeedEditor(){ var el=document.getElementById('seedEditor'); if(!e
    + '<div style="margin-top:8px"><button class="tgl" onclick="seedReset()">↺ Reset foundation to 2013 default</button></div>';
 }
 function anchors(){return seedMarks().concat(hwm().map(function(s){ var w=(s.surveyed?4.0:2.0); var oc=(s.lat!=null&&s.lon!=null&&typeof latOff==='function')?latOff({lat:s.lat,lon:s.lon}):0; if(oc>0.7) w*=0.5; return {rm:s.rm,off:s.off,w:w}; }));}
-function slope(){ var A=anchors().filter(function(a){return a.rm>0;}); if(!A.length) return (RANCH_SEED.rm>0?RANCH_SEED.off/RANCH_SEED.rm:2.09);
+function slope(){ var A=anchors().filter(function(a){return isFinite(a.rm)&&a.rm>0&&isFinite(a.off);}); if(!A.length) return (RANCH_SEED.rm>0?RANCH_SEED.off/RANCH_SEED.rm:2.09);
   var imps=A.map(function(a){return a.off/a.rm;}).slice().sort(function(x,y){return x-y;}); var med=imps[Math.floor((imps.length-1)/2)];
   var n=0,d=0; for(var i=0;i<A.length;i++){ var a=A[i]; var s=a.off/a.rm; var w=a.w; var dev=(med>0)?Math.abs(s-med)/med:0; if(dev>0.3 && A.length>=3) w*=0.2; n+=w*a.off*a.rm; d+=w*a.rm*a.rm; }
   return d>0?n/d:(RANCH_SEED.rm>0?RANCH_SEED.off/RANCH_SEED.rm:2.09); }
@@ -1841,7 +1841,11 @@ async function hubApplyMove(lat,lon){
       if(window.__updateReport){ var patch={lat:lat,lon:lon}; if(elev!=null)patch.elev=elev; await window.__updateReport(t.id,patch); }
       var a=reports(); var r=a.find(function(x){return x.id===t.id;}); if(r){ r.lat=lat; r.lon=lon; if(elev!=null)r.elev=elev; saveReports(a); }
     } else if(t.type==='loc'){ var ls=locs(); var l=ls.find(function(x){return x.id===t.id;}); if(l){ l.lat=lat; l.lon=lon; if(elev!=null)l.elev=elev; saveLocs(ls); if(window.__pushLoc)try{window.__pushLoc(l);}catch(e){} } }
-    else if(t.type==='hwm'){ var hs=hwm(); var m=hs.find(function(x){return x.id===t.id;}); if(m){ m.lat=lat; m.lon=lon; if(elev!=null)m.elev=elev; saveHWM(hs); if(window.__updateHWM&&m.id){ var hp={lat:lat,lon:lon}; if(elev!=null)hp.elev=elev; try{window.__updateHWM(m.id,hp);}catch(e){} } } }
+    else if(t.type==='hwm'){ var hs=hwm(); var m=hs.find(function(x){return x.id===t.id;}); if(m){ m.lat=lat; m.lon=lon; if(elev!=null)m.elev=elev;
+      // Moving a mark must repair its river-mile (and rise) so an off-channel/NaN mark becomes usable again.
+      try{ var _nrm=riverMi({lat:lat,lon:lon}); if(isFinite(_nrm))m.rm=+_nrm.toFixed(1); }catch(e){}
+      if(m.peak!=null&&isFinite(+m.peak)&&m.elev!=null&&isFinite(+m.elev)){ var _nd=(m.depth!=null&&isFinite(+m.depth))?+m.depth:0; m.off=+(+m.elev+_nd-TIL_ZERO-+m.peak).toFixed(1); }
+      saveHWM(hs); if(window.__updateHWM&&m.id){ var hp={lat:lat,lon:lon}; if(elev!=null)hp.elev=elev; if(m.rm!=null&&isFinite(m.rm))hp.rm=m.rm; if(m.off!=null&&isFinite(m.off))hp.off=m.off; try{window.__updateHWM(m.id,hp);}catch(e){} } } }
     else if(t.type==='place'){ var pp=(typeof hubPlaces==='function')?hubPlaces().find(function(x){return x.key===t.id;}):null; if(!pp)return;
       var lids={}; pp.reports.forEach(function(r){lids['r'+r.id]=1;}); pp.anchors.forEach(function(m){lids['h'+m.id]=1;});
       if(pp.locId){ var ls=locs(); var l=ls.find(function(x){return x.id===pp.locId;}); if(l){ l.lat=lat; l.lon=lon; if(elev!=null)l.elev=elev; saveLocs(ls); if(window.__pushLoc)try{window.__pushLoc(l);}catch(e){} } }
@@ -1864,7 +1868,7 @@ async function hubMakeStagePoint(id){
   var elev=(r.elev!=null)?+r.elev:null; if(elev==null){ try{ var v=await fetchElev(r.lat,r.lon); if(v!=null)elev=+(+v).toFixed(1); }catch(e){} }
   if(elev==null){ alert('Could not get a ground elevation (offline?).'); return; }
   var dep=(r.depth!=null)?+r.depth:0;
-  var rm=riverMi({lat:r.lat,lon:r.lon}); if(rm<3){ alert('Too close to the gauge to calibrate a slope — pick a spot farther up the reach.'); return; }
+  var rm=riverMi({lat:r.lat,lon:r.lon}); if(!isFinite(rm)||rm<3){ alert(isFinite(rm)?'Too close to the gauge to calibrate a slope — pick a spot farther up the reach.':'Could not place this spot on the mapped channel (its coordinates are off the reach). Use 📍 Fix on map to set a point near the river/creek first.'); return; }
   var off=+(elev+dep-TIL_ZERO-stage).toFixed(1); var sl=off/rm;
   if(sl<0.8||sl>3.2){ alert('This point implies a slope of '+sl.toFixed(2)+' ft/mile, outside the plausible range (~1.0–2.8). Double-check the water depth and the Tilden reading ('+stage.toFixed(1)+' ft). Not applied.'); return; }
   var hobj={event:'stage @ '+stage.toFixed(1)+' ft', where:r.where, rm:+rm.toFixed(1), off:off, peak:+stage.toFixed(1), surveyed:false, flood:'recession @ '+stage.toFixed(1)+' ft', stagept:true, lat:r.lat, lon:r.lon, elev:elev, who:(r.who||''), lid:(r.lid||newLid()), cid:'c'+Date.now()+'_'+Math.floor(Math.random()*1e6)};
@@ -1895,6 +1899,53 @@ async function hubMakeHWM(id){
   if(window.render)render();
 }
 function _entryEsc(x){ return String(x==null?'':x).replace(/[<>&"]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c];}); }
+/* ===== Mark doctor: scan calibration marks for problems, explain why, let the user fix/delete ===== */
+function markIssues(){
+  var arr=(typeof hwm==='function')?hwm():[];
+  var used=arr.filter(function(m){return isFinite(m.rm)&&m.rm>0&&isFinite(m.off);});
+  var med=null; if(used.length>=3){ var imps=used.map(function(m){return m.off/m.rm;}).slice().sort(function(a,b){return a-b;}); med=imps[Math.floor((imps.length-1)/2)]; }
+  var res=[];
+  arr.forEach(function(m){
+    var iss=[], sev=0;
+    var rmOK=(isFinite(m.rm)&&m.rm>0), offOK=(m.off!=null&&isFinite(m.off));
+    var rmPin=null; if(m.lat!=null&&m.lon!=null&&typeof riverMi==='function'){ try{ var rp=riverMi({lat:m.lat,lon:m.lon}); if(isFinite(rp))rmPin=rp; }catch(e){} }
+    if(!rmOK){ sev=Math.max(sev,3); iss.push('EXCLUDED from the model — no river-mile. This mark isn’t on the mapped channel'+(m.lat==null?' and has no GPS location.':(rmPin!=null?' (its pin sits off the reach; nearest channel point is river-mile '+rmPin.toFixed(1)+').':' (its coordinates fall off the reach).'))+' Fix its location onto the river/creek/slough — that repairs it automatically — or delete it.'); }
+    if(!offOK){ sev=Math.max(sev,3); iss.push('EXCLUDED from the model — no rise value (missing ground elevation or crest). Add the elevation in Edit, or delete it.'); }
+    if(rmOK&&m.rm<3){ sev=Math.max(sev,2); iss.push('Only '+(+m.rm).toFixed(1)+' mi from the Tilden gauge — too close to constrain the reach slope, so the model skips it.'); }
+    var s=(rmOK&&offOK)?(m.off/m.rm):null;
+    if(s!=null&&(s<0.8||s>3.2)){ sev=Math.max(sev,2); iss.push('Implies a reach slope of '+s.toFixed(2)+' ft/mile — outside the plausible 0.8–2.8 range. Usually a wrong water depth, ground elevation, or crest. It’s heavily down-weighted.'); }
+    else if(s!=null&&med!=null){ var dev=med>0?Math.abs(s-med)/med:0; if(dev>0.3){ sev=Math.max(sev,1); iss.push('Disagrees with your other marks by '+Math.round(dev*100)+'% (implies '+s.toFixed(2)+' vs the group’s '+med.toFixed(2)+' ft/mi). The model down-weights it ×5 — worth a second look at its depth/elevation/crest.'); } }
+    if(m.elev==null||!isFinite(m.elev)){ sev=Math.max(sev,1); iss.push('No ground elevation recorded — tap ⛰ auto in Edit so its depth and dry/wet read correctly.'); }
+    if(iss.length) res.push({m:m, iss:iss, sev:sev, s:s});
+  });
+  res.sort(function(a,b){return b.sev-a.sev;});
+  return res;
+}
+function markDocRow(x){
+  var m=x.m; var col=x.sev>=3?'#c1272d':x.sev>=2?'#b5670a':'#8a6d1a'; var ic=x.sev>=3?'🔴':x.sev>=2?'🟠':'🟡';
+  var enc=encodeURIComponent(m.where||'mark');
+  var meta='river-mile '+(isFinite(m.rm)?(+m.rm).toFixed(1):'—')+' · rise '+(m.off!=null&&isFinite(m.off)?(+m.off).toFixed(1)+' ft':'—')+' · implies '+(x.s!=null?x.s.toFixed(2)+' ft/mi':'—')+(m.lat!=null?' · '+(+m.lat).toFixed(5)+', '+(+m.lon).toFixed(5):' · no GPS');
+  var reasons=x.iss.map(function(r){return '<li style="margin:3px 0">'+_entryEsc(r)+'</li>';}).join('');
+  return '<div style="border:1px solid #e6ebf0;border-left:4px solid '+col+';border-radius:10px;padding:10px 12px;margin-bottom:10px">'
+    +'<div style="font-weight:800">'+ic+' '+_entryEsc(m.where||'(unnamed mark)')+(m.lid?' <span class="sub" style="color:#5b6ee1;font-weight:700">'+_entryEsc(m.lid)+'</span>':'')+'</div>'
+    +'<div class="sub" style="font-size:12px;margin:2px 0 6px">'+meta+'</div>'
+    +'<ul style="margin:0 0 9px 16px;padding:0;font-size:12.5px;color:#3a4550;line-height:1.4">'+reasons+'</ul>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="tgl" onclick="markDocFix(\''+m.id+'\',\''+enc+'\')">📍 Fix location</button><button class="tgl" onclick="markDocEdit(\''+m.id+'\')">✏️ Edit</button><button onclick="markDocDelete(\''+m.id+'\')" style="background:#fbe9e9;color:#a3242b;border:1px solid #eec3c3;border-radius:8px;padding:6px 11px;font-weight:700;cursor:pointer">🗑 Delete</button></div></div>';
+}
+function openMarkDoctor(){
+  var list=markIssues(); var total=(typeof hwm==='function')?hwm().length:0;
+  var ov=document.getElementById('markDocModal'); if(ov)ov.remove();
+  ov=document.createElement('div'); ov.id='markDocModal'; ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(10,20,30,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+  var body;
+  if(!list.length){ body='<div style="padding:16px;font-size:14px">✅ <b>No problem marks.</b> All '+total+' calibration mark'+(total===1?'':'s')+' sit on the mapped reach and imply a plausible slope. Nothing to fix.</div>'; }
+  else { body='<div style="padding:12px 14px"><div class="sub" style="font-size:12.5px;margin-bottom:10px">'+list.length+' of '+total+' mark'+(total===1?'':'s')+' flagged &nbsp;·&nbsp; 🔴 excluded from the model &nbsp; 🟠 out-of-range / down-weighted &nbsp; 🟡 minor. Fix the location (auto-repairs river-mile), edit the numbers, or delete — the model re-fits instantly.</div>'+list.map(markDocRow).join('')+'</div>'; }
+  ov.innerHTML='<div style="background:#fff;border-radius:14px;max-width:540px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.4)"><div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e6ebf0"><div style="font-weight:800">🩺 Check my marks</div><button onclick="var m=document.getElementById(\'markDocModal\');if(m)m.remove();" style="border:none;background:#eef2f6;border-radius:8px;padding:5px 11px;cursor:pointer;font-weight:700">✕</button></div>'+body+'</div>';
+  ov.addEventListener('click',function(ev){ if(ev.target===ov)ov.remove(); });
+  document.body.appendChild(ov);
+}
+function markDocFix(id,enc){ var m=document.getElementById('markDocModal'); if(m)m.remove(); if(typeof hubStartMove==='function')hubStartMove('hwm',id,enc); }
+function markDocEdit(id){ var m=document.getElementById('markDocModal'); if(m)m.remove(); if(typeof openEntryEditor==='function')openEntryEditor('hwm',id); }
+function markDocDelete(id){ var mk=(typeof hwm==='function')?hwm().find(function(x){return x.id===id;}):null; if(!mk)return; if(!confirm('Delete this mark permanently?\n\n“'+(mk.where||'mark')+'”\n\nThe model re-fits without it.'))return; if(window.delHWM)window.delHWM(id); saveHWM(hwm().filter(function(x){return x.id!==id;})); if(window.render)render(); openMarkDoctor(); }
 function openEntryEditor(kind,id){
   var e=null, cls='place', depth=null, peak=null;
   if(kind==='report'){ e=reports().find(function(x){return x.id===id;}); if(e){ cls='water'; depth=(e.depth!=null?+e.depth:0); peak=(e.peak!=null?+e.peak:null); } }
@@ -1945,7 +1996,7 @@ async function entryCalibrateStage(){
   var stage=(E.tilden!=null&&!isNaN(+E.tilden))?+E.tilden:((window.TIL_LIVE&&window.TIL_LIVE.stage!=null)?+window.TIL_LIVE.stage:((typeof gval==='function')?gval('nTil'):null));
   if(stage==null||isNaN(stage)){ var ss=prompt('What does the TILDEN gauge read now (ft)?',''); if(ss==null)return; stage=parseFloat(ss); }
   if(isNaN(stage)){ alert('Need a Tilden reading to reference the stage.'); return; }
-  var rm=riverMi({lat:E.lat,lon:E.lon}); if(rm<3){ alert('Too close to the gauge to calibrate a slope — pick a spot farther up the reach.'); return; }
+  var rm=riverMi({lat:E.lat,lon:E.lon}); if(!isFinite(rm)||rm<3){ alert(isFinite(rm)?'Too close to the gauge to calibrate a slope — pick a spot farther up the reach.':'Could not place this spot on the mapped channel (its coordinates are off the reach). Use 📍 Fix on map to set a point near the river/creek first.'); return; }
   var off=+(elev+dep-TIL_ZERO-stage).toFixed(1); var sl=off/rm;
   if(sl<0.8||sl>3.2){ alert('This point implies a slope of '+sl.toFixed(2)+' ft/mile, outside the plausible range (~1.0–2.8). Double-check the depth and the Tilden reading ('+stage.toFixed(1)+' ft). Not applied.'); return; }
   var hobj={event:'stage @ '+stage.toFixed(1)+' ft', where:name, rm:+rm.toFixed(1), off:off, peak:+stage.toFixed(1), surveyed:false, flood:'recession @ '+stage.toFixed(1)+' ft', stagept:true, lat:E.lat, lon:E.lon, elev:elev, who:(E.who||''), lid:(E.lid||newLid()), cid:'c'+Date.now()+'_'+Math.floor(Math.random()*1e6)};
@@ -2268,7 +2319,7 @@ function updateFillNote(){ var el=document.getElementById('fillNote'); if(!el)re
 function drawFloodAt(crest,frontRm){ if(!MAP)return;
   const w=FLOOD_RASTER.w,hh=FLOOD_RASTER.h,on=floodBytes(); if(!on)return;
   const base=FLOOD_RASTER.base0, step=FLOOD_RASTER.step, S0=FLOOD_RASTER.slope, rmsc=FLOOD_RASTER.rmscale||4;
-  const useCal=(FILL_MODEL==='cal'); const dS=useCal?(S0-calSlopeRaster()):0;
+  const useCal=(FILL_MODEL==='cal'); var _calS=useCal?calSlopeRaster():S0; if(!isFinite(_calS)||_calS<=0)_calS=S0; _calS=Math.max(1.0,Math.min(2.8,_calS)); const dS=useCal?(S0-_calS):0;
   const rmA=((frontRm!=null&&frontRm!==undefined)||useCal)?floodRM():null;
   const gated=(frontRm!=null&&frontRm!==undefined)&&!!rmA; const gate=gated?Math.round(frontRm*rmsc):-1;
   const cv=document.createElement('canvas');cv.width=w;cv.height=hh;const ctx=cv.getContext('2d');const im=ctx.createImageData(w,hh);const d=im.data;
@@ -2727,6 +2778,8 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v172","2026-08-10","Fixed a crash: the ‘🌊 Edge vs marks’ button called a function that no longer existed (toggleEdgeMarks), throwing the red ReferenceError at the top of the screen. Replaced it with a new ‘🩺 Check my marks’ tool. It scans every calibration mark and lists only the problem ones, each with the reason in plain language: 🔴 excluded from the model (off the mapped channel / no river-mile, or missing rise) · 🟠 out-of-range slope or too close to the gauge (down-weighted) · 🟡 minor (disagrees with the group by >30%, or missing elevation). Each flagged mark has Fix location, Edit, and Delete right there — and Fix location now RE-COMPUTES the mark’s river-mile and rise from the new spot, so dragging an off-channel mark back onto the river repairs it automatically."],
+  ["v171","2026-08-10","Fixed the calibrated inundation showing the whole reach dry while Raw LiDAR looked fine. Cause: the reach-slope fit could be poisoned by a single bad anchor — a stage-point whose location fell off the mapped channel got saved with river-mile = NaN (the old ‘rm<3’ guard let NaN through because NaN<3 is false), and one NaN anchor made the whole weighted slope NaN, so every calibrated cell failed the wet test. Three fixes: (1) the slope fit now ignores any anchor with a non-finite river-mile or rise, so one bad mark can’t blank the model; (2) creating a stage-point now rejects a location that isn’t on the mapped channel instead of saving NaN; (3) a render-time safety net clamps the calibrated slope to a plausible 1.0–2.8 ft/mi and falls back to Raw if it’s ever non-finite, so the calibrated layer can never blank out again. Depth shading is a separate toggle (smooth / contrast palette buttons) and works on BOTH the Raw and Calibrated fills — it just needs to be turned on."],
   ["v170","2026-08-09","Fixed ‘Fix location’ from the MAP POPUP (the green button on a pin). The popup passed the place’s key URL-encoded (the key contains @ and commas), but the move handler never decoded it, so when you tapped the new spot it compared an encoded key against the raw keys, matched nothing, and silently did nothing — the pin never moved. hubStartMove now decodes the id, so the map-click move applies (and, via the earlier cloud-sync + seed fixes, sticks). The hub-list Fix-location buttons were unaffected because they pass raw ids."],
   ["v169","2026-08-09","‘Calibrate to current Tilden stage’ is now a button INSIDE the Edit panel — it appears whenever the class is 💧 Water sighting. So for a spot with water sitting there right now (or a receding edge), you set class = Water sighting, confirm/enter the ground elevation and water depth, and tap it: the spot becomes a slope anchor referenced to the gauge’s CURRENT reading (not the 23.2 flood peak). It asks you to confirm the water is connected to the river first, and rejects isolated pockets and implausible slopes. Previously this action only lived on a water-log row in the ‘Logs & marks’ list, so a plain watch-spot (like the slough) had nowhere to show it."],
   ["v168","2026-08-09","Fixed the broken Edit-entry panel. It had a stray closing tag that closed the white card right after the title, so the form fields (name, class, elevation, Delete/Save) spilled OUT of the box and rendered scattered beside it — the panel is now one clean centered card (verified by parsing the generated HTML: the card fully contains the form). With this + v167, every hard-coded seed location (Water well, wellhead pads, the house, etc.) is fully editable AND deletable: the pencil opens the panel, Save syncs the change to the cloud, Delete tombstones it for good."],
