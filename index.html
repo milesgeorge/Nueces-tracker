@@ -195,7 +195,7 @@ window.addEventListener('unhandledrejection',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v168 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v169 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -1910,6 +1910,7 @@ function openEntryEditor(kind,id){
     +'<label style="font-size:12px;color:#6b7684">Ground elevation (ft) <button type="button" class="tgl" style="padding:1px 7px" onclick="entryFetchElev()">⛰ auto</button></label><input id="entryElev" type="number" step="0.1" value="'+elev+'" style="width:120px;padding:8px;margin:3px 0 10px">'
     +'<div id="entryDepWrap"><label style="font-size:12px;color:#6b7684" id="entryDepLbl">Water depth / height above ground (ft)</label><input id="entryDepth" type="number" step="0.1" value="'+(depth!=null?depth:'')+'" style="width:120px;padding:8px;margin:3px 0 10px;display:block"></div>'
     +'<div id="entryPeakWrap"><label style="font-size:12px;color:#6b7684">That flood\u2019s PEAK Tilden crest (ft)</label><input id="entryPeak" type="number" step="0.1" value="'+(peak!=null?peak:'')+'" style="width:120px;padding:8px;margin:3px 0 10px;display:block"></div>'
+    +'<div id="entryCalibWrap" style="margin:6px 0 2px"><button type="button" onclick="entryCalibrateStage()" style="width:100%;background:#0e6e88;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:800;cursor:pointer">📏 Calibrate to current Tilden stage</button><div class="sub" style="font-size:11px;margin-top:3px">For water sitting here right now (or a receding edge): makes this spot a slope anchor at the gauge’s CURRENT reading — not the flood peak. Confirms it’s connected to the river first.</div></div>'
     +'<div style="display:flex;justify-content:space-between;gap:8px;margin-top:8px"><button onclick="entryDelete()" style="background:#fbe9e9;color:#a3242b;border:1px solid #eec3c3;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer">🗑 Delete</button><button onclick="entrySave()" style="background:#0f8a5f;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:800;cursor:pointer">💾 Save</button></div>'
     +'</div>';
   var ov=document.getElementById('entryModal'); if(ov)ov.remove();
@@ -1925,7 +1926,31 @@ function entrySetClass(c){ var E=window.__editEntry; if(E)E.cls=c;
   var dw=document.getElementById('entryDepWrap'), pw=document.getElementById('entryPeakWrap'), dl=document.getElementById('entryDepLbl');
   if(dw)dw.style.display=(c==='place'?'none':'block');
   if(pw)pw.style.display=(c==='highwater'?'block':'none');
+  var cw=document.getElementById('entryCalibWrap'); if(cw)cw.style.display=(c==='water'?'block':'none');
   if(dl)dl.textContent=(c==='highwater'?'Height of the high-water line above the ground (ft)':'Water depth (ft)');
+}
+async function entryCalibrateStage(){
+  var E=window.__editEntry; if(!E)return;
+  var isAdm=(!window.__auth)||((typeof isAdminUser==='function')&&isAdminUser());
+  if(!isAdm){ alert('Only the admin can add a calibration point.'); return; }
+  if(E.lat==null||E.lon==null){ alert('This spot has no GPS location — use 📍 Fix on map first.'); return; }
+  var name=(document.getElementById('entryName').value||'').trim()||'unnamed';
+  var elev=parseFloat(document.getElementById('entryElev').value);
+  var depEl=document.getElementById('entryDepth'); var dep=depEl?parseFloat(depEl.value):0; if(isNaN(dep))dep=0;
+  if(isNaN(elev)){ try{ var v=await fetchElev(E.lat,E.lon); if(v!=null)elev=+(+v).toFixed(1); }catch(e){} }
+  if(isNaN(elev)||elev==null){ alert('Need a ground elevation first — tap ⛰ auto.'); return; }
+  if(!confirm('Is this water CONNECTED to the river / creek / slough — part of one continuous flood surface?\n\nOK = connected (good to calibrate the slope).\nCancel = an isolated pocket in a low spot — those are set by local ground, not the river, so they should NOT calibrate.')) return;
+  var stage=(E.tilden!=null&&!isNaN(+E.tilden))?+E.tilden:((window.TIL_LIVE&&window.TIL_LIVE.stage!=null)?+window.TIL_LIVE.stage:((typeof gval==='function')?gval('nTil'):null));
+  if(stage==null||isNaN(stage)){ var ss=prompt('What does the TILDEN gauge read now (ft)?',''); if(ss==null)return; stage=parseFloat(ss); }
+  if(isNaN(stage)){ alert('Need a Tilden reading to reference the stage.'); return; }
+  var rm=riverMi({lat:E.lat,lon:E.lon}); if(rm<3){ alert('Too close to the gauge to calibrate a slope — pick a spot farther up the reach.'); return; }
+  var off=+(elev+dep-TIL_ZERO-stage).toFixed(1); var sl=off/rm;
+  if(sl<0.8||sl>3.2){ alert('This point implies a slope of '+sl.toFixed(2)+' ft/mile, outside the plausible range (~1.0–2.8). Double-check the depth and the Tilden reading ('+stage.toFixed(1)+' ft). Not applied.'); return; }
+  var hobj={event:'stage @ '+stage.toFixed(1)+' ft', where:name, rm:+rm.toFixed(1), off:off, peak:+stage.toFixed(1), surveyed:false, flood:'recession @ '+stage.toFixed(1)+' ft', stagept:true, lat:E.lat, lon:E.lon, elev:elev, who:(E.who||''), lid:(E.lid||newLid()), cid:'c'+Date.now()+'_'+Math.floor(Math.random()*1e6)};
+  try{ if(window.hubSaveHWM){ await window.hubSaveHWM(hobj); } else { var a=hwm(); a.unshift(Object.assign({id:'h'+Date.now(),t:new Date().toLocaleString()},hobj)); saveHWM(a); } }catch(e){ alert('Could not save: '+(e.code||e.message||e)); return; }
+  var m=document.getElementById('entryModal'); if(m)m.remove();
+  if(window.render)render();
+  alert('✓ Calibration point added at Tilden stage '+stage.toFixed(1)+' ft (rise '+off.toFixed(1)+' ft at river-mile '+rm.toFixed(1)+') — it now helps fit the reach slope.');
 }
 async function entryFetchElev(){ var E=window.__editEntry; if(!E||E.lat==null){ alert('No location yet — Fix on map first.'); return; } var el=document.getElementById('entryElev'); if(el)el.placeholder='fetching…'; try{ var v=await fetchElev(E.lat,E.lon); if(v!=null&&el)el.value=(+v).toFixed(1); }catch(e){} }
 function entryFixLoc(){ var E=window.__editEntry; if(!E)return; var m=document.getElementById('entryModal'); if(m)m.remove(); hubStartMove(E.kind,E.id, encodeURIComponent(document.getElementById('entryName')?document.getElementById('entryName').value:'point')); }
@@ -2700,6 +2725,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v169","2026-08-09","‘Calibrate to current Tilden stage’ is now a button INSIDE the Edit panel — it appears whenever the class is 💧 Water sighting. So for a spot with water sitting there right now (or a receding edge), you set class = Water sighting, confirm/enter the ground elevation and water depth, and tap it: the spot becomes a slope anchor referenced to the gauge’s CURRENT reading (not the 23.2 flood peak). It asks you to confirm the water is connected to the river first, and rejects isolated pockets and implausible slopes. Previously this action only lived on a water-log row in the ‘Logs & marks’ list, so a plain watch-spot (like the slough) had nowhere to show it."],
   ["v168","2026-08-09","Fixed the broken Edit-entry panel. It had a stray closing tag that closed the white card right after the title, so the form fields (name, class, elevation, Delete/Save) spilled OUT of the box and rendered scattered beside it — the panel is now one clean centered card (verified by parsing the generated HTML: the card fully contains the form). With this + v167, every hard-coded seed location (Water well, wellhead pads, the house, etc.) is fully editable AND deletable: the pencil opens the panel, Save syncs the change to the cloud, Delete tombstones it for good."],
   ["v167","2026-08-09","ROOT-CAUSE fix for the ‘won’t delete / won’t move’ bugs. The shared-locations loader was blindly re-adding the built-in seed points (Water well, wellhead pads, the house, etc.) on every cloud sync — so deleting or moving a seed point undid itself a split second later. Now: (1) deletes write a cloud tombstone that sticks across all devices, even for seed points; (2) a seed point is dropped once you move/edit it (its cloud copy wins) or delete it; (3) editing a seed’s name/elevation now syncs to the cloud too. Also fixed the missing log IDs: the high-water-mark cloud loader was silently dropping lid/cid/epoch/tilden on round-trip, so converted marks showed no ID — those fields are now preserved, and the blue ID shows on each log/mark row and in the edit panel."],
   ["v166","2026-08-09","Fixed ‘Fix location’ not sticking: moving a place / high-water mark / location now writes the new coordinates to the shared cloud (added __updateHWM; loc & place moves call __pushLoc), so the next sync no longer snaps the pin back. New ‘➕ Add mark on map’ control on the desktop map: pick High-water mark / Current water / Place, then click the exact spot — the logger opens pre-filled with those coordinates (no GPS needed), so you can drop marks for spots you remember. Clarified that the model-form ‘verdict’ (single/two-segment/quadratic) is a diagnostic only — the live map still draws the single-slope surface."],
