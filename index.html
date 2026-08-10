@@ -195,7 +195,7 @@ window.addEventListener('unhandledrejection',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v169 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v170 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -1824,7 +1824,9 @@ function mapAddAt(lat,lon){ var m=window.__clickAdd; mapAddCancel(); if(!m)retur
   var gm=document.getElementById('hlGeoMan'); if(gm)gm.textContent='📍 spot set from your map click ('+(+lat).toFixed(5)+', '+(+lon).toFixed(5)+') — name it, add depth/crest, then Save.';
 }
 function hubStartMove(type,id,encName){
-  window.__moveTarget={type:type,id:id,name:decodeURIComponent(encName||'this point')};
+  // The map-popup passes the place key URL-encoded (its key contains @ and commas); hub-list buttons pass raw ids (no % chars, so decode is a no-op). Decode uniformly so the id matches when hubApplyMove looks it up.
+  var rawId=id; try{ rawId=decodeURIComponent(id); }catch(e){}
+  window.__moveTarget={type:type,id:rawId,name:decodeURIComponent(encName||'this point')};
   var b=document.getElementById('moveBanner'); if(!b){ b=document.createElement('div'); b.id='moveBanner'; b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99998;background:#0f8a5f;color:#fff;padding:11px 12px;font-weight:700;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.35)'; document.body.appendChild(b); }
   b.innerHTML='📍 Tap the correct spot on the map to move “'+window.__moveTarget.name+'”  ·  <a onclick="hubCancelMove()" style="color:#fff;text-decoration:underline;cursor:pointer">cancel</a>';
   try{ if(typeof closeHubDetail==='function')closeHubDetail(); }catch(e){}
@@ -2725,6 +2727,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v170","2026-08-09","Fixed ‘Fix location’ from the MAP POPUP (the green button on a pin). The popup passed the place’s key URL-encoded (the key contains @ and commas), but the move handler never decoded it, so when you tapped the new spot it compared an encoded key against the raw keys, matched nothing, and silently did nothing — the pin never moved. hubStartMove now decodes the id, so the map-click move applies (and, via the earlier cloud-sync + seed fixes, sticks). The hub-list Fix-location buttons were unaffected because they pass raw ids."],
   ["v169","2026-08-09","‘Calibrate to current Tilden stage’ is now a button INSIDE the Edit panel — it appears whenever the class is 💧 Water sighting. So for a spot with water sitting there right now (or a receding edge), you set class = Water sighting, confirm/enter the ground elevation and water depth, and tap it: the spot becomes a slope anchor referenced to the gauge’s CURRENT reading (not the 23.2 flood peak). It asks you to confirm the water is connected to the river first, and rejects isolated pockets and implausible slopes. Previously this action only lived on a water-log row in the ‘Logs & marks’ list, so a plain watch-spot (like the slough) had nowhere to show it."],
   ["v168","2026-08-09","Fixed the broken Edit-entry panel. It had a stray closing tag that closed the white card right after the title, so the form fields (name, class, elevation, Delete/Save) spilled OUT of the box and rendered scattered beside it — the panel is now one clean centered card (verified by parsing the generated HTML: the card fully contains the form). With this + v167, every hard-coded seed location (Water well, wellhead pads, the house, etc.) is fully editable AND deletable: the pencil opens the panel, Save syncs the change to the cloud, Delete tombstones it for good."],
   ["v167","2026-08-09","ROOT-CAUSE fix for the ‘won’t delete / won’t move’ bugs. The shared-locations loader was blindly re-adding the built-in seed points (Water well, wellhead pads, the house, etc.) on every cloud sync — so deleting or moving a seed point undid itself a split second later. Now: (1) deletes write a cloud tombstone that sticks across all devices, even for seed points; (2) a seed point is dropped once you move/edit it (its cloud copy wins) or delete it; (3) editing a seed’s name/elevation now syncs to the cloud too. Also fixed the missing log IDs: the high-water-mark cloud loader was silently dropping lid/cid/epoch/tilden on round-trip, so converted marks showed no ID — those fields are now preserved, and the blue ID shows on each log/mark row and in the edit panel."],
