@@ -260,7 +260,7 @@ body[data-tab="data"] .tab-data{ display:block; }
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v179 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v180 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -1275,10 +1275,19 @@ function slope(){ var A=anchors().filter(function(a){return isFinite(a.rm)&&a.rm
 function offsetAt(rm){return slope()*rm;}
 function wseAt(loc,crest){return TIL_ZERO+crest+offsetAt(riverMi(loc));}
 /* ---- Access crossings: the Tilden crest at which home access is cut (lowest flagged approach governs) ---- */
-function accessCrossings(){ try{ return locs().filter(function(l){ return l&&l.access&&l.elev!=null&&isFinite(+l.elev)&&l.lat!=null&&l.lon!=null; }); }catch(e){ return []; } }
+function accessCrossings(){ try{
+  var out=[]; function add(l){ if(l&&l.access&&l.elev!=null&&isFinite(+l.elev)&&l.lat!=null&&l.lon!=null) out.push({name:(l.name||l.where||'crossing'),elev:+l.elev,lat:l.lat,lon:l.lon,id:l.id}); }
+  try{ locs().forEach(add); }catch(e){}
+  try{ reports().forEach(add); }catch(e){}
+  try{ hwm().forEach(add); }catch(e){}
+  return out;
+}catch(e){ return []; } }
 function accessCutStage(){ var best=null; accessCrossings().forEach(function(l){ var rm=riverMi({lat:l.lat,lon:l.lon}); if(!isFinite(rm))return; var st=+(+l.elev - TIL_ZERO - offsetAt(rm)).toFixed(1); if(best==null||st<best.stage) best={stage:st,name:l.name,elev:+l.elev,rm:rm,id:l.id}; }); return best; }
 function toggleAccess(id,on){ var ls=locs(); var l=ls.find(function(x){return x.id===id;}); if(l){ l.access=!!on; saveLocs(ls); if(window.__pushLoc)try{window.__pushLoc(l);}catch(e){} if(window.render)render(); } }
-function entryToggleAccess(on){ var E=window.__editEntry; if(E&&E.kind==='loc') toggleAccess(E.id,on); }
+function entryToggleAccess(on){ var E=window.__editEntry; if(!E)return;
+  if(E.kind==='loc'){ toggleAccess(E.id,on); }
+  else if(E.kind==='report'){ var a=reports(); var r=a.find(function(x){return x.id===E.id;}); if(r){ r.access=!!on; saveReports(a); if(window.__updateReport)try{window.__updateReport(E.id,{access:!!on});}catch(e){} if(window.render)render(); } }
+  else if(E.kind==='hwm'){ var hs=hwm(); var m=hs.find(function(x){return x.id===E.id;}); if(m){ m.access=!!on; saveHWM(hs); if(window.__updateHWM)try{window.__updateHWM(E.id,{access:!!on});}catch(e){} if(window.render)render(); } } }
 function accessWarn(crest, A){
   var acc=accessCutStage(); var html='';
   if(acc){
@@ -2110,7 +2119,7 @@ function entrySetClass(c){ var E=window.__editEntry; if(E)E.cls=c;
   if(dw)dw.style.display=(c==='place'?'none':'block');
   if(pw)pw.style.display=(c==='highwater'?'block':'none');
   var cw=document.getElementById('entryCalibWrap'); if(cw)cw.style.display=(c==='water'?'block':'none');
-  var aw=document.getElementById('entryAccessWrap'); if(aw)aw.style.display=(c==='place'?'block':'none');
+  var aw=document.getElementById('entryAccessWrap'); if(aw)aw.style.display=((c==='place'||c==='water')?'block':'none');
   if(dl)dl.textContent=(c==='highwater'?'Height of the high-water line above the ground (ft)':'Water depth (ft)');
 }
 async function entryCalibrateStage(){
@@ -2909,6 +2918,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v180","2026-11-22","Fixed: the 🚗 Access-crossing checkbox was hidden unless the spot was a pure Place, but most of your crossings are logged with water/marks, so it never appeared. It now shows in the edit panel for Places AND water sightings, and the flag + the access-cut computation work across all record types (location, water log, or crest mark). So: open your access crossing’s ✏️ pencil, tick 🚗 Access crossing, and the GET-OUT / access-cut stage turns on."],
   ["v179","2026-11-22","‘GET OUT’ now means what it should: home access cut off at your bridge. Added a 🚗 ‘Access crossing’ checkbox to any location’s edit panel — flag the LOWEST point on your access road/bridge. The app computes the exact Tilden stage that floods it (lowest flagged crossing governs), shows it in the Now card (‘Home access (X) cuts off at Tilden ≈ N ft — M ft of room now’) and in the Section-2 forecast box, and escalates the warning to ‘ACCESS CLOSING’ then ‘URGENT — GET OUT (access cut)’ as the crest approaches/reaches it. Until you flag a crossing it prompts you to. Also cross-checked all warning wordings against the official NWS impact stages (done in v175/v178) so Section 1 status, the Section 2 forecast, and the gauge colors all agree."],
   ["v178","2026-11-22","Three fixes. (1) Rewrote the Section-2 ‘Predicted if Tilden crests at X’ warnings to match the OFFICIAL NWS impact stages instead of arbitrary bins. The old version screamed ‘URGENT — GET OUT’ for anything 10–15 ft; now 8–11 = Low/Rising, 11–14 = ‘Sloughs filling’ (explicitly NOT flooding, access not cut), 14–16 = Minor flooding, 16–19 = Moderate, 19+ = Major/evacuate. So 14 ft no longer falsely reads as an evacuation — it correctly says minor flooding of low ground/sloughs. (2) The crest slider minimum was hardcoded at 14 ft (flood stage); lowered to 8 ft so you can model current and below-flood-stage conditions. (3) Reach profile is tap-to-enlarge: tap it (or the ⤢ Enlarge button) to open it full-size in a scrollable view that’s readable on a phone. NOTE: whether the Elm Creek access bridge specifically floods is NOT yet wired to a real crossing elevation — tell me which logged location is that bridge and I’ll compute an exact ‘access cut at Tilden ≈ X ft’ readout."],
   ["v177","2026-11-22","UX overhaul Phase 2. The page is now organized into tabs — 🏠 Now · 📈 Forecast · 🗺 Map · 🛠 Data — instead of one long scroll; a sticky bar at the top switches between them, replacing the old ‘Jump to’ links. Now = status + gauge chain; Forecast = reach profile, forecast, mechanism, NOAA/fused, weather; Map = satellite map; Data = report/calibration, archive, history. In Simple view the Data tab is hidden. Also fixed a mobile bug where the gauge chain (Tilden) spilled outside its card — on a phone the chain now scrolls sideways inside the box."],
@@ -4065,7 +4075,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   };
   onSnapshot(query(collection(db,'hwm'), where('status','==','approved')), snap => {
     const arr = snap.docs.map(d => { const s=d.data();
-      return { id:d.id, t:'(shared)', event:s.event, where:s.where, rm:s.rm, off:s.off, peak:s.peak, surveyed:!!s.surveyed, flood:s.flood||'', elev:(s.elev!=null?s.elev:null), lat:(s.lat!=null?s.lat:null), lon:(s.lon!=null?s.lon:null), depth:(s.depth!=null?s.depth:null), who:s.who||'', stagept:!!s.stagept, lid:s.lid||'', cid:s.cid||'', epoch:(s.epoch!=null?s.epoch:null), tilden:(s.tilden!=null?s.tilden:null) }; })
+      return { id:d.id, t:'(shared)', event:s.event, where:s.where, rm:s.rm, off:s.off, peak:s.peak, surveyed:!!s.surveyed, flood:s.flood||'', elev:(s.elev!=null?s.elev:null), lat:(s.lat!=null?s.lat:null), lon:(s.lon!=null?s.lon:null), depth:(s.depth!=null?s.depth:null), who:s.who||'', stagept:!!s.stagept, access:!!s.access, lid:s.lid||'', cid:s.cid||'', epoch:(s.epoch!=null?s.epoch:null), tilden:(s.tilden!=null?s.tilden:null) }; })
       .filter(s => typeof s.off==='number' && typeof s.rm==='number');
     localStorage.setItem('nueces_v2_hwm', JSON.stringify(arr));
     if (window.render) window.render();
