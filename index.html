@@ -286,7 +286,7 @@ details.howto>*:not(summary){margin:4px 0 9px}
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v192 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v193 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -1209,7 +1209,7 @@ async function loadHistory(){
     const j=await fetch(url).then(r=>r.json());
     const vals=((((j.value||{}).timeSeries||[])[0]||{}).values||[])[0];
     const arr=vals?vals.value:[];
-    HIST_SERIES=arr.map(v=>({t:new Date(v.dateTime).getTime(),stage:parseFloat(v.value)})).filter(x=>!isNaN(x.stage)).sort((a,b)=>a.t-b.t);
+    HIST_SERIES=arr.map(v=>({t:new Date(v.dateTime).getTime(),stage:parseFloat(v.value)})).filter(x=>isFinite(x.stage)&&x.stage>-50).sort((a,b)=>a.t-b.t);
     if(!HIST_SERIES.length){ if(note)note.textContent='No USGS data for that window (instantaneous data is available ~2007→present).'; HIST_ON=false; return; }
     HIST_ON=true; FLOOD_ON=true;
     const pk=HIST_SERIES.reduce((a,b)=>b.stage>a.stage?b:a);
@@ -1230,7 +1230,7 @@ async function buildLiveTimeline(){
     const iso=function(d){return d.toISOString().slice(0,19);}; const end=new Date(), start=new Date(Date.now()-7*24*3600000);
     const j=await fetch('https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08194500&parameterCd=00065&startDT='+iso(start)+'&endDT='+iso(end)).then(function(r){return r.json();});
     const vals=((((j.value||{}).timeSeries||[])[0]||{}).values||[])[0];
-    let obs=(vals?vals.value:[]).map(function(v){return {t:new Date(v.dateTime).getTime(),stage:parseFloat(v.value)};}).filter(function(x){return !isNaN(x.stage);}).sort(function(a,b){return a.t-b.t;});
+    let obs=(vals?vals.value:[]).map(function(v){return {t:new Date(v.dateTime).getTime(),stage:parseFloat(v.value)};}).filter(function(x){return isFinite(x.stage)&&x.stage>-50;}).sort(function(a,b){return a.t-b.t;});
     if(!obs.length)return; const nowStage=obs[obs.length-1].stage; let series=obs.slice();
     if(typeof OFFICIAL!=='undefined'&&OFFICIAL.til&&OFFICIAL.til.stage>0&&OFFICIAL.til.valid){ const ct=new Date(OFFICIAL.til.valid).getTime(), cs=OFFICIAL.til.stage; if(ct>obs[obs.length-1].t){ for(let i=1;i<=8;i++){ const f=i/8; series.push({t:obs[obs.length-1].t+f*(ct-obs[obs.length-1].t), stage:nowStage+f*(cs-nowStage)}); } } }
     HIST_SERIES=series; HIST_ON=true; TL_NOW=Date.now();
@@ -1364,7 +1364,7 @@ async function fetchChain(){
     (j.value.timeSeries||[]).forEach(ts=>{
       const site=ts.sourceInfo.siteCode[0].value, pc=ts.variable.variableCode[0].value;
       const val=parseFloat(ts.values[0].value[0].value);
-      if(isNaN(val))return;
+      if(!isFinite(val)||val<=-999998||val<-50)return;   // -999999 is the USGS "no data" sentinel — not a real reading
       if(pc==='00065'&&SITE[site]){ document.getElementById(SITE[site]).textContent=val.toFixed(1); if(site==='08194500'){ window.TIL_LIVE={stage:val,time:new Date()}; } ok++; }
       if(pc==='00060'&&FLOW[site]){ CHAINFLOW[FLOW[site]]=val/1000; }
     });
@@ -1388,7 +1388,7 @@ async function fetchTrends(){
       const a=parseFloat(vals[0].value), b=parseFloat(vals[vals.length-1].value);
       const hrs=Math.max(1,(new Date(vals[vals.length-1].dateTime)-new Date(vals[0].dateTime))/3.6e6);
       const key={'08194000':'COTT2','08194500':'TILT2'}[site];
-      if(key&&!isNaN(a)&&!isNaN(b))TREND[key]={stage:b,rate:(b-a)/hrs,rising:(b-a)>0.05};
+      if(key&&isFinite(a)&&isFinite(b)&&a>-50&&b>-50)TREND[key]={stage:b,rate:(b-a)/hrs,rising:(b-a)>0.05};
     });
   }catch(e){}
   step(()=>{if(window.render)render();});
@@ -1682,7 +1682,7 @@ function drawLadder(crest){
 }
 
 /* ---- reach profile with overlays ---- */
-function gval(id){const t=document.getElementById(id).textContent;return t==='—'||t==='?'?null:parseFloat(t);}
+function gval(id){const el=document.getElementById(id); if(!el)return null; const t=el.textContent; if(t==='—'||t==='?')return null; const v=parseFloat(t); return (isFinite(v)&&v>-50)?v:null;}
 let CHAINFLOW={};   // filled by fetchChain: {ASRT2:kcfs,...}
 function toggleCard(card){ var b=card.querySelector(':scope > .cardBody'), c=card.querySelector(':scope > h2 .cardChev'); if(!b)return; var open=(b.style.display!=='none'); b.style.display=open?'none':''; if(c)c.textContent=open?'▸':'▾'; if(!open&&MAP&&MAP.invalidateSize){ setTimeout(function(){try{MAP.invalidateSize();}catch(e){}},60); } }
 function initCollapsers(){ document.querySelectorAll('.card > h2').forEach(function(h2){ var card=h2.parentElement; if(card.dataset.collapsible)return; card.dataset.collapsible='1';
@@ -1708,7 +1708,7 @@ function refreshTilNow(){
   try{
     fetch('https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08194500&parameterCd=00065').then(function(r){return r.json();}).then(function(j){
       var ts=((j.value&&j.value.timeSeries)||[])[0]; if(!ts)return;
-      var v=parseFloat(ts.values[0].value[0].value); if(isNaN(v))return;
+      var v=parseFloat(ts.values[0].value[0].value); if(!isFinite(v)||v<-50)return;
       window.TIL_LIVE={stage:v,time:new Date()};
       var n=document.getElementById('nTil'); if(n)n.textContent=v.toFixed(1);
       paintTilNow();
@@ -2837,7 +2837,7 @@ async function autoPeak(){
     const j=await fetch('https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08194500&parameterCd=00065&period=P21D').then(r=>r.json());
     const arr=j.value.timeSeries[0].values[0].value;
     let mx=-1e9,when='';
-    arr.forEach(v=>{const x=parseFloat(v.value);if(x>mx){mx=x;when=v.dateTime;}});
+    arr.forEach(v=>{const x=parseFloat(v.value);if(isFinite(x)&&x>-50&&x>mx){mx=x;when=v.dateTime;}});
     document.getElementById('hPeak').value=mx.toFixed(1);
     note.textContent=`highest in the last 3 weeks: ${mx.toFixed(1)} ft (${new Date(when).toLocaleString()}). If the river is still rising, wait until it crests.`;
   }catch(e){note.textContent='could not fetch — look up the crest on water.noaa.gov/gauges/TILT2 and type it.';}
@@ -2934,7 +2934,7 @@ async function fetchOfficial(){
       fetch('https://api.water.noaa.gov/nwps/v1/gauges/TILT2').then(r=>r.json()).catch(()=>null),
       fetch('https://api.water.noaa.gov/nwps/v1/gauges/COTT2').then(r=>r.json()).catch(()=>null)
     ]);
-    if(t&&t.status&&t.status.forecast){const f=t.status.forecast;OFFICIAL.til={stage:+f.primary,flow:(+f.secondary||0)*1000,cat:f.floodCategory,valid:f.validTime};}
+    if(t&&t.status&&t.status.forecast&&isFinite(+t.status.forecast.primary)&&+t.status.forecast.primary>-50){const f=t.status.forecast;OFFICIAL.til={stage:+f.primary,flow:(+f.secondary||0)*1000,cat:f.floodCategory,valid:f.validTime};}
     if(t&&t.flood){
       OFFICIAL.impacts=(t.flood.impacts||[]).map(x=>({stage:+x.stage,txt:x.statement})).filter(x=>x.stage>0&&x.txt).sort((a,b)=>a.stage-b.stage);
       OFFICIAL.floodStage=(t.flood.categories&&t.flood.categories.minor&&+t.flood.categories.minor.stage)||14;
@@ -3011,6 +3011,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v193","2026-11-23","DATA BUG FIX: USGS gauges report -999999 as their ‘no data’ sentinel when a sensor drops out, and the app was treating it as a real reading — so Cotulla showed -999999, and that garbage fed the Tilden stage, forecast crest, projected-peak band and everything downstream. Now every gauge-ingestion point (live chain, trends, historical replay, the two live-Tilden setters, the peak finder) rejects -999999 and any implausible (< -50) value, the NOAA forecast crest is validated the same way, and gval() — which feeds all the math — refuses bad numbers as a final backstop. A dropped-out gauge now shows ‘—’ / last-known instead of corrupting the forecast."],
   ["v192","2026-11-23","Data tab places table upgraded. Added a Sort menu (lowest ground first · closest to flooding · river-mile · name · recently logged) and quick filter chips (All · ⚓ crest anchors · 💧 water logs · 📍 watch spots · 🚗 access · ⚠ needs attention) above the list, plus a 🩺 Check my marks button right there. The dense ‘what the badges mean’ intro is tucked behind an ⓘ toggle like the Forecast tab."],
   ["v191","2026-11-23","Forecast tab decluttered. (1) The ‘what floods at this crest’ ladder now shows just the ~14 crossings straddling the forecast waterline (the ones about to flood or clear), with a ‘Show all N points’ button to expand; the full list still lives in the Data tab. (2) The long explanatory paragraphs (how to read the profile, the crest-slider/NOAA note, the mechanism and the three-reads blurbs) are tucked behind small ‘ⓘ’ toggles, so the controls and numbers are front-and-center with the detail one tap away."],
   ["v190","2026-11-23","Forecast tab now leads with the answer: ‘2 · Forecast & alert’ (projected crest, the GET-OUT/access warning, and the what-floods-at-this-crest list) moved ABOVE the reach-profile chart, so you see what the flood does before the supporting diagram. (First of a few Forecast-tab tidy-ups.)"],
