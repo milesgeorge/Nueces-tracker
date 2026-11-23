@@ -274,7 +274,7 @@ body.mapFullBody{overflow:hidden}
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v188 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v189 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -2522,7 +2522,7 @@ function initMap(){
       var _bStreet=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'});
       L.control.layers({'🛰 Satellite':_bSat,'🗺 Topographic':_bTopo,'🛣 Streets':_bStreet},null,{position:'topright',collapsed:true}).addTo(MAP);
     }catch(_e){}
-    try{ if(L.markerClusterGroup){ MARKERCLUSTER=L.markerClusterGroup({maxClusterRadius:46,spiderfyOnMaxZoom:true,showCoverageOnHover:false,disableClusteringAtZoom:20,chunkedLoading:true}); MARKERCLUSTER.addTo(MAP); } }catch(_e2){}
+    try{ if(L.markerClusterGroup){ MARKERCLUSTER=L.markerClusterGroup({maxClusterRadius:46,spiderfyOnMaxZoom:true,showCoverageOnHover:false,disableClusteringAtZoom:21,chunkedLoading:true}); MARKERCLUSTER.addTo(MAP); } }catch(_e2){}
     MAP.on('click',e=>{ if(window.__moveTarget){ hubApplyMove(e.latlng.lat,e.latlng.lng); return; }
       if(window.__clickAdd){ mapAddAt(e.latlng.lat,e.latlng.lng); return; } // drop a new mark of chosen type
       openLoc();document.getElementById('mLat').value=e.latlng.lat.toFixed(6);
@@ -2955,6 +2955,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v189","2026-11-23","Clusters persist a bit more — raised the disband zoom to 21, so the ranch pins stay grouped until you’re zoomed in very close; tap a cluster (or the 🔵 toggle) to open it sooner."],
   ["v188","2026-11-23","Cluster controls. Clusters now hold together to a closer zoom (disband at zoom 20 instead of 18), so the ranch pins stay grouped as you zoom in rather than scattering early. Added a ‘🔵 Cluster pins’ toggle in the ☰ Layers panel to turn clustering on/off entirely — off shows every pin individually; your choice is remembered. Tapping a cluster still spiderfies it open at any zoom."],
   ["v187","2026-11-22","Map overhaul part 2. (Declutter) The pins that pile up at the ranch (places, water logs, and the red crest-anchor diamonds) now CLUSTER — a numbered circle at low zoom that splits apart as you zoom in or tap it, so the rm-11.8 clump is finally readable. (Linking) A map pin’s popup has a ‘📋 Show in list’ button that jumps to the Data tab and filters the places list to that spot; and every row in the places list has a 📍 button that jumps to the Map tab and centers on that pin. If the cluster plugin ever fails to load, pins fall back to plain markers automatically."],
   ["v186","2026-11-22","Fixed the ☰ Layers panel order: the Flood-stage-lines interval dropdown was stranded at the bottom (below Flow energy) instead of under its own ‘〰 Flood-stage lines’ button — a pre-existing ordering bug that the new vertical panel made obvious. It now sits with its button, matching the Elevation-lines dropdown."],
