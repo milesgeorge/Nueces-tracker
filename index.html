@@ -260,7 +260,7 @@ body[data-tab="data"] .tab-data{ display:block; }
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v177 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v179 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -362,6 +362,7 @@ body[data-tab="data"] .tab-data{ display:block; }
     <div class="nowBar">
       <button class="modeBtn" id="modeBtn" onclick="toggleMode()">■ Simple view</button>
       <span class="nowHint" id="heroAccess"></span>
+      <div class="nowHint" id="heroAccessCut" style="width:100%;margin-top:4px;font-weight:700"></div>
     </div>
   </div>
 
@@ -398,7 +399,8 @@ body[data-tab="data"] .tab-data{ display:block; }
       <span class="sub" style="font-weight:600;white-space:nowrap">▾ tap to fold</span>
     </summary>
     <p class="sub" style="margin-top:8px"><b style="color:#c1272d">Red ●</b> = the forecast crest surface (set by the peak-crest slider in Section 2); <b style="color:#1a6f8b">blue ○</b> = the water surface <b>right now</b>, from the live gauge — the dashed red line between them is the rise still to come. Pills show travel time between gauges plus a rough <b>arrival date</b> for the moving wave — these now <b>scale with the flood mechanism</b> you pick in Section 2 (dry ≈ slow, tropical ≈ fast) — and the <b>FLOOD FRONT</b> card marks where the flood-stage front sits. <span style="color:#8a94a0">The gauges and blue “now” rings are always <b>live</b>; the red crest line follows the peak-crest slider, so if you load a past flood it shows that historic crest against today’s live gauges rather than a full historic snapshot.</span></p>
-    <div id="profileSvg"></div>
+    <div id="profileSvg" onclick="enlargeProfile()" style="cursor:zoom-in"></div>
+      <div style="text-align:right;margin-top:4px"><button class="sm" onclick="enlargeProfile()" title="Open the reach profile full-size — pinch/scroll to read it on a phone">⤢ Enlarge profile</button></div>
     <div id="leadNote" style="margin-top:8px;padding:9px 12px;background:#fff8e6;border:1px solid #ecd489;border-left:4px solid #e0852a;border-radius:9px;font-size:12.5px;color:#5a4a22"></div>
   </details>
 
@@ -419,7 +421,7 @@ body[data-tab="data"] .tab-data{ display:block; }
       <div style="font-size:12px;font-weight:700;letter-spacing:.3px;color:var(--red)">PROJECTED PEAK CREST <span class="help" style="font-weight:400">— what the model forecasts this flood will crest at</span></div>
       <div style="font-size:34px;font-weight:800;color:var(--red);line-height:1.15"><span id="crestVal">22.0</span> ft
         <span id="crestBand" style="font-size:13px;font-weight:600;color:var(--mut)"></span></div>
-      <input id="crest" type="range" min="14" max="28" step="0.1" value="22.0" oninput="onTilden(true)" style="margin-top:6px">
+      <input id="crest" type="range" min="8" max="28" step="0.1" value="22.0" oninput="onTilden(true)" style="margin-top:6px">
       <div class="sub" style="margin-top:2px">Drag to set the peak the model should forecast for. The current stage above sits <b>below</b> this peak while the wave is still building.</div>
     </div>
     <div style="background:#f2f6fa;border:1px solid var(--rule);border-radius:8px;padding:8px 11px;margin-top:8px;font-size:12px;color:#38414d">
@@ -1272,6 +1274,22 @@ function slope(){ var A=anchors().filter(function(a){return isFinite(a.rm)&&a.rm
   return d>0?n/d:(RANCH_SEED.rm>0?RANCH_SEED.off/RANCH_SEED.rm:2.09); }
 function offsetAt(rm){return slope()*rm;}
 function wseAt(loc,crest){return TIL_ZERO+crest+offsetAt(riverMi(loc));}
+/* ---- Access crossings: the Tilden crest at which home access is cut (lowest flagged approach governs) ---- */
+function accessCrossings(){ try{ return locs().filter(function(l){ return l&&l.access&&l.elev!=null&&isFinite(+l.elev)&&l.lat!=null&&l.lon!=null; }); }catch(e){ return []; } }
+function accessCutStage(){ var best=null; accessCrossings().forEach(function(l){ var rm=riverMi({lat:l.lat,lon:l.lon}); if(!isFinite(rm))return; var st=+(+l.elev - TIL_ZERO - offsetAt(rm)).toFixed(1); if(best==null||st<best.stage) best={stage:st,name:l.name,elev:+l.elev,rm:rm,id:l.id}; }); return best; }
+function toggleAccess(id,on){ var ls=locs(); var l=ls.find(function(x){return x.id===id;}); if(l){ l.access=!!on; saveLocs(ls); if(window.__pushLoc)try{window.__pushLoc(l);}catch(e){} if(window.render)render(); } }
+function entryToggleAccess(on){ var E=window.__editEntry; if(E&&E.kind==='loc') toggleAccess(E.id,on); }
+function accessWarn(crest, A){
+  var acc=accessCutStage(); var html='';
+  if(acc){
+    if(crest>=acc.stage){ A={lvl:'URGENT — GET OUT (access cut)', msg:'At this crest, home access is cut off at '+acc.name+' — it floods at Tilden ≈ '+acc.stage.toFixed(1)+' ft. Leave before Tilden reaches that; after it you are stranded on the floodplain side.', c:'#7a1220'}; }
+    else if(crest>=acc.stage-1.5){ A={lvl:'ACCESS CLOSING', msg:'Home access via '+acc.name+' floods at Tilden ≈ '+acc.stage.toFixed(1)+' ft — '+(acc.stage-crest).toFixed(1)+' ft above this crest. Plan to leave now.', c:'#c1272d'}; }
+    html='<div class="sub" style="margin-top:6px">🚗 Home access via <b>'+acc.name+'</b> cuts off at Tilden ≈ <b>'+acc.stage.toFixed(1)+' ft</b> (lowest flagged crossing).</div>';
+  } else {
+    html='<div class="sub" style="margin-top:6px;color:#8a3b0a">🚗 No access crossing flagged — open a location’s ✏️ pencil and tick “Access crossing” to enable the GET OUT warning.</div>';
+  }
+  return {A:A, html:html};
+}
 
 /* ================= location store ================= */
 function locs(){try{const u=JSON.parse(localStorage.getItem('nueces_v2_loc')||'null');return u||SEED_LOCS.slice();}catch(e){return SEED_LOCS.slice();}}
@@ -1366,11 +1384,14 @@ function paintAuto(d){
 
 /* ================= render ================= */
 function alertFor(t){
-  if(t<2.5)return{lvl:'DRY / STANDBY',msg:'Wave not yet arrived. Watch for the first move off ~1.9 ft.',c:'#4b5563'};
-  if(t<5)return{lvl:'WAVE ARRIVING',msg:'Begin staging stock & equipment. ~a day before the low floodplain.',c:'#1a6f8b'};
-  if(t<10)return{lvl:'MOVE NOW',msg:'~5–8 h to water over the back pens. Get off the floodplain.',c:'#b9770a'};
-  if(t<15)return{lvl:'URGENT — GET OUT',msg:'~2–4 h to the back pens; access closing.',c:'#c1272d'};
-  return{lvl:'FLOODPLAIN CUT OFF',msg:'Nueces, Winn Lake Slue, and Elm Creek all flooded.',c:'#7a1220'};
+  // Wording keyed to the OFFICIAL NWS impact stages for TILT2: action 11 · minor/flood 14 · moderate 16 · major 19.
+  // Below ~14 ft the river only tops its banks into the sloughs — that is NOT flooding.
+  if(t<8)  return{lvl:'LOW / STANDBY',msg:'River is within its banks. Watch the upstream gauges (Cotulla, Asherton) for the first rise.',c:'#4b5563'};
+  if(t<11) return{lvl:'RISING',msg:'Rising toward bank-full. Good time to stage stock and move equipment off the lowest ground — no flooding yet.',c:'#1a6f8b'};
+  if(t<14) return{lvl:'SLOUGHS FILLING',msg:'The channel is topping its banks into the sloughs and peripheral channels (Winn Lake Slue, Elm Creek slough). This is normal pre-flood — NOT flooding, and access is not cut. Move anything stored on the low floodplain.',c:'#b9770a'};
+  if(t<16) return{lvl:'MINOR FLOODING',msg:'Minor lowland flooding (NWS): sloughs and low channels begin cutting off parts of the floodplain, isolating livestock and low-lying equipment. Low crossings may start to go under — check your access route.',c:'#d9741a'};
+  if(t<19) return{lvl:'MODERATE FLOODING',msg:'Moderate flooding (NWS): much of the floodplain is cut off; hunting cabins, pumps and tank batteries are affected. Low river crossings are likely underwater — plan access accordingly.',c:'#c1272d'};
+  return{lvl:'MAJOR — EVACUATE LOW AREAS',msg:'Major flooding (NWS): wholesale evacuation of livestock; roads, bridges and riverside equipment flood. Nueces, Winn Lake Slue and Elm Creek all out of banks.',c:'#7a1220'};
 }
 /* Official NOAA/NWS per-stage flood impacts for TILT2 (Nueces at Tilden) */
 const IMPACTS=[[31,'The Highway 16 bridge floor floods.'],[28,'Flow is to the top of the recorder shelf.'],[20,'Major flooding below Cotulla to below Tilden — extensive floodplain cut off, requiring wholesale evacuation of livestock. Hunting cabins, pump jacks, tank batteries, irrigation pumps and any low-lying equipment near the river flood.'],[19,'Major lowland flooding of livestock, roads, irrigation pumps and tank batteries. Fencing and hunting cabins are damaged.'],[18,'Flooding of livestock, roads, irrigation pumps and tank batteries. Fences and hunting cabins are damaged.'],[16,'Moderate lowland flooding. Hunting cabins, oil-field tanks and pumps are affected; livestock become isolated.'],[15,'Much of the floodplain below Cotulla to below Tilden is cut off as sloughs and side channels fill. Cabins, pump jacks and tank batteries flood well away from the channel; livestock cut off and can drown.'],[14,'Minor lowland flooding — sloughs and side channels cut off floodplain, isolating livestock and damaging equipment in low areas. Oil-field tanks and pump jacks flood.'],[11,'The main channel overflows its banks into side channels, isolating areas of the floodplain.']];
@@ -1429,10 +1450,10 @@ function render(){
   } else { rn.textContent='—'; rn.style.color='#cfe0ee'; rx.textContent='no gauge data';
     const rNow=document.getElementById('ranchNow'); if(rNow)rNow.textContent='NOW: waiting on live gauge data.'; }
   // Section 3 alert = PREDICTION for the chosen crest (clearly labeled, so it isn't read as "now")
-  const A=alertFor(crest);
+  let A=alertFor(crest); var _aw=accessWarn(crest,A); A=_aw.A;
   document.getElementById('alertBox').innerHTML=`<div id="alert" style="background:${A.c}">`+
     `<div style="font-size:11px;font-weight:700;opacity:.9;letter-spacing:.3px">PREDICTED IF TILDEN CRESTS AT ${crest.toFixed(1)} FT</div>`+
-    `<div class="lvl">${A.lvl}</div><div class="msg">${A.msg}</div></div>`+(function(){var im=impactFor(crest);if(!im)return '';var stg=(im.stage!=null?im.stage:im[0]);var txt=(im.txt!=null?im.txt:(im.impact!=null?im.impact:im[1]));if(stg==null||txt==null||txt==='')return '';return '<div style="margin-top:6px;background:#fff6e6;border:1px solid #e2c37a;border-radius:8px;padding:8px 11px;font-size:12.5px;color:#5a4300"><b>🏛 NOAA official impact (≥'+(+stg).toFixed(1)+' ft):</b> '+txt+'</div>';})();
+    `<div class="lvl">${A.lvl}</div><div class="msg">${A.msg}</div></div>`+(function(){var im=impactFor(crest);if(!im)return '';var stg=(im.stage!=null?im.stage:im[0]);var txt=(im.txt!=null?im.txt:(im.impact!=null?im.impact:im[1]));if(stg==null||txt==null||txt==='')return '';return '<div style="margin-top:6px;background:#fff6e6;border:1px solid #e2c37a;border-radius:8px;padding:8px 11px;font-size:12.5px;color:#5a4300"><b>🏛 NOAA official impact (≥'+(+stg).toFixed(1)+' ft):</b> '+txt+'</div>';})()+_aw.html;
   drawLadder(crest);drawProfile(crest);renderLocs(crest);try{if(window.renderHub)renderHub();}catch(e){}updateMap(crest);renderHist(crest);renderScen();renderReports();renderHWM();if(window.drawModelLayers)drawModelLayers(); if(window.updateFillNote)updateFillNote(); if(window.drawResiduals)drawResiduals();
   if(window.renderFusion)step(renderFusion);
 }
@@ -1637,6 +1658,13 @@ function refreshTilNow(){
       paintTilNow();
     }).catch(function(){});
   }catch(e){}
+}
+function enlargeProfile(){
+  var el=document.getElementById('profileSvg'); if(!el||!el.innerHTML){ return; }
+  var body='<div style="overflow:auto;-webkit-overflow-scrolling:touch;border:1px solid #e6ebf0;border-radius:10px;background:#fff">'
+    +'<div style="min-width:840px;padding:4px">'+el.innerHTML+'</div></div>'
+    +'<div class="sub" style="font-size:12px;margin-top:8px">Side-view water-surface profile from Uvalde down to Three Rivers. On a phone, turn it landscape or scroll sideways to read the whole reach.</div>';
+  if(window.buildModal) window.buildModal('profZoomModal','📐 Reach profile — full size', body, 940);
 }
 function drawProfile(crest){
   const W=880,H=452,padT=60,plotBot=300,ML=66,MR=66;
@@ -2062,6 +2090,7 @@ function openEntryEditor(kind,id){
     +'<label style="font-size:12px;color:#6b7684">Class</label><div style="display:flex;gap:6px;margin:3px 0 10px">'+cb('water','💧 Water sighting','#1a6f8b')+cb('highwater','🎯 High-water mark','#0f8a5f')+cb('place','📍 Place','#5b6ee1')+'</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><span class="sub">location</span> <span id="entryLL" class="sub"></span> <button class="tgl" onclick="entryFixLoc()">📍 Fix on map</button></div>'
     +'<label style="font-size:12px;color:#6b7684">Ground elevation (ft) <button type="button" class="tgl" style="padding:1px 7px" onclick="entryFetchElev()">⛰ auto</button></label><input id="entryElev" type="number" step="0.1" value="'+elev+'" style="width:120px;padding:8px;margin:3px 0 10px">'
+    +'<div id="entryAccessWrap" style="display:none;margin:2px 0 10px"><label style="display:flex;align-items:center;gap:7px;font-weight:700;color:#8a3b0a"><input type="checkbox" id="entryAccess" style="width:auto"'+(e.access?' checked':'')+' onchange="entryToggleAccess(this.checked)"> 🚗 Access crossing — home is cut off if this floods</label><div class="sub" style="font-size:11px;margin-top:2px">Flag the <b>lowest</b> point on your access road/bridge. The app warns “GET OUT” when the forecast reaches the Tilden stage that floods it.</div></div>'
     +'<div id="entryDepWrap"><label style="font-size:12px;color:#6b7684" id="entryDepLbl">Water depth / height above ground (ft)</label><input id="entryDepth" type="number" step="0.1" value="'+(depth!=null?depth:'')+'" style="width:120px;padding:8px;margin:3px 0 10px;display:block"></div>'
     +'<div id="entryPeakWrap"><label style="font-size:12px;color:#6b7684">That flood\u2019s PEAK Tilden crest (ft)</label><input id="entryPeak" type="number" step="0.1" value="'+(peak!=null?peak:'')+'" style="width:120px;padding:8px;margin:3px 0 10px;display:block"></div>'
     +'<div id="entryCalibWrap" style="margin:6px 0 2px"><button type="button" onclick="entryCalibrateStage()" style="width:100%;background:#0e6e88;color:#fff;border:none;border-radius:8px;padding:10px;font-weight:800;cursor:pointer">📏 Calibrate to current Tilden stage</button><div class="sub" style="font-size:11px;margin-top:3px">For water sitting here right now (or a receding edge): makes this spot a slope anchor at the gauge’s CURRENT reading — not the flood peak. Confirms it’s connected to the river first.</div></div>'
@@ -2081,6 +2110,7 @@ function entrySetClass(c){ var E=window.__editEntry; if(E)E.cls=c;
   if(dw)dw.style.display=(c==='place'?'none':'block');
   if(pw)pw.style.display=(c==='highwater'?'block':'none');
   var cw=document.getElementById('entryCalibWrap'); if(cw)cw.style.display=(c==='water'?'block':'none');
+  var aw=document.getElementById('entryAccessWrap'); if(aw)aw.style.display=(c==='place'?'block':'none');
   if(dl)dl.textContent=(c==='highwater'?'Height of the high-water line above the ground (ft)':'Water depth (ft)');
 }
 async function entryCalibrateStage(){
@@ -2879,6 +2909,8 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v179","2026-11-22","‘GET OUT’ now means what it should: home access cut off at your bridge. Added a 🚗 ‘Access crossing’ checkbox to any location’s edit panel — flag the LOWEST point on your access road/bridge. The app computes the exact Tilden stage that floods it (lowest flagged crossing governs), shows it in the Now card (‘Home access (X) cuts off at Tilden ≈ N ft — M ft of room now’) and in the Section-2 forecast box, and escalates the warning to ‘ACCESS CLOSING’ then ‘URGENT — GET OUT (access cut)’ as the crest approaches/reaches it. Until you flag a crossing it prompts you to. Also cross-checked all warning wordings against the official NWS impact stages (done in v175/v178) so Section 1 status, the Section 2 forecast, and the gauge colors all agree."],
+  ["v178","2026-11-22","Three fixes. (1) Rewrote the Section-2 ‘Predicted if Tilden crests at X’ warnings to match the OFFICIAL NWS impact stages instead of arbitrary bins. The old version screamed ‘URGENT — GET OUT’ for anything 10–15 ft; now 8–11 = Low/Rising, 11–14 = ‘Sloughs filling’ (explicitly NOT flooding, access not cut), 14–16 = Minor flooding, 16–19 = Moderate, 19+ = Major/evacuate. So 14 ft no longer falsely reads as an evacuation — it correctly says minor flooding of low ground/sloughs. (2) The crest slider minimum was hardcoded at 14 ft (flood stage); lowered to 8 ft so you can model current and below-flood-stage conditions. (3) Reach profile is tap-to-enlarge: tap it (or the ⤢ Enlarge button) to open it full-size in a scrollable view that’s readable on a phone. NOTE: whether the Elm Creek access bridge specifically floods is NOT yet wired to a real crossing elevation — tell me which logged location is that bridge and I’ll compute an exact ‘access cut at Tilden ≈ X ft’ readout."],
   ["v177","2026-11-22","UX overhaul Phase 2. The page is now organized into tabs — 🏠 Now · 📈 Forecast · 🗺 Map · 🛠 Data — instead of one long scroll; a sticky bar at the top switches between them, replacing the old ‘Jump to’ links. Now = status + gauge chain; Forecast = reach profile, forecast, mechanism, NOAA/fused, weather; Map = satellite map; Data = report/calibration, archive, history. In Simple view the Data tab is hidden. Also fixed a mobile bug where the gauge chain (Tilden) spilled outside its card — on a phone the chain now scrolls sideways inside the box."],
   ["v176","2026-11-22","UX overhaul Phase 1 of 4. Added a ‘Miles Ranch — right now’ hero card at the very top: the one-glance answer (current status, Tilden stage, forecast crest) in plain big type. Added a Simple ⇄ Expert toggle — Simple view hides the workbench sections (reach profile, mechanism detail, model calibration, history) for everyday glancing; Expert shows everything; your choice is remembered per device. Refreshed the visual design system app-wide (cards, buttons, spacing, shadows, mobile touch targets) for consistency. Coming next: tabbed navigation, one unified Add flow, and resizable image quadrants."],
   ["v175","2026-11-22","Fixed the Section 1 RANCH status calling it FLOODING when it isn’t. The label was reading raw Tilden stage (anything 10–15 ft = ‘FLOODING’), so at today’s ~11.5 ft it wrongly said flooding even though the model’s own ‘ft to flood’ margin showed otherwise. It now uses the official Tilden flood stages (action 11 · minor/flood 14 · moderate 16 · major 19) plus the modeled ranch margin: DRY → RISING → SLOUGHS WET (banks topping into peripheral channels, NOT flooding) → FLOODING (minor) → FLOODING → MAJOR FLOOD. The sub-text now says ‘sloughs/low ground wet — no road flooding yet’ below flood stage, so the big label and the detail agree."],
@@ -3868,6 +3900,12 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
       var ht=document.getElementById('heroTil'); if(ht) ht.textContent=(til&&til!=='—')?til+' ft':'—';
       var hc=document.getElementById('heroCrest'); if(hc) hc.textContent=(crest?crest+' ft':'—');
       var ha=document.getElementById('heroAccess'); if(ha) ha.textContent=band?('projected peak '+band.replace(/^\(|\)$/g,'')):'';
+      var hac=document.getElementById('heroAccessCut');
+      if(hac){ var acc=(typeof accessCutStage==='function')?accessCutStage():null;
+        if(acc){ var ns=parseFloat(til); var below=(isFinite(ns))?(acc.stage-ns):null;
+          hac.textContent='🚗 Home access ('+acc.name+') cuts off at Tilden ≈ '+acc.stage.toFixed(1)+' ft'+(below!=null?(below>0?' — '+below.toFixed(1)+' ft of room now':' — CUT OFF NOW'):'');
+          hac.style.color=(below!=null&&below<=0)?'#ffb4b4':(below!=null&&below<2?'#ffd79b':'#bcd3ea'); hac.style.display='block'; }
+        else { hac.style.display='none'; } }
     }catch(e){}
   };
   function tagExpert(){
@@ -3999,7 +4037,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   window.delReport = function(id){ try{ deleteDoc(doc(db,'reports',id)); }catch(e){} };
   window.__updateReport = async function(id,obj){ try{ await updateDoc(doc(db,'reports',id),obj); }catch(e){ if(window.__user && !window.__user.isAnonymous){} } };
   window.__updateHWM = async function(id,obj){ try{ await updateDoc(doc(db,'hwm',id),obj); }catch(e){} };
-  window.__pushLoc = async function(l){ try{ await setDoc(doc(db,'locations',l.id), {name:l.name,lat:l.lat,lon:l.lon,elev:l.elev,surveyed:!!l.surveyed,who:l.who||'',epoch:(l.epoch!=null?l.epoch:null),lid:l.lid||''}); }catch(e){} };
+  window.__pushLoc = async function(l){ try{ await setDoc(doc(db,'locations',l.id), {name:l.name,lat:l.lat,lon:l.lon,elev:l.elev,surveyed:!!l.surveyed,access:!!l.access,who:l.who||'',epoch:(l.epoch!=null?l.epoch:null),lid:l.lid||''}); }catch(e){} };
   /* pending-approval counters for the owner banner on the main page */
   onSnapshot(query(collection(db,'reports'), where('status','==','pending')), snap => { window.__pendReports = snap.size; window.__pendingReports = snap.docs.map(d => ({ id:d.id, ...d.data() })); if(window.onPending) window.onPending(); if(window.render) window.render(); });
   onSnapshot(query(collection(db,'hwm'), where('status','==','pending')), snap => { window.__pendHWM = snap.size; window.__pendingHWM = snap.docs.map(d => ({ id:d.id, ...d.data() })); if(window.onPending) window.onPending(); if(window.render) window.render(); });
@@ -4047,7 +4085,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   };
 
   /* ---------- LOCATIONS: open shared map pins ---------- */
-  async function pushLoc(l){ try{ await setDoc(doc(db,'locations',l.id), {name:l.name,lat:l.lat,lon:l.lon,elev:l.elev,surveyed:!!l.surveyed}); }catch(e){} }
+  async function pushLoc(l){ try{ await setDoc(doc(db,'locations',l.id), {name:l.name,lat:l.lat,lon:l.lon,elev:l.elev,surveyed:!!l.surveyed,access:!!l.access}); }catch(e){} }
   const _saveLoc = window.saveLoc;
   window.saveLoc = async function(){ await _saveLoc(); for(const l of window.locs()){ await pushLoc(l); } };
   const _delLoc = window.delLoc;
@@ -4056,7 +4094,7 @@ if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'PASTE_HERE') {
   onSnapshot(collection(db,'locations'), snap => {
     const all = snap.docs.map(d => ({id:d.id, ...d.data()}));
     const deleted = new Set(all.filter(x=>x.deleted).map(x=>x.id));
-    const remote = all.filter(x=>!x.deleted).map(x => ({id:x.id,name:x.name,lat:x.lat,lon:x.lon,elev:x.elev,surveyed:!!x.surveyed,seed:false,who:x.who||'',epoch:(x.epoch!=null?x.epoch:null),lid:x.lid||''}));
+    const remote = all.filter(x=>!x.deleted).map(x => ({id:x.id,name:x.name,lat:x.lat,lon:x.lon,elev:x.elev,surveyed:!!x.surveyed,access:!!x.access,seed:false,who:x.who||'',epoch:(x.epoch!=null?x.epoch:null),lid:x.lid||''}));
     const ids = new Set(remote.map(r=>r.id));
     // A seed is dropped once a remote doc overrides it (moved/edited) OR it has been tombstoned — so deletes and moves stick.
     const seeds = (window.__seedLocs||[]).filter(s => !ids.has(s.id) && !deleted.has(s.id));
