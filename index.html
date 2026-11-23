@@ -230,6 +230,27 @@ body.simpleMode .modeFlag.expert{ display:none; }
   .card{ padding:14px 13px; }
 }
 
+
+/* ===== v177 mobile chain fix + tabs ===== */
+.chain{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.chain .node{ min-width:0; }
+@media(max-width:640px){
+  .chain{ gap:4px; }
+  .chain .node{ flex:0 0 auto; min-width:84px; padding:7px 4px; }
+  .chain .node .vv{ font-size:15px; }
+  .chain .arrow{ font-size:12px; flex:0 0 auto; align-self:center; }
+}
+#topnav{ display:none !important; }
+.tabbar{ position:sticky; top:0; z-index:500; display:flex; gap:6px; background:rgba(246,248,250,.94); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); padding:9px 6px; margin:0 -14px 12px; border-bottom:1px solid #e6ebf1; overflow-x:auto; }
+.tabBtn{ flex:0 0 auto; background:#fff; color:var(--mut); border:1px solid #e6ebf1; border-radius:999px; padding:9px 16px; font-weight:800; font-size:13.5px; cursor:pointer; transition:background .12s,color .12s; }
+.tabBtn.on{ background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 2px 8px rgba(31,111,235,.28); }
+body.simpleMode .expertTab{ display:none; }
+.tsec{ display:none; }
+body[data-tab="now"] .tab-now,
+body[data-tab="forecast"] .tab-forecast,
+body[data-tab="map"] .tab-map,
+body[data-tab="data"] .tab-data{ display:block; }
+
 </style>
 </head>
 <body>
@@ -239,7 +260,7 @@ body.simpleMode .modeFlag.expert{ display:none; }
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v176 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v177 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -318,6 +339,13 @@ body.simpleMode .modeFlag.expert{ display:none; }
     <button class="sm" style="flex:none;width:100%;margin-top:12px;background:#12202e;color:#fff" onclick="closeAlert()">Close</button>
   </div></div>
 
+  <!-- TABS (Phase 2) -->
+  <nav class="tabbar" id="tabbar">
+    <button id="tab_now" class="tabBtn on" onclick="showTab('now')">🏠 Now</button>
+    <button id="tab_forecast" class="tabBtn" onclick="showTab('forecast')">📈 Forecast</button>
+    <button id="tab_map" class="tabBtn" onclick="showTab('map')">🗺 Map</button>
+    <button id="tab_data" class="tabBtn expertTab" onclick="showTab('data')">🛠 Data</button>
+  </nav>
   <!-- NOW HERO (Phase 1) -->
   <div class="card nowHero" id="nowHero">
     <div class="nowTop">
@@ -2851,6 +2879,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v177","2026-11-22","UX overhaul Phase 2. The page is now organized into tabs — 🏠 Now · 📈 Forecast · 🗺 Map · 🛠 Data — instead of one long scroll; a sticky bar at the top switches between them, replacing the old ‘Jump to’ links. Now = status + gauge chain; Forecast = reach profile, forecast, mechanism, NOAA/fused, weather; Map = satellite map; Data = report/calibration, archive, history. In Simple view the Data tab is hidden. Also fixed a mobile bug where the gauge chain (Tilden) spilled outside its card — on a phone the chain now scrolls sideways inside the box."],
   ["v176","2026-11-22","UX overhaul Phase 1 of 4. Added a ‘Miles Ranch — right now’ hero card at the very top: the one-glance answer (current status, Tilden stage, forecast crest) in plain big type. Added a Simple ⇄ Expert toggle — Simple view hides the workbench sections (reach profile, mechanism detail, model calibration, history) for everyday glancing; Expert shows everything; your choice is remembered per device. Refreshed the visual design system app-wide (cards, buttons, spacing, shadows, mobile touch targets) for consistency. Coming next: tabbed navigation, one unified Add flow, and resizable image quadrants."],
   ["v175","2026-11-22","Fixed the Section 1 RANCH status calling it FLOODING when it isn’t. The label was reading raw Tilden stage (anything 10–15 ft = ‘FLOODING’), so at today’s ~11.5 ft it wrongly said flooding even though the model’s own ‘ft to flood’ margin showed otherwise. It now uses the official Tilden flood stages (action 11 · minor/flood 14 · moderate 16 · major 19) plus the modeled ranch margin: DRY → RISING → SLOUGHS WET (banks topping into peripheral channels, NOT flooding) → FLOODING (minor) → FLOODING → MAJOR FLOOD. The sub-text now says ‘sloughs/low ground wet — no road flooding yet’ below flood stage, so the big label and the detail agree."],
   ["v174","2026-11-22","Moved the 📡 System check button up next to the version badge at the top of the page (it was tucked inside the Advanced ‘compare model inundations’ panel under the map, so it was easy to miss). Same tool — a live check of every data feed."],
@@ -3859,6 +3888,43 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
   if(document.readyState==='loading') window.addEventListener('DOMContentLoaded', function(){ setTimeout(boot,300); });
   else setTimeout(boot,300);
 }catch(e){ try{console.error('phase1 error',e);}catch(_){ } } })();
+
+</script>
+
+<script>
+/* ===== v177 Phase 2: tabbed navigation ===== */
+(function(){ try{
+  function _tag(id,cls){ var e=document.getElementById(id); if(e){ cls.split(' ').forEach(function(c){ e.classList.add(c); }); } }
+  function tagTabs(){
+    _tag('nowHero','tsec tab-now'); _tag('sec1','tsec tab-now');
+    _tag('sec3','tsec tab-forecast'); _tag('fuseCard','tsec tab-forecast'); _tag('wxCard','tsec tab-forecast');
+    _tag('secmap','tsec tab-map');
+    _tag('sec6','tsec tab-data'); _tag('archiveCard','tsec tab-data'); _tag('sec7','tsec tab-data');
+    var hs=document.querySelectorAll('h2,h3');
+    for(var i=0;i<hs.length;i++){ var t=(hs[i].textContent||'').trim(); var c=hs[i].closest ? hs[i].closest('.card') : null; if(!c)continue;
+      if(/^1B(\b|\s|·)/.test(t)||/^2A(\b|\s|·)/.test(t)){ c.classList.add('tsec','tab-forecast'); } }
+  }
+  window.showTab = function(tab){
+    document.body.setAttribute('data-tab', tab);
+    try{ localStorage.setItem('nueces_ui_tab', tab); }catch(e){}
+    ['now','forecast','map','data'].forEach(function(t){ var b=document.getElementById('tab_'+t); if(b) b.classList.toggle('on', t===tab); });
+    if(tab==='map'){ setTimeout(function(){ try{ if(window.MAP&&MAP.invalidateSize)MAP.invalidateSize(true); }catch(e){} }, 90); }
+    try{ window.dispatchEvent(new Event('resize')); }catch(e){}
+    try{ window.scrollTo(0,0); }catch(e){}
+  };
+  // When switching to Simple while on the (expert-only) Data tab, fall back to Now.
+  var _origToggle = window.toggleMode;
+  window.toggleMode = function(){ if(typeof _origToggle==='function')_origToggle();
+    if(document.body.classList.contains('simpleMode') && document.body.getAttribute('data-tab')==='data'){ window.showTab('now'); } };
+  function boot2(){
+    tagTabs();
+    var saved='now'; try{ saved=localStorage.getItem('nueces_ui_tab')||'now'; }catch(e){}
+    if(document.body.classList.contains('simpleMode') && saved==='data') saved='now';
+    window.showTab(saved);
+  }
+  if(document.readyState==='loading') window.addEventListener('DOMContentLoaded', function(){ setTimeout(boot2,550); });
+  else setTimeout(boot2,550);
+}catch(e){ try{console.error('phase2 error',e);}catch(_){ } } })();
 
 </script>
 
