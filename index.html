@@ -186,6 +186,50 @@ window.addEventListener('unhandledrejection',function(e){
   .hfc-crest{font-weight:800;font-size:17px;color:#3f6ea8;letter-spacing:-.2px}
   .hfc-crest.big{color:#a3242b}
   .hfc-date{font-weight:600;color:#7a8794;font-size:11.5px}
+
+/* ===== v176 design system (Phase 1 overhaul) ===== */
+:root{
+  --accent:#1f6feb; --accent-ink:#0b4bbf;
+  --radius:14px; --radius-sm:10px;
+  --shadow:0 1px 2px rgba(16,32,52,.06),0 6px 20px rgba(16,32,52,.07);
+  --shadow-lg:0 12px 40px rgba(10,20,30,.18);
+  --gap:14px; --ok:#0f8a5f; --warn:#b9770a; --bad:#c1272d;
+}
+body{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+.wrap{ max-width:1120px; }
+.card{ border-radius:var(--radius); box-shadow:var(--shadow); border-color:#e6ebf1; padding:16px 17px; }
+.card h2, .card h3{ letter-spacing:.1px; }
+/* consistent primary/secondary buttons */
+button{ transition:filter .12s ease, transform .02s ease; }
+button:active{ transform:translateY(1px); }
+.sm{ border-radius:999px !important; padding:6px 12px !important; font-weight:700; }
+/* ---- Now hero ---- */
+.nowHero{ background:linear-gradient(135deg,#16304a 0%,#214a6e 100%); color:#eaf2fb; border:none; box-shadow:var(--shadow-lg); padding:18px 20px; }
+.nowHero .nowLabel{ font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#9fc0e4; font-weight:700; }
+.nowHero .nowStatus{ font-size:34px; font-weight:800; line-height:1.05; margin:4px 0 2px; }
+.nowHero .nowSub{ font-size:14px; color:#cfe0f2; }
+.nowTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap; }
+.nowMeta{ display:flex; gap:10px; flex-wrap:wrap; }
+.nowMetaItem{ background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.16); border-radius:12px; padding:8px 13px; min-width:92px; }
+.nowMetaItem span{ display:block; font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:#9fc0e4; }
+.nowMetaItem b{ font-size:20px; font-weight:800; color:#fff; }
+.nowBar{ display:flex; align-items:center; gap:12px; margin-top:14px; flex-wrap:wrap; }
+.modeBtn{ background:rgba(255,255,255,.14); color:#fff; border:1px solid rgba(255,255,255,.28); border-radius:999px; padding:7px 15px; font-weight:800; cursor:pointer; font-size:13px; }
+.modeBtn:hover{ background:rgba(255,255,255,.22); }
+.nowHint{ font-size:12.5px; color:#bcd3ea; }
+/* ---- simple mode hides the expert/workbench sections ---- */
+body.simpleMode .expSec{ display:none !important; }
+.modeFlag{ display:inline-block; font-size:10.5px; font-weight:800; color:#8a6d1a; background:#fff4e6; border:1px solid #f0cf9c; border-radius:999px; padding:1px 9px; margin-left:6px; vertical-align:middle; }
+body:not(.simpleMode) .modeFlag.simple{ display:none; }
+body.simpleMode .modeFlag.expert{ display:none; }
+/* ---- mobile polish ---- */
+@media(max-width:640px){
+  .nowHero .nowStatus{ font-size:28px; }
+  .nowMetaItem{ min-width:0; flex:1; }
+  .sm{ padding:8px 12px !important; }
+  .card{ padding:14px 13px; }
+}
+
 </style>
 </head>
 <body>
@@ -195,7 +239,7 @@ window.addEventListener('unhandledrejection',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v175 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v176 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -273,6 +317,25 @@ window.addEventListener('unhandledrejection',function(e){
     <div id="alertModalBody" style="flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;font-size:13.5px;line-height:1.5;color:#26313d"></div>
     <button class="sm" style="flex:none;width:100%;margin-top:12px;background:#12202e;color:#fff" onclick="closeAlert()">Close</button>
   </div></div>
+
+  <!-- NOW HERO (Phase 1) -->
+  <div class="card nowHero" id="nowHero">
+    <div class="nowTop">
+      <div style="min-width:200px">
+        <div class="nowLabel">Miles Ranch — right now</div>
+        <div class="nowStatus" id="heroStatus">—</div>
+        <div class="nowSub" id="heroSub"></div>
+      </div>
+      <div class="nowMeta">
+        <div class="nowMetaItem"><span>Tilden now</span><b id="heroTil">—</b></div>
+        <div class="nowMetaItem"><span>Forecast crest</span><b id="heroCrest">—</b></div>
+      </div>
+    </div>
+    <div class="nowBar">
+      <button class="modeBtn" id="modeBtn" onclick="toggleMode()">■ Simple view</button>
+      <span class="nowHint" id="heroAccess"></span>
+    </div>
+  </div>
 
   <!-- 1 CHAIN -->
   <div class="card livecard" id="sec1">
@@ -2788,6 +2851,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v176","2026-11-22","UX overhaul Phase 1 of 4. Added a ‘Miles Ranch — right now’ hero card at the very top: the one-glance answer (current status, Tilden stage, forecast crest) in plain big type. Added a Simple ⇄ Expert toggle — Simple view hides the workbench sections (reach profile, mechanism detail, model calibration, history) for everyday glancing; Expert shows everything; your choice is remembered per device. Refreshed the visual design system app-wide (cards, buttons, spacing, shadows, mobile touch targets) for consistency. Coming next: tabbed navigation, one unified Add flow, and resizable image quadrants."],
   ["v175","2026-11-22","Fixed the Section 1 RANCH status calling it FLOODING when it isn’t. The label was reading raw Tilden stage (anything 10–15 ft = ‘FLOODING’), so at today’s ~11.5 ft it wrongly said flooding even though the model’s own ‘ft to flood’ margin showed otherwise. It now uses the official Tilden flood stages (action 11 · minor/flood 14 · moderate 16 · major 19) plus the modeled ranch margin: DRY → RISING → SLOUGHS WET (banks topping into peripheral channels, NOT flooding) → FLOODING (minor) → FLOODING → MAJOR FLOOD. The sub-text now says ‘sloughs/low ground wet — no road flooding yet’ below flood stage, so the big label and the detail agree."],
   ["v174","2026-11-22","Moved the 📡 System check button up next to the version badge at the top of the page (it was tucked inside the Advanced ‘compare model inundations’ panel under the map, so it was easy to miss). Same tool — a live check of every data feed."],
   ["v173","2026-11-22","Robustness pass. (1) Elevation now has a fallback chain — USGS EPQS → Open-Meteo → the app’s own embedded LiDAR/DEM — so a spot always gets a ground elevation even when EPQS is down (the cause of ‘elevation didn’t record’). (2) Local saves are quota-safe: if the device’s storage fills, you get a clear warning instead of a silent failure; cloud data is unaffected. (3) New 📡 System check button live-tests every feed (gauges, forecast, alerts, elevation, database) and shows green/slow/no-response, so you can tell an app problem from a government API being down. (4) On load the app self-checks and flags any calibration marks the model can’t use (one tap to review). (5) Internal: a single correct modal builder, a number guard, and on-load self-tests reduce whole classes of past bugs. Separately, Firestore security rules now validate writes server-side — see the Phase 5 rules file."],
@@ -3759,6 +3823,42 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
   function _boot(){ try{ window.selfTest(); }catch(e){} setTimeout(function(){ try{ window.sweepData(); }catch(e){} }, 4000); setTimeout(function(){ try{ window.sweepData(); }catch(e){} }, 12000); }
   if(document.readyState==='complete'||document.readyState==='interactive') setTimeout(_boot,1500); else window.addEventListener('DOMContentLoaded',function(){ setTimeout(_boot,1500); });
 }catch(e){ try{console.error('robustness module error',e);}catch(_){ } } })();
+
+</script>
+
+<script>
+/* ===== v176 Phase 1: Now hero + Simple/Expert ===== */
+(function(){ try{
+  function _txt(id){ var e=document.getElementById(id); return e?(e.textContent||'').trim():''; }
+  function _col(id){ var e=document.getElementById(id); return e?(e.style.color||''):''; }
+  window.renderNowHero = function(){
+    try{
+      var st=_txt('nRanch')||'—', sub=_txt('nRanchEx'), til=_txt('nTil'), crest=_txt('crestVal'), band=_txt('crestBand');
+      var hs=document.getElementById('heroStatus'); if(hs){ hs.textContent=st; var c=_col('nRanch'); if(c)hs.style.color=c; }
+      var hsub=document.getElementById('heroSub'); if(hsub) hsub.textContent=sub||'';
+      var ht=document.getElementById('heroTil'); if(ht) ht.textContent=(til&&til!=='—')?til+' ft':'—';
+      var hc=document.getElementById('heroCrest'); if(hc) hc.textContent=(crest?crest+' ft':'—');
+      var ha=document.getElementById('heroAccess'); if(ha) ha.textContent=band?('projected peak '+band.replace(/^\(|\)$/g,'')):'';
+    }catch(e){}
+  };
+  function tagExpert(){
+    try{
+      ['sec6','sec7'].forEach(function(id){ var e=document.getElementById(id); if(e)e.classList.add('expSec'); });
+      var hs=document.querySelectorAll('h2,h3'); for(var i=0;i<hs.length;i++){ var t=(hs[i].textContent||'').trim(); if(/^1B(\b|\s|·)/.test(t)||/^2A(\b|\s|·)/.test(t)){ var card=hs[i].closest('.card'); if(card)card.classList.add('expSec'); } }
+    }catch(e){}
+  }
+  window.toggleMode = function(){ var simple=!document.body.classList.contains('simpleMode'); applyMode(simple); try{ localStorage.setItem('nueces_ui_mode', simple?'simple':'expert'); }catch(e){} };
+  function applyMode(simple){ document.body.classList.toggle('simpleMode', !!simple); var b=document.getElementById('modeBtn'); if(b) b.textContent = simple?'⚙ Show all (Expert)':'■ Simple view'; }
+  function boot(){
+    tagExpert();
+    var saved='expert'; try{ saved=localStorage.getItem('nueces_ui_mode')||'expert'; }catch(e){}
+    applyMode(saved==='simple');
+    window.renderNowHero();
+    setInterval(window.renderNowHero, 2500);
+  }
+  if(document.readyState==='loading') window.addEventListener('DOMContentLoaded', function(){ setTimeout(boot,300); });
+  else setTimeout(boot,300);
+}catch(e){ try{console.error('phase1 error',e);}catch(_){ } } })();
 
 </script>
 
