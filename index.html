@@ -274,7 +274,7 @@ body.mapFullBody{overflow:hidden}
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v187 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v188 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -565,6 +565,7 @@ body.mapFullBody{overflow:hidden}
     <div id="mapControls">
       <details class="mapgrp"><summary class="mapgrp-h" style="cursor:pointer">🗺 Map layers — what’s drawn <span class="sub" style="font-weight:400">(tap)</span></summary><div class="mapgrp-b">
         <button class="sm" id="floodBtn" onclick="toggleFlood()">🌊 Flood extent</button>
+        <button class="sm" id="clusterBtn" onclick="toggleCluster()" title="Group overlapping pins into a numbered cluster (tap or zoom in to expand). Turn off to show every pin individually.">🔵 Cluster pins</button>
         <button class="sm" id="logsMapBtn" onclick="toggleLogsMap()">📍 Field logs</button>
         <button class="sm" id="rainBtn" onclick="toggleRain()">🌧 Rain layer</button>
         <button class="sm" id="elevBtn" onclick="toggleElev()">⛰ Elevation</button>
@@ -2445,7 +2446,11 @@ function delLoc(id,skip){if(!skip&&!confirm('Delete this location?'))return fals
 
 /* ================= satellite map ================= */
 let MAP=null, MARKERS=[], FRONTLAYER=[], MARKERCLUSTER=null;
-function _addMapMk(mk){ if(MARKERCLUSTER){ try{ MARKERCLUSTER.addLayer(mk); }catch(e){ mk.addTo(MAP); } } else { mk.addTo(MAP); } MARKERS.push(mk); }
+let CLUSTER_ON=(function(){ try{ return localStorage.getItem('nueces_cluster')!=='0'; }catch(e){ return true; } })();
+function _addMapMk(mk){ if(MARKERCLUSTER && CLUSTER_ON){ try{ MARKERCLUSTER.addLayer(mk); }catch(e){ mk.addTo(MAP); } } else { mk.addTo(MAP); } MARKERS.push(mk); }
+function toggleCluster(){ CLUSTER_ON=!CLUSTER_ON; try{ localStorage.setItem('nueces_cluster', CLUSTER_ON?'1':'0'); }catch(e){}
+  var b=document.getElementById('clusterBtn'); if(b)b.style.filter=CLUSTER_ON?'none':'grayscale(1) opacity(.55)';
+  try{ var c=document.getElementById('crest'); var crest=c?parseFloat(c.value):NaN; if(isFinite(crest)&&typeof updateMap==='function')updateMap(crest); }catch(e){} }
 function floodBytes(){ return FLOODBYTES; }
 function pngToBytes(uri,w,h){ return new Promise(function(res){ const img=new Image(); img.onload=function(){ try{ const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const ctx=cv.getContext('2d'); ctx.drawImage(img,0,0); const d=ctx.getImageData(0,0,w,h).data; const a=new Uint8Array(w*h); for(let i=0;i<w*h;i++)a[i]=d[i*4]; res(a); }catch(e){ res(new Uint8Array(w*h)); } }; img.onerror=function(){ res(new Uint8Array(w*h)); }; img.src=uri; }); }
 async function initRasters(){ try{ FLOODBYTES=await pngToBytes(FLOOD_RASTER.data,FLOOD_RASTER.w,FLOOD_RASTER.h); FLOODRM=await pngToBytes(FLOOD_RASTER.rm,FLOOD_RASTER.w,FLOOD_RASTER.h); if(typeof FLOOD_FINE1M!=="undefined"&&FLOOD_FINE1M.data){FLOOD1MBYTES=await pngToBytes(FLOOD_FINE1M.data,FLOOD_FINE1M.w,FLOOD_FINE1M.h);} ELEVBYTES=await pngToBytes(ELEV_RASTER.data,ELEV_RASTER.w,ELEV_RASTER.h); FINEBYTES=await pngToBytes(ELEV_FINE.data,ELEV_FINE.w,ELEV_FINE.h); if(typeof ELEV_FINE1M!=="undefined"&&ELEV_FINE1M.data){FINE1MBYTES=await pngToBytes(ELEV_FINE1M.data,ELEV_FINE1M.w,ELEV_FINE1M.h);} if(FLOOD_ON&&typeof drawFlood==='function')drawFlood(); if(ELEV_ON&&typeof drawElev==='function')drawElev(); }catch(e){} }
@@ -2517,7 +2522,7 @@ function initMap(){
       var _bStreet=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'});
       L.control.layers({'🛰 Satellite':_bSat,'🗺 Topographic':_bTopo,'🛣 Streets':_bStreet},null,{position:'topright',collapsed:true}).addTo(MAP);
     }catch(_e){}
-    try{ if(L.markerClusterGroup){ MARKERCLUSTER=L.markerClusterGroup({maxClusterRadius:46,spiderfyOnMaxZoom:true,showCoverageOnHover:false,disableClusteringAtZoom:18,chunkedLoading:true}); MARKERCLUSTER.addTo(MAP); } }catch(_e2){}
+    try{ if(L.markerClusterGroup){ MARKERCLUSTER=L.markerClusterGroup({maxClusterRadius:46,spiderfyOnMaxZoom:true,showCoverageOnHover:false,disableClusteringAtZoom:20,chunkedLoading:true}); MARKERCLUSTER.addTo(MAP); } }catch(_e2){}
     MAP.on('click',e=>{ if(window.__moveTarget){ hubApplyMove(e.latlng.lat,e.latlng.lng); return; }
       if(window.__clickAdd){ mapAddAt(e.latlng.lat,e.latlng.lng); return; } // drop a new mark of chosen type
       openLoc();document.getElementById('mLat').value=e.latlng.lat.toFixed(6);
@@ -2950,6 +2955,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v188","2026-11-23","Cluster controls. Clusters now hold together to a closer zoom (disband at zoom 20 instead of 18), so the ranch pins stay grouped as you zoom in rather than scattering early. Added a ‘🔵 Cluster pins’ toggle in the ☰ Layers panel to turn clustering on/off entirely — off shows every pin individually; your choice is remembered. Tapping a cluster still spiderfies it open at any zoom."],
   ["v187","2026-11-22","Map overhaul part 2. (Declutter) The pins that pile up at the ranch (places, water logs, and the red crest-anchor diamonds) now CLUSTER — a numbered circle at low zoom that splits apart as you zoom in or tap it, so the rm-11.8 clump is finally readable. (Linking) A map pin’s popup has a ‘📋 Show in list’ button that jumps to the Data tab and filters the places list to that spot; and every row in the places list has a 📍 button that jumps to the Map tab and centers on that pin. If the cluster plugin ever fails to load, pins fall back to plain markers automatically."],
   ["v186","2026-11-22","Fixed the ☰ Layers panel order: the Flood-stage-lines interval dropdown was stranded at the bottom (below Flow energy) instead of under its own ‘〰 Flood-stage lines’ button — a pre-existing ordering bug that the new vertical panel made obvious. It now sits with its button, matching the Elevation-lines dropdown."],
   ["v185","2026-11-22","Fix for v184: the new ☰ Layers button, ⛶ Fullscreen, and basemap switcher didn’t appear because the code checked window.MAP, but the map is stored as a lexical global (let MAP) that isn’t attached to window — so the check was always false and the controls were never added. Referenced the map directly instead. The map tab’s auto-resize on tab-switch had the same issue and is fixed too. (So: deploy v185 and the Map controls show up.)"],
@@ -4049,6 +4055,7 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
         if(det)det.style.display='none';
       }
     }catch(e){}
+    try{ var cb=document.getElementById('clusterBtn'); if(cb)cb.style.filter=(typeof CLUSTER_ON!=='undefined'&&!CLUSTER_ON)?'grayscale(1) opacity(.55)':'none'; }catch(e){}
   });
 }catch(e){ try{console.error('mapEnhance',e);}catch(_){ } } })();
 
