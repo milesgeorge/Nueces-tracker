@@ -260,7 +260,7 @@ body[data-tab="data"] .tab-data{ display:block; }
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v181 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v182 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -615,10 +615,9 @@ body[data-tab="data"] .tab-data{ display:block; }
     <p class="sub" style="margin:2px 0 8px">Every spot on the river in one list, matched to the pins on the map. Badges: <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#5b6ee1" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:-2px"><path d="M12 21s-6-5.4-6-10a6 6 0 0 1 12 0c0 4.6-6 10-6 10z"/><circle cx="12" cy="11" r="2.3"/></svg> tracked · <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#1a9e75" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:inline-block;vertical-align:-2px"><path d="M12 3.2s5.5 6.1 5.5 10.3a5.5 5.5 0 0 1-11 0C6.5 9.3 12 3.2 12 3.2z"/></svg> water observed now · <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#c1272d" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:17px;height:17px;display:inline-block;vertical-align:-3px"><circle cx="12" cy="5.2" r="2"/><path d="M12 7.2v11.6"/><path d="M5 12.5a7 7 0 0 0 14 0"/><path d="M4.6 12.5H7M17 12.5h2.4"/></svg> crest anchor (tunes the forecast). <br><b>Depth pills:</b> <span class="dpill dp-green">dry</span> = ground still above the water (freeboard) · <span class="dpill dp-red">under</span> = flooded, water over the ground · <span class="dpill dp-amber">amber</span> = within ½ ft of flooding · <span class="dpill dp-blue">deep</span> = a logged water depth. <br><b>rm</b> = river-miles upstream of the Tilden gauge · <b>off-channel</b> = sideways distance from the main river channel. Delete a row and it clears from the map, list, and calibration.</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0">
       <input id="hubSearch" placeholder="search places…" oninput="renderHub()" style="flex:1;min-width:150px;padding:8px 10px;border:1px solid var(--rule);border-radius:8px">
-      <button class="add sm" onclick="openHubLogger()">＋ Log a sighting</button>
-      <button class="sm" onclick="openLoc()">＋ Add a watch spot</button>
+      <button class="add sm" onclick="openHubLogger()" style="font-weight:800;padding:8px 18px;font-size:14px">＋ Add</button>
     </div>
-    <div class="sub" style="margin:-2px 2px 8px;line-height:1.45"><b>Log a sighting</b> = record the water depth <i>right now</i>, or a <i>high-water / crest line</i>, at a spot — it creates the spot automatically if it’s new. &nbsp;<b>Add a watch spot</b> = just save a place (name + elevation) to watch its forecast, with no reading logged yet.</div>
+    <div class="sub" style="margin:-2px 2px 8px;line-height:1.45"><b>＋ Add</b> walks you through it: pick <b>what</b> — 💧 current water, 🎯 a high-water/crest line, or 📍 just a place to watch — then <b>where</b> (GPS, tap the map, or type coordinates), then save. New spots are created automatically.</div>
     <div style="margin:2px 2px 10px"><a href="log.html" style="display:inline-flex;align-items:center;gap:7px;background:#1a6f8b;color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:9px 14px;border-radius:10px">📱 On a phone in the field? Open the Quick Field Log →</a></div>
     <div class="mapgrp" style="margin:4px 0 10px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
@@ -829,15 +828,16 @@ body[data-tab="data"] .tab-data{ display:block; }
 <!-- HUB LOGGER MODAL -->
 <div class="modal" id="hubLogModal">
   <div class="box">
-    <h3 id="hlTitle">Log a sighting</h3>
-    <div style="display:flex;gap:8px;margin:2px 0 10px">
+    <h3 id="hlTitle">＋ Add to the map</h3>
+    <label style="font-weight:800;color:#6b7684;font-size:12px">① What are you adding?</label>
+    <div style="display:flex;gap:8px;margin:4px 0 10px">
       <button type="button" id="hlModeWater" onclick="setHubMode('water')" style="flex:1;padding:11px;border:none;border-radius:10px;font-weight:700;color:#fff;background:#1a6f8b;cursor:pointer">💧 Current water</button>
       <button type="button" id="hlModeCrest" onclick="setHubMode('crest')" style="flex:1;padding:11px;border:none;border-radius:10px;font-weight:700;color:#fff;background:#9aa6b2;cursor:pointer">⚓ High-water / crest</button>
       <button type="button" id="hlModePlace" onclick="setHubMode('place')" style="flex:1;padding:11px;border:none;border-radius:10px;font-weight:700;color:#fff;background:#9aa6b2;cursor:pointer">📍 Just a place</button>
     </div>
     <div id="hlModeBanner" style="text-align:center;font-weight:800;font-size:12.5px;padding:7px;border-radius:8px;margin:0 0 10px;background:#e6f0f5;color:#1a6f8b">You are logging: 💧 CURRENT WATER</div>
 
-    <label>Where is this spot?</label>
+    <label style="font-weight:800;color:#6b7684;font-size:12px">② Where is it?</label>
     <div style="display:flex;gap:6px;margin:2px 0 6px">
       <button type="button" id="hlTabGps" onclick="setHubSpotMode('gps')" class="sm" style="flex:1">📍 Use my GPS</button>
       <button type="button" id="hlTabPick" onclick="setHubSpotMode('pick')" class="sm" style="flex:1">Pick a place</button>
@@ -860,7 +860,8 @@ body[data-tab="data"] .tab-data{ display:block; }
       <div id="hlGeoMan" class="help" style="margin-top:6px"></div>
     </div>
 
-    <label id="hlNameLbl" style="margin-top:8px">Spot name (for a new spot)</label>
+    <label style="font-weight:800;color:#6b7684;font-size:12px;display:block;margin-top:10px">③ Details &amp; save</label>
+    <label id="hlNameLbl" style="margin-top:6px">Spot name (for a new spot)</label>
     <input id="hlName" placeholder="e.g. river pump, low crossing">
 
     <label id="hlDepLbl" style="margin-top:8px">Water depth here (ft · 0 = just reaching the ground)</label>
@@ -2918,6 +2919,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v182","2026-11-22","UX overhaul Phase 3 — one unified Add flow. The two separate buttons (‘Log a sighting’ + ‘Add a watch spot’) are now a single ‘＋ Add’ that opens one guided flow with explicit steps: ① What are you adding? (💧 current water · 🎯 high-water/crest · 📍 just a place to watch) → ② Where? (GPS · tap the map · type coordinates · pick an existing place) → ③ Details & save. New spots are created automatically. The map’s ‘＋ Add mark on map’ and the Quick Field Log feed into the same flow, so there’s one way to add things instead of four."],
   ["v181","2026-11-22","The 🚗 Access-crossing checkbox now shows in the edit panel for EVERY class — water sighting, high-water mark, or Place. (Your bridge point is logged as a high-water mark, which is why it was still hidden in v180.) Tick it and the access-cut / GET-OUT warning turns on. Tip: flag the lowest DRIVABLE approach point of the crossing, not the creek bed, so the computed cut-off stage reflects when you actually lose the road."],
   ["v180","2026-11-22","Fixed: the 🚗 Access-crossing checkbox was hidden unless the spot was a pure Place, but most of your crossings are logged with water/marks, so it never appeared. It now shows in the edit panel for Places AND water sightings, and the flag + the access-cut computation work across all record types (location, water log, or crest mark). So: open your access crossing’s ✏️ pencil, tick 🚗 Access crossing, and the GET-OUT / access-cut stage turns on."],
   ["v179","2026-11-22","‘GET OUT’ now means what it should: home access cut off at your bridge. Added a 🚗 ‘Access crossing’ checkbox to any location’s edit panel — flag the LOWEST point on your access road/bridge. The app computes the exact Tilden stage that floods it (lowest flagged crossing governs), shows it in the Now card (‘Home access (X) cuts off at Tilden ≈ N ft — M ft of room now’) and in the Section-2 forecast box, and escalates the warning to ‘ACCESS CLOSING’ then ‘URGENT — GET OUT (access cut)’ as the crest approaches/reaches it. Until you flag a crossing it prompts you to. Also cross-checked all warning wordings against the official NWS impact stages (done in v175/v178) so Section 1 status, the Section 2 forecast, and the gauge colors all agree."],
