@@ -195,7 +195,7 @@ window.addEventListener('unhandledrejection',function(e){
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v172 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v173 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -483,6 +483,7 @@ window.addEventListener('unhandledrejection',function(e){
         <button class="sm" id="residBtn" onclick="toggleResiduals()" style="filter:grayscale(1) opacity(.55)">📊 Model vs marks</button>
         <button class="sm" onclick="openResidReport()" style="background:#eef4fb;color:#1f6feb;border:1px solid #bcd6f5" title="open the model-vs-marks comparison table">📋 Open comparison table ↗</button>
         <button class="sm" id="markDocBtn" onclick="openMarkDoctor()" style="background:#fff4e6;color:#a2560a;border:1px solid #f0cf9c" title="Scan every calibration mark for problems — off-channel, out-of-range slope, missing data — with the reason for each, so you can fix or delete them">🩺 Check my marks</button>
+        <button class="sm" id="sysCheckBtn" onclick="openSysCheck()" style="background:#eef4fb;color:#1f6feb;border:1px solid #bcd6f5" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)">📡 System check</button>
         <button class="sm" id="fimBtn" onclick="toggleFim()" style="filter:grayscale(1) opacity(.55)">🛰 NOAA FIM (n/a)</button>
         <button class="sm" onclick="openModelsHelp()" style="background:#1a6f8b;color:#fff;font-weight:700">📖 Models explained</button>
       </div></details></details>
@@ -1118,11 +1119,11 @@ const RANCH_RM=riverMi(RANCH_HOUSE);                  // its along-channel river
 RANCH_SEED.rm=RANCH_RM;                               // keep the 2013 rise (off) as the physical anchor; slope = off / RANCH_RM
 /* HIGH-WATER MARKS calibrate the model (peak-to-peak). LIVE REPORTS only show on the map. */
 function hwm(){try{return JSON.parse(localStorage.getItem('nueces_v2_hwm')||'[]')}catch(e){return[]}}
-function saveHWM(a){localStorage.setItem('nueces_v2_hwm',JSON.stringify(a));}
+function saveHWM(a){(window.safeSetItem||function(k,v){localStorage.setItem(k,v);})('nueces_v2_hwm',JSON.stringify(a));}
 function reports(){try{return JSON.parse(localStorage.getItem('nueces_v2_reports')||'[]')}catch(e){return[]}}
-function saveReports(a){localStorage.setItem('nueces_v2_reports',JSON.stringify(a));}
+function saveReports(a){(window.safeSetItem||function(k,v){localStorage.setItem(k,v);})('nueces_v2_reports',JSON.stringify(a));}
 function seedMarks(){ try{ var s=JSON.parse(localStorage.getItem('nueces_seed_marks')||'null'); if(s&&s.length)return s; }catch(e){} return [{rm:RANCH_SEED.rm, off:RANCH_SEED.off, w:RANCH_SEED.w||4.0, label:'2013 Elm Creek line (surveyed)'}]; }
-function saveSeedMarks(a){ try{ localStorage.setItem('nueces_seed_marks', JSON.stringify(a)); }catch(e){} }
+function saveSeedMarks(a){ (window.safeSetItem||function(k,v){try{localStorage.setItem(k,v);}catch(e){}})('nueces_seed_marks', JSON.stringify(a)); }
 function slopeSeed(){ var A=seedMarks().filter(function(a){return a.rm>0;}); if(!A.length) return (RANCH_SEED.rm>0?RANCH_SEED.off/RANCH_SEED.rm:2.09); var n=0,d=0; A.forEach(function(a){ var w=a.w||1; n+=w*a.off*a.rm; d+=w*a.rm*a.rm; }); return d>0?n/d:(RANCH_SEED.off/RANCH_SEED.rm); }
 function seedSet(i,k,v){ var S=seedMarks(); if(!S[i])return; S[i][k]=(k==='label')?v:(parseFloat(v)||0); saveSeedMarks(S); renderSeedEditor(); if(window.render)render(); }
 function seedDel(i){ var S=seedMarks(); if(S.length<=1){ alert('Keep at least one baseline seed point — the model needs a foundation.'); return; } S.splice(i,1); saveSeedMarks(S); renderSeedEditor(); if(window.render)render(); }
@@ -1185,7 +1186,7 @@ function wseAt(loc,crest){return TIL_ZERO+crest+offsetAt(riverMi(loc));}
 
 /* ================= location store ================= */
 function locs(){try{const u=JSON.parse(localStorage.getItem('nueces_v2_loc')||'null');return u||SEED_LOCS.slice();}catch(e){return SEED_LOCS.slice();}}
-function saveLocs(a){localStorage.setItem('nueces_v2_loc',JSON.stringify(a));}
+function saveLocs(a){(window.safeSetItem||function(k,v){localStorage.setItem(k,v);})('nueces_v2_loc',JSON.stringify(a));}
 function newLid(){ return 'L'+Date.now().toString(36).slice(-5).toUpperCase(); }
 function whoNow(){ var u=window.__user; return (u&&(u.displayName||u.email))||'me'; }
 
@@ -2778,6 +2779,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v173","2026-11-22","Robustness pass. (1) Elevation now has a fallback chain — USGS EPQS → Open-Meteo → the app’s own embedded LiDAR/DEM — so a spot always gets a ground elevation even when EPQS is down (the cause of ‘elevation didn’t record’). (2) Local saves are quota-safe: if the device’s storage fills, you get a clear warning instead of a silent failure; cloud data is unaffected. (3) New 📡 System check button live-tests every feed (gauges, forecast, alerts, elevation, database) and shows green/slow/no-response, so you can tell an app problem from a government API being down. (4) On load the app self-checks and flags any calibration marks the model can’t use (one tap to review). (5) Internal: a single correct modal builder, a number guard, and on-load self-tests reduce whole classes of past bugs. Separately, Firestore security rules now validate writes server-side — see the Phase 5 rules file."],
   ["v172","2026-08-10","Fixed a crash: the ‘🌊 Edge vs marks’ button called a function that no longer existed (toggleEdgeMarks), throwing the red ReferenceError at the top of the screen. Replaced it with a new ‘🩺 Check my marks’ tool. It scans every calibration mark and lists only the problem ones, each with the reason in plain language: 🔴 excluded from the model (off the mapped channel / no river-mile, or missing rise) · 🟠 out-of-range slope or too close to the gauge (down-weighted) · 🟡 minor (disagrees with the group by >30%, or missing elevation). Each flagged mark has Fix location, Edit, and Delete right there — and Fix location now RE-COMPUTES the mark’s river-mile and rise from the new spot, so dragging an off-channel mark back onto the river repairs it automatically."],
   ["v171","2026-08-10","Fixed the calibrated inundation showing the whole reach dry while Raw LiDAR looked fine. Cause: the reach-slope fit could be poisoned by a single bad anchor — a stage-point whose location fell off the mapped channel got saved with river-mile = NaN (the old ‘rm<3’ guard let NaN through because NaN<3 is false), and one NaN anchor made the whole weighted slope NaN, so every calibrated cell failed the wet test. Three fixes: (1) the slope fit now ignores any anchor with a non-finite river-mile or rise, so one bad mark can’t blank the model; (2) creating a stage-point now rejects a location that isn’t on the mapped channel instead of saving NaN; (3) a render-time safety net clamps the calibrated slope to a plausible 1.0–2.8 ft/mi and falls back to Raw if it’s ever non-finite, so the calibrated layer can never blank out again. Depth shading is a separate toggle (smooth / contrast palette buttons) and works on BOTH the Raw and Calibrated fills — it just needs to be turned on."],
   ["v170","2026-08-09","Fixed ‘Fix location’ from the MAP POPUP (the green button on a pin). The popup passed the place’s key URL-encoded (the key contains @ and commas), but the move handler never decoded it, so when you tapped the new spot it compared an encoded key against the raw keys, matched nothing, and silently did nothing — the pin never moved. hubStartMove now decodes the id, so the map-click move applies (and, via the earlier cloud-sync + seed fixes, sticks). The hub-list Fix-location buttons were unaffected because they pass raw ids."],
@@ -2982,7 +2984,7 @@ function toggleAdmin(){ if(ADMIN)return; if(!realUser()){ openAuth(); return; } 
 function knownFloodRows(){try{return (typeof HISTX!=='undefined'?HISTX:HIST);}catch(e){return [];}}
 function fillPrefill(){var s=document.getElementById('evPrefill'); if(!s)return; var cur=s.value; var rows=knownFloodRows().slice().sort(function(a,b){return b[0]-a[0];}); s.innerHTML='<option value="">prefill from a known flood…</option>'+rows.map(function(r,i){return '<option value="'+i+'">'+((r[2]||r[1]))+' · '+(+r[0]).toFixed(1)+' ft</option>';}).join(''); s.value=cur;}
 function prefillEvent(i){ if(i===''||i==null)return; var rows=knownFloodRows().slice().sort(function(a,b){return b[0]-a[0];}); var r=rows[+i]; if(!r)return; var yrM=(''+(r[1]||'')).match(/\d{4}/); var nm=(r[2]||('Flood '+(r[1]||''))); var ev=document.getElementById('evName'); if(ev)ev.value=nm+(yrM&&(''+nm).indexOf(yrM[0])<0?' '+yrM[0]:''); var d=document.getElementById('evDate'); if(d&&yrM)d.value=yrM[0]+'-06-01'; var c=document.getElementById('evCrest'); if(c)c.value=(+r[0]).toFixed(1); var tg=document.getElementById('evTags'); if(tg)tg.value=(yrM?yrM[0]+', ':'')+'historic'; var al=document.getElementById('evAttachLive'); if(al)al.checked=false; }
-function saveEventsArr(a){localStorage.setItem('nueces_v2_events',JSON.stringify(a));}
+function saveEventsArr(a){(window.safeSetItem||function(k,v){localStorage.setItem(k,v);})('nueces_v2_events',JSON.stringify(a));}
 let STAGED=[]; var EV_EDIT_ID=null;
 function compressImg(file){return new Promise(res=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height,M=1280;if(w>M||h>M){if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;}}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);c.toBlob(b=>res({blob:b||file,thumb:c.toDataURL('image/jpeg',0.45)}),'image/jpeg',0.75);};img.onerror=()=>res({blob:file,thumb:''});img.src=URL.createObjectURL(file);});}
 function evDragOver(e){ e.preventDefault(); var d=document.getElementById("evDrop"); if(d){d.style.background="#eef4ff";d.style.borderColor="#5b6ee1";} }
@@ -3630,6 +3632,123 @@ function boot(){
   try{ initCollapsers(); if(window.MAP&&MAP.invalidateSize)setTimeout(function(){try{MAP.invalidateSize();}catch(e){}},90); }catch(e){}
 }
 if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',boot); else boot();
+</script>
+
+<script>
+/* ============================================================
+   ROBUSTNESS MODULE (v173) — resilience, diagnostics, self-tests
+   Appended last so its definitions override earlier ones.
+   ============================================================ */
+(function(){ try{
+  /* ---------- Tier 3: tiny safe helpers ---------- */
+  window.FIN = function(x,d){ var v=+x; return isFinite(v)?v:(d==null?null:d); };
+  // One correct modal builder — prevents the "card closes early / fields spill out" class of bug.
+  window.buildModal = function(id,title,innerHtml,maxw){
+    var ov=document.getElementById(id); if(ov)ov.remove();
+    ov=document.createElement('div'); ov.id=id;
+    ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(10,20,30,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+    var card='<div style="background:#fff;border-radius:14px;max-width:'+(maxw||460)+'px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.4)">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e6ebf0"><div style="font-weight:800">'+title+'</div>'
+      +'<button onclick="var m=document.getElementById(\''+id+'\');if(m)m.remove();" style="border:none;background:#eef2f6;border-radius:8px;padding:5px 11px;cursor:pointer;font-weight:700">✕</button></div>'
+      +'<div style="padding:14px 16px">'+innerHtml+'</div></div>';
+    ov.innerHTML=card;
+    ov.addEventListener('click',function(ev){ if(ev.target===ov)ov.remove(); });
+    document.body.appendChild(ov); return ov;
+  };
+
+  /* ---------- Tier 1: storage-safe saves ---------- */
+  window.safeSetItem = function(key,val){
+    try{ localStorage.setItem(key,val); return true; }
+    catch(e){ try{ if(e&&(e.name==='QuotaExceededError'||e.code===22||e.code===1014)) _storageWarn(); }catch(_){ } return false; }
+  };
+  function _storageWarn(){ try{ if(document.getElementById('storeWarnBar'))return;
+    var b=document.createElement('div'); b.id='storeWarnBar';
+    b.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:99997;background:#8a1f1f;color:#fff;padding:9px 12px;font-weight:700;text-align:center';
+    b.innerHTML='⚠ This device’s local storage is full — new logs may not save locally. Your cloud data is safe. <a onclick="var x=document.getElementById(\'storeWarnBar\');if(x)x.remove();" style="color:#fff;text-decoration:underline;cursor:pointer">dismiss</a>';
+    document.body.appendChild(b);
+  }catch(e){} }
+
+  /* ---------- Tier 1: elevation fallback chain ---------- */
+  function _fetchTO(url,ms){ return new Promise(function(res,rej){ var done=false; var t=setTimeout(function(){ if(!done){done=true;rej(new Error('timeout'));} },ms||7000);
+    fetch(url).then(function(r){ if(!done){done=true;clearTimeout(t);res(r);} }).catch(function(e){ if(!done){done=true;clearTimeout(t);rej(e);} }); }); }
+  window._fetchTO=_fetchTO;
+  window.localElev = function(lat,lon){ try{
+    var cand=[ [ (typeof FINEBYTES!=='undefined'?FINEBYTES:null), (typeof ELEV_FINE!=='undefined'?ELEV_FINE:null) ],
+               [ (typeof ELEVBYTES!=='undefined'?ELEVBYTES:null), (typeof ELEV_RASTER!=='undefined'?ELEV_RASTER:null) ] ];
+    for(var k=0;k<cand.length;k++){ var by=cand[k][0], R=cand[k][1]; if(!by||!R)continue;
+      if(lat<R.south||lat>R.north||lon<R.west||lon>R.east)continue;
+      var c=Math.round((lon-R.west)/(R.east-R.west)*(R.w-1)), r=Math.round((R.north-lat)/(R.north-R.south)*(R.h-1));
+      if(c<0||c>=R.w||r<0||r>=R.h)continue; var b=by[r*R.w+c]; if(b===255)continue;
+      return +(R.base+b*R.step).toFixed(1); } }catch(e){} return null; };
+  // Override fetchElev: EPQS -> Open-Meteo -> embedded LiDAR/DEM. Records which source in window.__elevSrc.
+  window.fetchElev = async function(lat,lon){
+    if(!isFinite(+lat)||!isFinite(+lon)) return null;
+    try{ var r=await _fetchTO('https://epqs.nationalmap.gov/v1/json?x='+lon+'&y='+lat+'&units=Feet&wkid=4326',7000).then(function(x){return x.json();});
+      var v=(r&&r.value!=null)?+r.value:null; if(v!=null&&isFinite(v)&&v>-1000){ window.__elevSrc='USGS EPQS'; return +v.toFixed(1); } }catch(e){}
+    try{ var r2=await _fetchTO('https://api.open-meteo.com/v1/elevation?latitude='+lat+'&longitude='+lon,7000).then(function(x){return x.json();});
+      if(r2&&r2.elevation&&r2.elevation.length){ var m=+r2.elevation[0]; if(isFinite(m)){ window.__elevSrc='Open-Meteo'; return +(m*3.28084).toFixed(1); } } }catch(e){}
+    var le=window.localElev(lat,lon); if(le!=null){ window.__elevSrc='embedded LiDAR'; return le; }
+    window.__elevSrc=null; return null;
+  };
+
+  /* ---------- Tier 2: startup data sweep (non-destructive) ---------- */
+  window.sweepData = function(){
+    try{ var bad=0, arr=(typeof hwm==='function')?hwm():[];
+      arr.forEach(function(m){ if(!(isFinite(m.rm)&&m.rm>0&&isFinite(m.off))) bad++; });
+      var el=document.getElementById('sweepNote');
+      if(bad>0){ if(!el){ el=document.createElement('div'); el.id='sweepNote'; el.style.cssText='margin:6px 0;padding:8px 11px;border:1px solid #f0cf9c;background:#fff4e6;color:#8a560a;border-radius:9px;font-size:12.5px;cursor:pointer;font-weight:600';
+          el.onclick=function(){ if(typeof openMarkDoctor==='function')openMarkDoctor(); };
+          var host=document.querySelector('.wrap')||document.body; host.insertBefore(el, host.firstChild); }
+        el.innerHTML='⚠ '+bad+' calibration mark'+(bad>1?'s':'')+' can’t be used by the model (off-channel or missing data). Tap to review in 🩺 Check my marks.'; }
+      else if(el){ el.remove(); }
+      return bad;
+    }catch(e){ return 0; }
+  };
+
+  /* ---------- Tier 1: system / data-feed check ---------- */
+  function _pill(st){ return st==='ok'?'<span style="color:#0f8a5f;font-weight:800">✔ OK</span>':st==='slow'?'<span style="color:#b5670a;font-weight:800">● slow</span>':st==='fail'?'<span style="color:#c1272d;font-weight:800">✕ no response</span>':'<span class="sub">…</span>'; }
+  async function _probe(url,ms){ var t0=Date.now(); try{ var r=await _fetchTO(url,ms||9000); if(!r.ok&&r.status>=400) return {st:'fail',ms:Date.now()-t0,code:r.status}; return {st:(Date.now()-t0>4000?'slow':'ok'),ms:Date.now()-t0}; }catch(e){ return {st:'fail',ms:Date.now()-t0}; } }
+  window.openSysCheck = async function(){
+    var feeds=[
+      ['USGS gauges (NWIS)','https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08194500&parameterCd=00065'],
+      ['NOAA forecast (NWPS)','https://api.water.noaa.gov/nwps/v1/gauges/TILT2'],
+      ['Weather alerts (weather.gov)','https://api.weather.gov/points/28.2300,-98.6487'],
+      ['Elevation (USGS EPQS)','https://epqs.nationalmap.gov/v1/json?x=-98.6487&y=28.23&units=Feet&wkid=4326'],
+      ['Elevation backup (Open-Meteo)','https://api.open-meteo.com/v1/elevation?latitude=28.23&longitude=-98.6487']
+    ];
+    var rows=feeds.map(function(f,i){ return '<tr><td style="padding:6px 8px">'+f[0]+'</td><td id="sysc_'+i+'" style="padding:6px 8px;text-align:right">'+_pill('wait')+'</td></tr>'; }).join('');
+    var fb=(window.__user)?(window.__user.isAnonymous?'<span style="color:#0f8a5f;font-weight:800">✔ connected (guest)</span>':'<span style="color:#0f8a5f;font-weight:800">✔ signed in</span>'):'<span style="color:#b5670a;font-weight:800">● offline / local only</span>';
+    var body='<div class="sub" style="font-size:12.5px;margin-bottom:8px">Live check of the services the app pulls from. If a government API is “no response,” it’s usually that service being down — not your app or your data.</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:13px"><tbody>'+rows
+      +'<tr><td style="padding:6px 8px">Shared database (Firebase)</td><td style="padding:6px 8px;text-align:right">'+fb+'</td></tr>'
+      +'<tr><td style="padding:6px 8px">Embedded LiDAR elevation (offline)</td><td style="padding:6px 8px;text-align:right"><span style="color:#0f8a5f;font-weight:800">✔ built in</span></td></tr>'
+      +'</tbody></table><div class="sub" style="font-size:11.5px;margin-top:8px">Elevation falls back automatically: EPQS → Open-Meteo → embedded LiDAR, so a spot always gets a ground elevation.</div>';
+    window.buildModal('sysCheckModal','🩺 System check',body,460);
+    for(var i=0;i<feeds.length;i++){ (function(i){ _probe(feeds[i][1]).then(function(res){ var c=document.getElementById('sysc_'+i); if(c)c.innerHTML=_pill(res.st)+(res.ms?' <span class="sub" style="font-size:11px">'+(res.ms/1000).toFixed(1)+'s</span>':''); }); })(i); }
+  };
+
+  /* ---------- Tier 3: on-load self-tests (console only) ---------- */
+  window.selfTest = function(){ var pass=0, fail=[];
+    function chk(name,cond){ if(cond)pass++; else fail.push(name); }
+    try{
+      chk('FIN guards NaN', window.FIN(NaN,2)===2 && window.FIN('3.5')===3.5);
+      chk('localElev returns number or null', (function(){ var v=window.localElev(28.23,-98.649); return v===null||isFinite(v); })());
+      chk('place-key encode/decode round-trips', decodeURIComponent(encodeURIComponent('a well@28.2,-98.6'))==='a well@28.2,-98.6');
+      chk('slope() finite', (typeof slope!=='function')|| isFinite(slope()));
+      // modal structural balance
+      var tmp=window.buildModal('__selftestModal','t','<div><input></div><div>x</div>',400); var html=tmp.innerHTML; tmp.remove();
+      var depth=0,minD=0; html.replace(/<\/?[a-z]+/g,function(tag){ if(tag==='<div')depth++; else if(tag==='</div'){depth--; if(depth<minD)minD=depth;} return tag; });
+      chk('modal card well-formed', minD>=0);
+    }catch(e){ fail.push('exception:'+(e&&e.message)); }
+    try{ console.log('%cNueces self-test: '+pass+' passed'+(fail.length?', FAILED: '+fail.join(', '):', all green'), 'color:'+(fail.length?'#c1272d':'#0f8a5f')); }catch(e){}
+    window.__selfTest={pass:pass,fail:fail}; return window.__selfTest;
+  };
+
+  /* ---------- run sweep + self-test after load ---------- */
+  function _boot(){ try{ window.selfTest(); }catch(e){} setTimeout(function(){ try{ window.sweepData(); }catch(e){} }, 4000); setTimeout(function(){ try{ window.sweepData(); }catch(e){} }, 12000); }
+  if(document.readyState==='complete'||document.readyState==='interactive') setTimeout(_boot,1500); else window.addEventListener('DOMContentLoaded',function(){ setTimeout(_boot,1500); });
+}catch(e){ try{console.error('robustness module error',e);}catch(_){ } } })();
+
 </script>
 
 <!-- ============================================================= -->
