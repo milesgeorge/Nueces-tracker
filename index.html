@@ -251,6 +251,17 @@ body[data-tab="forecast"] .tab-forecast,
 body[data-tab="map"] .tab-map,
 body[data-tab="data"] .tab-data{ display:block; }
 
+
+/* ===== v184 map enhancements ===== */
+.mapFull{position:fixed !important;inset:0 !important;width:100vw !important;height:100dvh !important;max-height:none !important;min-height:0 !important;z-index:9998 !important;border-radius:0 !important;margin:0 !important}
+body.mapFullBody{overflow:hidden}
+.mapFsCtl a,.mapLayerCtl>a{font:700 17px/30px -apple-system,sans-serif !important;text-align:center;display:block;width:30px;height:30px;background:#fff;color:#12202e;text-decoration:none}
+.mapLayerCtl{position:relative}
+.mapLayerPanel{position:absolute;top:0;left:36px;width:216px;max-height:62vh;overflow:auto;background:#fff;border:1px solid var(--rule);border-radius:10px;box-shadow:0 12px 40px rgba(10,20,30,.28);padding:9px;flex-direction:column;gap:6px;z-index:1200}
+.mapLayerPanel .sm{width:100%;text-align:left}
+.mapLayerPanel select{width:100%;margin-top:2px}
+.mapLayerPanel .sub{font-size:11px}
+
 </style>
 </head>
 <body>
@@ -260,7 +271,7 @@ body[data-tab="data"] .tab-data{ display:block; }
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v183 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v184 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -2492,9 +2503,14 @@ function toggleMapSize(){
 }
 function initMap(){
   try{
-    MAP=L.map('map',{zoomControl:true});
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    MAP=L.map('map',{zoomControl:true, scrollWheelZoom:false});
+    var _bSat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       {maxZoom:22,maxNativeZoom:19,attribution:'Imagery © Esri'}).addTo(MAP);
+    try{
+      var _bTopo=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:22,maxNativeZoom:19,attribution:'Esri'});
+      var _bStreet=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'});
+      L.control.layers({'🛰 Satellite':_bSat,'🗺 Topographic':_bTopo,'🛣 Streets':_bStreet},null,{position:'topright',collapsed:true}).addTo(MAP);
+    }catch(_e){}
     MAP.on('click',e=>{ if(window.__moveTarget){ hubApplyMove(e.latlng.lat,e.latlng.lng); return; }
       if(window.__clickAdd){ mapAddAt(e.latlng.lat,e.latlng.lng); return; } // drop a new mark of chosen type
       openLoc();document.getElementById('mLat').value=e.latlng.lat.toFixed(6);
@@ -2924,6 +2940,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v184","2026-11-22","Map tab overhaul, part 1. (Viewing) The map no longer hijacks page scroll — zoom is now the +/− buttons or pinch, so you can scroll past it. Added a basemap switcher (🛰 Satellite / 🗺 Topographic / 🛣 Streets) top-right, and a one-tap ⬛ Fullscreen button. (Interactive) The layer toggles (flood extent, field logs, elevation, river-mile lines, contours, rain, add-mark) moved out of the buried accordion into an always-there ☰ Layers button on the map. (Workflow) The big places & marks table moved to the 🛠 Data tab, so the Map tab is just the map + playback. Part 2 next: marker clustering for the overlapping ranch pins and map↔list tap linking."],
   ["v183","2026-11-22","UX overhaul Phase 4 (final) — the official NOAA images are now a resizable quadrant gallery. They sit in a responsive grid (2-up on desktop, 1-up on a phone), and tapping any one opens it full-size in a lightbox with a link to the official water.noaa.gov page. Expanded from 3 images to 6: Tilden live hydrograph, Tilden stage-vs-flood-categories, Cotulla hydrograph, HEFS short-range probabilistic, and 10-day + 90-day exceedance charts. The reach profile (Phase 3.5) is likewise tap-to-enlarge. That completes the four-phase overhaul: Now hero + Simple/Expert, tabs, unified Add, and the image gallery, all on a consistent modern design system."],
   ["v182","2026-11-22","UX overhaul Phase 3 — one unified Add flow. The two separate buttons (‘Log a sighting’ + ‘Add a watch spot’) are now a single ‘＋ Add’ that opens one guided flow with explicit steps: ① What are you adding? (💧 current water · 🎯 high-water/crest · 📍 just a place to watch) → ② Where? (GPS · tap the map · type coordinates · pick an existing place) → ③ Details & save. New spots are created automatically. The map’s ‘＋ Add mark on map’ and the Quick Field Log feed into the same flow, so there’s one way to add things instead of four."],
   ["v181","2026-11-22","The 🚗 Access-crossing checkbox now shows in the edit panel for EVERY class — water sighting, high-water mark, or Place. (Your bridge point is logged as a high-water mark, which is why it was still hidden in v180.) Tick it and the access-cut / GET-OUT warning turns on. Tip: flag the lowest DRIVABLE approach point of the crossing, not the creek bed, so the computed cut-off stage reflects when you actually lose the road."],
@@ -3959,7 +3976,7 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
     _tag('nowHero','tsec tab-now'); _tag('sec1','tsec tab-now');
     _tag('sec3','tsec tab-forecast'); _tag('fuseCard','tsec tab-forecast'); _tag('wxCard','tsec tab-forecast');
     _tag('secmap','tsec tab-map');
-    _tag('sec6','tsec tab-data'); _tag('archiveCard','tsec tab-data'); _tag('sec7','tsec tab-data');
+    _tag('sec6','tsec tab-data'); _tag('archiveCard','tsec tab-data'); _tag('sec7','tsec tab-data'); _tag('hubCard','tsec tab-data');
     var hs=document.querySelectorAll('h2,h3');
     for(var i=0;i<hs.length;i++){ var t=(hs[i].textContent||'').trim(); var c=hs[i].closest ? hs[i].closest('.card') : null; if(!c)continue;
       if(/^1B(\b|\s|·)/.test(t)||/^2A(\b|\s|·)/.test(t)){ c.classList.add('tsec','tab-forecast'); } }
@@ -3985,6 +4002,42 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
   if(document.readyState==='loading') window.addEventListener('DOMContentLoaded', function(){ setTimeout(boot2,550); });
   else setTimeout(boot2,550);
 }catch(e){ try{console.error('phase2 error',e);}catch(_){ } } })();
+
+</script>
+
+<script>
+/* ===== v184 Map tab enhancements: fullscreen + on-map layer toolbar ===== */
+(function(){ try{
+  function whenMap(cb,n){ n=n||0; if(window.MAP&&window.MAP.getContainer&&window.L){ cb(); } else if(n<80){ setTimeout(function(){ whenMap(cb,n+1); },300); } }
+  whenMap(function(){
+    var MAP=window.MAP, L=window.L;
+    // Fullscreen toggle
+    window.toggleMapFull=function(){ var m=document.getElementById('map'); if(!m)return; var on=m.classList.toggle('mapFull'); document.body.classList.toggle('mapFullBody',on);
+      setTimeout(function(){ try{ MAP.invalidateSize(true); }catch(e){} },120);
+      var x=document.getElementById('mapFullExit');
+      if(on){ if(!x){ x=document.createElement('button'); x.id='mapFullExit'; x.textContent='✕ Exit fullscreen'; x.onclick=window.toggleMapFull; x.style.cssText='position:fixed;top:10px;right:10px;z-index:10000;background:#12202e;color:#fff;border:none;border-radius:999px;padding:9px 15px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4)'; document.body.appendChild(x); } x.style.display='block'; }
+      else if(x){ x.style.display='none'; } };
+    try{ var FsCtl=L.control({position:'topleft'});
+      FsCtl.onAdd=function(){ var d=L.DomUtil.create('div','leaflet-bar mapFsCtl'); var a=L.DomUtil.create('a','',d); a.href='#'; a.title='Fullscreen map'; a.innerHTML='⛶'; L.DomEvent.on(a,'click',function(e){ L.DomEvent.preventDefault(e); window.toggleMapFull(); }); L.DomEvent.disableClickPropagation(d); return d; };
+      FsCtl.addTo(MAP);
+    }catch(e){}
+    // On-map layer toolbar: relocate the existing toggle group into a control
+    try{
+      var grp=document.querySelector('.mapgrp-b');
+      if(grp){
+        var det=grp.closest('details');
+        var LCtl=L.control({position:'topleft'});
+        LCtl.onAdd=function(){ var d=L.DomUtil.create('div','leaflet-bar mapLayerCtl'); var a=L.DomUtil.create('a','',d); a.href='#'; a.title='Map layers'; a.innerHTML='☰'; var panel=L.DomUtil.create('div','mapLayerPanel',d); panel.id='layerCtlPanel'; panel.style.display='none';
+          L.DomEvent.on(a,'click',function(e){ L.DomEvent.preventDefault(e); panel.style.display=(panel.style.display==='none'?'flex':'none'); });
+          L.DomEvent.disableClickPropagation(d); if(L.DomEvent.disableScrollPropagation)L.DomEvent.disableScrollPropagation(d); return d; };
+        LCtl.addTo(MAP);
+        var panel=document.getElementById('layerCtlPanel');
+        if(panel){ panel.appendChild(grp); grp.style.display='contents'; }
+        if(det)det.style.display='none';
+      }
+    }catch(e){}
+  });
+}catch(e){ try{console.error('mapEnhance',e);}catch(_){ } } })();
 
 </script>
 
