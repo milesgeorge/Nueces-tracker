@@ -260,7 +260,7 @@ body[data-tab="data"] .tab-data{ display:block; }
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v182 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v183 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -493,7 +493,7 @@ body[data-tab="data"] .tab-data{ display:block; }
     </div>
     <div style="margin-top:12px">
       <b style="font-size:13px">🛰️ Satellite &amp; official maps <span class="sub" style="font-weight:400">— passive; no one in the field needed</span></b>
-      <div id="hgImgs" style="display:grid;grid-template-columns:1fr;gap:10px;margin-top:8px"></div>
+      <div id="hgImgs" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:8px"></div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px" id="satLinks"></div>
       <div class="sub" id="satNote" style="margin-top:8px"></div>
     </div>
@@ -1675,6 +1675,11 @@ function enlargeProfile(){
     +'<div style="min-width:840px;padding:4px">'+el.innerHTML+'</div></div>'
     +'<div class="sub" style="font-size:12px;margin-top:8px">Side-view water-surface profile from Uvalde down to Three Rivers. On a phone, turn it landscape or scroll sideways to read the whole reach.</div>';
   if(window.buildModal) window.buildModal('profZoomModal','📐 Reach profile — full size', body, 940);
+}
+function enlargeImg(url,title,page){
+  var body='<img src="'+url+'" style="width:100%;border-radius:8px;background:#fff;display:block">'
+    +'<div style="margin-top:10px;text-align:center"><a href="'+page+'" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;background:#1a6f8b;color:#fff;padding:8px 15px;border-radius:999px;font-weight:800;font-size:13px">Open on water.noaa.gov ↗</a></div>';
+  if(window.buildModal) window.buildModal('imgZoomModal', title||'Forecast image', body, 920);
 }
 function drawProfile(crest){
   const W=880,H=452,padT=60,plotBot=300,ML=66,MR=66;
@@ -2919,6 +2924,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v183","2026-11-22","UX overhaul Phase 4 (final) — the official NOAA images are now a resizable quadrant gallery. They sit in a responsive grid (2-up on desktop, 1-up on a phone), and tapping any one opens it full-size in a lightbox with a link to the official water.noaa.gov page. Expanded from 3 images to 6: Tilden live hydrograph, Tilden stage-vs-flood-categories, Cotulla hydrograph, HEFS short-range probabilistic, and 10-day + 90-day exceedance charts. The reach profile (Phase 3.5) is likewise tap-to-enlarge. That completes the four-phase overhaul: Now hero + Simple/Expert, tabs, unified Add, and the image gallery, all on a consistent modern design system."],
   ["v182","2026-11-22","UX overhaul Phase 3 — one unified Add flow. The two separate buttons (‘Log a sighting’ + ‘Add a watch spot’) are now a single ‘＋ Add’ that opens one guided flow with explicit steps: ① What are you adding? (💧 current water · 🎯 high-water/crest · 📍 just a place to watch) → ② Where? (GPS · tap the map · type coordinates · pick an existing place) → ③ Details & save. New spots are created automatically. The map’s ‘＋ Add mark on map’ and the Quick Field Log feed into the same flow, so there’s one way to add things instead of four."],
   ["v181","2026-11-22","The 🚗 Access-crossing checkbox now shows in the edit panel for EVERY class — water sighting, high-water mark, or Place. (Your bridge point is logged as a high-water mark, which is why it was still hidden in v180.) Tick it and the access-cut / GET-OUT warning turns on. Tip: flag the lowest DRIVABLE approach point of the crossing, not the creek bed, so the computed cut-off stage reflects when you actually lose the road."],
   ["v180","2026-11-22","Fixed: the 🚗 Access-crossing checkbox was hidden unless the spot was a pure Place, but most of your crossings are logged with water/marks, so it never appeared. It now shows in the edit panel for Places AND water sightings, and the flag + the access-cut computation work across all record types (location, water log, or crest mark). So: open your access crossing’s ✏️ pencil, tick 🚗 Access crossing, and the GET-OUT / access-cut stage turns on."],
@@ -3079,12 +3085,15 @@ function buildSatPanel(){
   const imgs=document.getElementById('hgImgs'); if(imgs){
     const cards=[
       ['Tilden — live hydrograph','https://water.noaa.gov/resources/hydrographs/tilt2_hg.png','https://water.noaa.gov/gauges/TILT2'],
+      ['Tilden — stage vs flood categories','https://water.noaa.gov/resources/hydrographs/tilt2_record.png','https://water.noaa.gov/gauges/TILT2'],
       ['Cotulla — live hydrograph (upstream)','https://water.noaa.gov/resources/hydrographs/cott2_hg.png','https://water.noaa.gov/gauges/COTT2'],
-      ['Tilden — probabilistic (HEFS) short-range','https://water.noaa.gov/resources/probabilistic/short_term/TILT2.shortrange.hefs.png','https://water.noaa.gov/gauges/TILT2']
+      ['Tilden — HEFS short-range (probabilistic)','https://water.noaa.gov/resources/probabilistic/short_term/TILT2.shortrange.hefs.png','https://water.noaa.gov/gauges/TILT2'],
+      ['Tilden — 10-day exceedance (stage)','https://water.noaa.gov/resources/probabilistic/exceedance/TILT2.SSTG.prob.weekint.gif','https://water.noaa.gov/gauges/TILT2'],
+      ['Tilden — 90-day exceedance (stage)','https://water.noaa.gov/resources/probabilistic/exceedance/TILT2.SSTG.exceed.90day.gif','https://water.noaa.gov/gauges/TILT2']
     ];
-    imgs.innerHTML=cards.map(c=>`<a href="${c[2]}" target="_blank" rel="noopener" style="text-decoration:none">
-      <div style="font-size:12px;color:var(--mut);font-weight:600;margin-bottom:2px">${c[0]}</div>
-      <img src="${c[1]}" loading="lazy" style="width:100%;border:1px solid var(--rule);border-radius:8px;background:#fff" onerror="this.parentNode.style.display='none'"></a>`).join('');
+    imgs.innerHTML=cards.map(c=>`<figure style="margin:0;cursor:zoom-in" onclick="enlargeImg('${c[1]}','${c[0].replace(/'/g,'')}','${c[2]}')">
+      <figcaption style="font-size:12px;color:var(--mut);font-weight:700;margin-bottom:3px">${c[0]} <span style="color:var(--accent)">⤢</span></figcaption>
+      <img src="${c[1]}" loading="lazy" style="width:100%;border:1px solid var(--rule);border-radius:8px;background:#fff;display:block" onerror="var f=this.closest('figure'); if(f)f.style.display='none'"></figure>`).join('');
   }
   const links=document.getElementById('satLinks'); if(links){
     const L=[
