@@ -273,6 +273,10 @@ details.howto>summary::-webkit-details-marker{display:none}
 details.howto>*:not(summary){margin:4px 0 9px}
 .ldots{font-size:11.5px;color:var(--mut);text-align:center;padding:4px 0;font-style:italic}
 
+
+/* ===== v192 Data tab filter chips ===== */
+.hubFchip{background:#fff;border:1px solid var(--rule);color:var(--mut);font-weight:700}
+.hubFchip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -282,7 +286,7 @@ details.howto>*:not(summary){margin:4px 0 9px}
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v191 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v192 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -641,6 +645,24 @@ details.howto>*:not(summary){margin:4px 0 9px}
       <button class="add sm" onclick="openHubLogger()" style="font-weight:800;padding:8px 18px;font-size:14px">＋ Add</button>
     </div>
     <div class="sub" style="margin:-2px 2px 8px;line-height:1.45"><b>＋ Add</b> walks you through it: pick <b>what</b> — 💧 current water, 🎯 a high-water/crest line, or 📍 just a place to watch — then <b>where</b> (GPS, tap the map, or type coordinates), then save. New spots are created automatically.</div>
+    <div class="hubControls" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 2px 10px">
+      <label style="font-size:12px;color:var(--mut);font-weight:700">Sort</label>
+      <select id="hubSort" onchange="setHubSort(this.value)" style="font-size:12.5px;padding:6px 8px;border:1px solid var(--rule);border-radius:8px">
+        <option value="elev">Lowest ground first</option>
+        <option value="risk">Closest to flooding</option>
+        <option value="rm">River-mile</option>
+        <option value="name">Name A–Z</option>
+        <option value="logged">Recently logged</option>
+      </select>
+      <button class="sm" onclick="openMarkDoctor()" style="background:#fff4e6;color:#a2560a;border:1px solid #f0cf9c;margin-left:auto">🩺 Check my marks</button>
+      <span style="flex-basis:100%;height:0"></span>
+      <button class="sm hubFchip on" data-f="all" onclick="setHubFilter('all')">All</button>
+      <button class="sm hubFchip" data-f="anchor" onclick="setHubFilter('anchor')">⚓ Crest anchors</button>
+      <button class="sm hubFchip" data-f="water" onclick="setHubFilter('water')">💧 Water logs</button>
+      <button class="sm hubFchip" data-f="place" onclick="setHubFilter('place')">📍 Watch spots</button>
+      <button class="sm hubFchip" data-f="access" onclick="setHubFilter('access')">🚗 Access</button>
+      <button class="sm hubFchip" data-f="attention" onclick="setHubFilter('attention')">⚠ Needs attention</button>
+    </div>
     <div style="margin:2px 2px 10px"><a href="log.html" style="display:inline-flex;align-items:center;gap:7px;background:#1a6f8b;color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:9px 14px;border-radius:10px">📱 On a phone in the field? Open the Quick Field Log →</a></div>
     <div class="mapgrp" style="margin:4px 0 10px">
       <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
@@ -1908,6 +1930,9 @@ async function hubAddElev(encName){
   saveLocs(ls);
   if(window.render)render();
 }
+let HUB_SORT='elev', HUB_FILTER='all';
+function setHubSort(v){ HUB_SORT=v; if(window.renderHub)renderHub(); }
+function setHubFilter(v){ HUB_FILTER=v; var cs=document.querySelectorAll('.hubFchip'); for(var i=0;i<cs.length;i++){ cs[i].classList.toggle('on', cs[i].getAttribute('data-f')===v); } if(window.renderHub)renderHub(); }
 function renderHub(){
   var body=document.querySelector('#hubTable tbody'); if(!body)return;
   var crest=parseFloat((document.getElementById('crest')||{}).value); if(isNaN(crest))crest=0;
@@ -1916,8 +1941,30 @@ function renderHub(){
   function dtag(d){ var flooded=d>0, mag=Math.abs(d); if(mag<=0.5) return '<span class="dpill dp-amber">'+mag.toFixed(1)+'′ '+(flooded?'under':'dry')+'</span>'; if(flooded) return '<span class="dpill dp-red">'+mag.toFixed(1)+'′ under</span>'; return '<span class="dpill dp-green">'+mag.toFixed(1)+'′ dry</span>'; }
   function fmt(t){ try{ return new Date(t).toLocaleDateString(undefined,{month:'short',day:'numeric'}); }catch(e){ return ''; } }
   function he(x){ return String(x==null?'':x).replace(/[<>&]/g,function(c){return ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c];}); }
-  var places=hubPlaces().filter(function(p){return !q||(p.name||'').toLowerCase().indexOf(q)>=0;});
-  places.sort(function(a,b){ var ea=(a.elev==null?1e9:a.elev), eb=(b.elev==null?1e9:b.elev); if(ea!==eb)return ea-eb; return (a.name||'').localeCompare(b.name||''); });
+  var _accSet=[]; try{ _accSet=accessCrossings(); }catch(e){}
+  function _pAccess(p){ if(p.lat==null)return false; for(var i=0;i<_accSet.length;i++){ if(typeof _samePlace==='function'&&_samePlace(_accSet[i].lat,_accSet[i].lon,p.lat,p.lon))return true; } return false; }
+  function _pWater(p){ return (p.reports||[]).some(function(r){return (r.kind||'water')!=='highwater';}); }
+  function _prm(p){ var r=1e9; try{ if(p.lat!=null){ r=riverMi(p); if(!isFinite(r))r=1e9; } }catch(e){} return r; }
+  function _pAttention(p){ return (p.elev==null||!isFinite(p.elev)) || _prm(p)>=1e9; }
+  var places=hubPlaces().filter(function(p){
+    if(q && (p.name||'').toLowerCase().indexOf(q)<0) return false;
+    switch(HUB_FILTER){
+      case 'anchor': return (p.anchors||[]).length>0;
+      case 'water': return _pWater(p);
+      case 'place': return p.locId && !(p.reports||[]).length && !(p.anchors||[]).length;
+      case 'access': return _pAccess(p);
+      case 'attention': return _pAttention(p);
+      default: return true;
+    }
+  });
+  var _crestWse=TIL_ZERO+crest+offsetAt(RANCH_RM);
+  places.sort(function(a,b){
+    if(HUB_SORT==='name') return (a.name||'').localeCompare(b.name||'');
+    if(HUB_SORT==='rm') return _prm(a)-_prm(b);
+    if(HUB_SORT==='risk'){ var ma=(a.elev==null?1e9:a.elev)-_crestWse, mb=(b.elev==null?1e9:b.elev)-_crestWse; return ma-mb; }
+    if(HUB_SORT==='logged') return (b.epoch||0)-(a.epoch||0);
+    var ea=(a.elev==null?1e9:a.elev), eb=(b.elev==null?1e9:b.elev); if(ea!==eb)return ea-eb; return (a.name||'').localeCompare(b.name||'');
+  });
   body.innerHTML='';
   var __drawn=0, __err='';
   places.forEach(function(p){
@@ -2964,6 +3011,7 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v192","2026-11-23","Data tab places table upgraded. Added a Sort menu (lowest ground first · closest to flooding · river-mile · name · recently logged) and quick filter chips (All · ⚓ crest anchors · 💧 water logs · 📍 watch spots · 🚗 access · ⚠ needs attention) above the list, plus a 🩺 Check my marks button right there. The dense ‘what the badges mean’ intro is tucked behind an ⓘ toggle like the Forecast tab."],
   ["v191","2026-11-23","Forecast tab decluttered. (1) The ‘what floods at this crest’ ladder now shows just the ~14 crossings straddling the forecast waterline (the ones about to flood or clear), with a ‘Show all N points’ button to expand; the full list still lives in the Data tab. (2) The long explanatory paragraphs (how to read the profile, the crest-slider/NOAA note, the mechanism and the three-reads blurbs) are tucked behind small ‘ⓘ’ toggles, so the controls and numbers are front-and-center with the detail one tap away."],
   ["v190","2026-11-23","Forecast tab now leads with the answer: ‘2 · Forecast & alert’ (projected crest, the GET-OUT/access warning, and the what-floods-at-this-crest list) moved ABOVE the reach-profile chart, so you see what the flood does before the supporting diagram. (First of a few Forecast-tab tidy-ups.)"],
   ["v189","2026-11-23","Clusters persist a bit more — raised the disband zoom to 21, so the ranch pins stay grouped until you’re zoomed in very close; tap a cluster (or the 🔵 toggle) to open it sooner."],
@@ -4107,6 +4155,7 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
     _tuck('when NOAA has an official crest forecast','ⓘ About the crest slider & NOAA auto-fill');
     _tuck('Depth math is identical','ⓘ How the mechanism works');
     _tuck('Three independent reads','ⓘ About these three reads');
+    _tuck('Depth pills:','ⓘ What the badges & columns mean');
   }
   if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',function(){ setTimeout(tuckAll,850); }); else setTimeout(tuckAll,850);
 }catch(e){} })();
