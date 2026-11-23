@@ -265,6 +265,14 @@ body.mapFullBody{overflow:hidden}
 .mapLayerPanel select{width:100%;margin-top:2px}
 .mapLayerPanel .sub{font-size:11px}
 
+
+/* ===== v191 collapsible explainer ===== */
+details.howto{margin:6px 0;border:1px solid #e6ebf1;border-radius:9px;background:#f8fafc;padding:0 10px}
+details.howto>summary{cursor:pointer;color:var(--accent);font-weight:700;font-size:12.5px;padding:7px 0;list-style:none}
+details.howto>summary::-webkit-details-marker{display:none}
+details.howto>*:not(summary){margin:4px 0 9px}
+.ldots{font-size:11.5px;color:var(--mut);text-align:center;padding:4px 0;font-style:italic}
+
 </style>
 </head>
 <body>
@@ -274,7 +282,7 @@ body.mapFullBody{overflow:hidden}
     <div>
       <h1>Nueces Reach Model — Miles Ranch</h1>
       <div class="tracksites">Uvalde → Asherton → Cotulla → <b>Ranch</b> → Tilden → Three Rivers</div>
-      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v189 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
+      <div style="font-size:11px;color:#8aa0b4;margin-top:2px">build 2026-07-29 · v191 <button onclick="openBuildLog()" title="Version / build log" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">🗒 log</button><button onclick="openSysCheck()" title="Live check of every data feed the app uses (gauges, forecast, elevation, database)" style="background:rgba(255,255,255,.12);color:#cfe0ee;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:1px 7px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle">📡 system check</button></div>
       <p class="tagline">Turns the live NOAA river gauges into a flood forecast — water depth and timing — at any point on the ranch, in the ungauged reach between Cotulla and Tilden.</p>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
@@ -1622,31 +1630,32 @@ function renderScen(){const el=document.getElementById('scenList');const a=scens
 
 /* ---- HTML row ladder: each location one aligned row; water line sits between
         the last-dry and first-wet rows with a centered label. Scales & scrolls. ---- */
+let LADDER_ALL=false;
+function toggleLadderAll(){ LADDER_ALL=!LADDER_ALL; var c=document.getElementById('crest'); var crest=c?parseFloat(c.value):NaN; if(isFinite(crest))drawLadder(crest); }
 function drawLadder(crest){
   const L=locs().slice().sort((a,b)=>b.elev-a.elev);   // highest at top
   const wseR=TIL_ZERO+crest+offsetAt(RANCH_RM);
-  let html='';
-  let lineDrawn=false;
-  L.forEach((l,i)=>{
-    const d=wseR-l.elev, under=d>0, c=under?'#c1272d':'#0f8a5f';
-    // draw the water line just above the first underwater row
-    if(under && !lineDrawn){
-      html+=`<div class="wline" id="wlineEl"><span class="wlab">💧 water surface ${wseR.toFixed(1)} ft</span></div>`;
-      lineDrawn=true;
-    }
+  let wi=L.findIndex(l=>(wseR-l.elev)>0); if(wi<0)wi=L.length;   // first underwater row = waterline
+  const K=7; let start=0, end=L.length;
+  if(!LADDER_ALL && L.length>(2*K+2)){ start=Math.max(0, wi-K); end=Math.min(L.length, wi+K); }
+  let html='', lineDrawn=false;
+  if(start>0) html+=`<div class="ldots">\u2026 ${start} drier point${start>1?'s':''} above (dry)</div>`;
+  for(let i=start;i<end;i++){ const l=L[i]; const d=wseR-l.elev, under=d>0, c=under?'#c1272d':'#0f8a5f';
+    if(under && !lineDrawn){ html+=`<div class="wline" id="wlineEl"><span class="wlab">\ud83d\udca7 water surface ${wseR.toFixed(1)} ft</span></div>`; lineDrawn=true; }
     html+=`<div class="lrow${under?' wet':''}">`+
       `<span class="ldot" style="background:${c}"></span>`+
       `<span class="lname">${l.name}</span>`+
       `<span class="lelev">${l.elev.toFixed(1)} ft</span>`+
       `<span class="ltag" style="background:${c}">${under?d.toFixed(1)+' ft under':(-d).toFixed(1)+' ft dry'}</span>`+
       `</div>`;
-  });
-  if(!lineDrawn){ // water below everything
-    html+=`<div class="wline" id="wlineEl"><span class="wlab">💧 water surface ${wseR.toFixed(1)} ft — below all points</span></div>`;
   }
+  if(!lineDrawn){ html+=`<div class="wline" id="wlineEl"><span class="wlab">\ud83d\udca7 water surface ${wseR.toFixed(1)} ft${wi>=L.length?' \u2014 below all points':''}</span></div>`; }
+  if(end<L.length) html+=`<div class="ldots">\u2026 ${L.length-end} flooded point${(L.length-end)>1?'s':''} below (under water)</div>`;
+  const canTrim=(L.length>(2*K+2));
+  const toggle=canTrim?`<button class="sm" onclick="toggleLadderAll()" style="margin-top:7px;width:100%">${LADDER_ALL?'\u25b4 Show just the waterline':'\u25be Show all '+L.length+' points'}</button>`:'';
   document.getElementById('ladderBox').innerHTML=
-    `<div class="ladderHdr">Highest at top — rows above the blue line stay dry (green), below it flood (red). <b>↕ Scroll the list</b> to see every point.</div>`+
-    `<div class="ladderWrap" id="ladderWrap">${html}</div>`;
+    `<div class="ladderHdr">${LADDER_ALL?'Every point, highest at top':'The crossings nearest the forecast waterline'} \u2014 above the blue line stay dry (green), below it flood (red).</div>`+
+    `<div class="ladderWrap" id="ladderWrap">${html}</div>`+toggle;
   requestAnimationFrame(function(){ var _lw=document.getElementById('ladderWrap'), _wl=document.getElementById('wlineEl'); if(_lw&&_wl){ _lw.scrollTop=Math.max(0, _wl.offsetTop - _lw.clientHeight/2 + _wl.offsetHeight/2); } });
 }
 
@@ -2955,6 +2964,8 @@ function closeAlert(){document.getElementById('alertModal').style.display='none'
 
 /* ---- version / build log ---- */
 const BUILD_LOG=[
+  ["v191","2026-11-23","Forecast tab decluttered. (1) The ‘what floods at this crest’ ladder now shows just the ~14 crossings straddling the forecast waterline (the ones about to flood or clear), with a ‘Show all N points’ button to expand; the full list still lives in the Data tab. (2) The long explanatory paragraphs (how to read the profile, the crest-slider/NOAA note, the mechanism and the three-reads blurbs) are tucked behind small ‘ⓘ’ toggles, so the controls and numbers are front-and-center with the detail one tap away."],
+  ["v190","2026-11-23","Forecast tab now leads with the answer: ‘2 · Forecast & alert’ (projected crest, the GET-OUT/access warning, and the what-floods-at-this-crest list) moved ABOVE the reach-profile chart, so you see what the flood does before the supporting diagram. (First of a few Forecast-tab tidy-ups.)"],
   ["v189","2026-11-23","Clusters persist a bit more — raised the disband zoom to 21, so the ranch pins stay grouped until you’re zoomed in very close; tap a cluster (or the 🔵 toggle) to open it sooner."],
   ["v188","2026-11-23","Cluster controls. Clusters now hold together to a closer zoom (disband at zoom 20 instead of 18), so the ranch pins stay grouped as you zoom in rather than scattering early. Added a ‘🔵 Cluster pins’ toggle in the ☰ Layers panel to turn clustering on/off entirely — off shows every pin individually; your choice is remembered. Tapping a cluster still spiderfies it open at any zoom."],
   ["v187","2026-11-22","Map overhaul part 2. (Declutter) The pins that pile up at the ranch (places, water logs, and the red crest-anchor diamonds) now CLUSTER — a numbered circle at low zoom that splits apart as you zoom in or tap it, so the rm-11.8 clump is finally readable. (Linking) A map pin’s popup has a ‘📋 Show in list’ button that jumps to the Data tab and filters the places list to that spot; and every row in the places list has a 📍 button that jumps to the Map tab and centers on that pin. If the cluster plugin ever fails to load, pins fall back to plain markers automatically."],
@@ -4059,6 +4070,46 @@ if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',b
     try{ var cb=document.getElementById('clusterBtn'); if(cb)cb.style.filter=(typeof CLUSTER_ON!=='undefined'&&!CLUSTER_ON)?'grayscale(1) opacity(.55)':'none'; }catch(e){}
   });
 }catch(e){ try{console.error('mapEnhance',e);}catch(_){ } } })();
+
+</script>
+
+<script>
+/* ===== v190 Forecast tab: lead with the forecast answer (Section 2 before the reach profile) ===== */
+(function(){ try{
+  function reorder(){ try{
+    var hs=document.querySelectorAll('h2,h3'), card1b=null;
+    for(var i=0;i<hs.length;i++){ var t=(hs[i].textContent||'').trim(); if(/^1B(\b|\s|·)/.test(t)){ card1b=(hs[i].closest?hs[i].closest('.card'):null); break; } }
+    var sec3=document.getElementById('sec3');
+    if(card1b&&sec3&&card1b.parentNode&&sec3!==card1b){ card1b.parentNode.insertBefore(sec3, card1b); }
+  }catch(e){} }
+  if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',function(){ setTimeout(reorder,750); }); else setTimeout(reorder,750);
+}catch(e){} })();
+
+</script>
+
+<script>
+/* ===== v191 Forecast tab: tuck long explainer text behind "ⓘ" toggles ===== */
+(function(){ try{
+  function _tuck(marker,label){
+    var els=document.querySelectorAll('p, div');
+    for(var i=0;i<els.length;i++){ var p=els[i]; if(p._tucked)continue; var tc=p.textContent||'';
+      if(tc.indexOf(marker)<0) continue; if(tc.length<150||tc.length>1400) continue;
+      var childHas=false; for(var c=0;c<p.children.length;c++){ if((p.children[c].textContent||'').indexOf(marker)>=0){ childHas=true; break; } }
+      if(childHas) continue;
+      try{ var det=document.createElement('details'); det.className='howto';
+        var sum=document.createElement('summary'); sum.textContent=label; det.appendChild(sum);
+        p.parentNode.insertBefore(det,p); det.appendChild(p); p._tucked=true; }catch(e){}
+      return true;
+    } return false;
+  }
+  function tuckAll(){
+    _tuck('the forecast crest surface','ⓘ How to read this profile');
+    _tuck('when NOAA has an official crest forecast','ⓘ About the crest slider & NOAA auto-fill');
+    _tuck('Depth math is identical','ⓘ How the mechanism works');
+    _tuck('Three independent reads','ⓘ About these three reads');
+  }
+  if(document.readyState==='loading') window.addEventListener('DOMContentLoaded',function(){ setTimeout(tuckAll,850); }); else setTimeout(tuckAll,850);
+}catch(e){} })();
 
 </script>
 
